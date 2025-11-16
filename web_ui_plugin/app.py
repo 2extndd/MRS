@@ -330,6 +330,7 @@ def api_force_scan():
     """Force scan all queries manually"""
     try:
         logger.info("🔍 Force scan triggered via API")
+        db.add_log_entry('INFO', 'Manual scan triggered from web UI', 'api')
 
         # Import and run scanner
         from core import MercariSearcher
@@ -337,14 +338,20 @@ def api_force_scan():
         results = searcher.search_all_queries()
 
         logger.info(f"✅ Force scan completed: {results}")
+        db.add_log_entry('INFO',
+            f"Manual scan completed: {results.get('new_items', 0)} new items found",
+            'api',
+            f"Total: {results.get('total_items_found', 0)}, Searches: {results.get('successful_searches', 0)}")
 
         return jsonify({
             'success': True,
             'new_items': results.get('new_items', 0),
+            'total_items': results.get('total_items_found', 0),
             'message': f'Scan completed! Found {results.get("new_items", 0)} new items.'
         })
     except Exception as e:
         logger.error(f"❌ Error in force scan: {e}")
+        db.add_log_entry('ERROR', f'Manual scan failed: {str(e)}', 'api')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
