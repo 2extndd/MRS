@@ -1,103 +1,60 @@
-# Railway Manual Setup Guide
+# Railway Manual Setup - MercariSearcher
 
-Since Railway CLI requires interactive login, follow these steps via Railway Dashboard.
+## ⚠️ API Token Limitations
 
----
-
-## STEP 1: Open Railway Dashboard
-
-Go to: **https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d**
+Предоставленный Railway API токен имеет права только на чтение проектов, но не на создание сервисов.
+Необходима **ручная настройка через веб-интерфейс Railway Dashboard**.
 
 ---
 
-## STEP 2: Connect GitHub Repository
+## 🚀 Быстрая Настройка (5 минут)
 
-### If not already connected:
+### Шаг 1: Откройте Railway Dashboard
 
-1. Click **"+ New"** in Railway Dashboard
-2. Select **"GitHub Repo"**
-3. Choose **"2extndd/MRS"**
-4. Branch: **main**
-5. Click **"Deploy"**
-
-### If already connected but not deploying:
-
-1. Go to existing service
-2. Click **"Settings"**
-3. **"Source"** tab
-4. Verify connected to: `2extndd/MRS` on branch `main`
-5. Click **"Redeploy"**
+**URL**: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
 
 ---
 
-## STEP 3: Check Current Deployment Status
+### Шаг 2: Добавьте PostgreSQL
 
-### Look for these files in Railway build logs:
-
-Railway should detect:
-- ✓ `nixpacks.toml` → Uses nixpacks builder with Python 3.11
-- ✓ `railway.toml` → Build and deploy configuration
-- ✓ `runtime.txt` → Python version
-- ✓ `requirements.txt` → Dependencies
-
-### Expected Build Process:
-
-```
-Building...
-├─ Detected nixpacks.toml
-├─ Using nixpkgs: python311, postgresql
-├─ Installing dependencies from requirements.txt
-├─ Starting with: gunicorn --bind 0.0.0.0:$PORT wsgi:application
-└─ ✓ Deployment successful
-```
-
-### If you see mise error:
-
-```
-ERROR: no precompiled python found for core:python@3.11.0
-```
-
-**Solution:** Clear build cache:
-1. Service → **Settings**
-2. Scroll to **Danger Zone**
-3. Click **"Clear Build Cache"**
-4. Click **"Redeploy"**
+1. Нажмите **"+ New"**
+2. Выберите **"Database"**
+3. Выберите **"PostgreSQL"**
+4. Подождите 30 секунд
+5. ✓ Готово!
 
 ---
 
-## STEP 4: Add PostgreSQL Database
+### Шаг 3: Подключите GitHub Репозиторий (первый сервис)
 
-1. In Railway Dashboard, click **"+ New"**
-2. Select **"Database"**
-3. Choose **"PostgreSQL"**
-4. Wait for provisioning (1-2 minutes)
+1. Нажмите **"+ New"**
+2. Выберите **"GitHub Repo"**
+3. Найдите и выберите: **`2extndd/MRS`**
+4. Branch: **`main`**
+5. Нажмите **"Add Service"**
 
-**Railway will automatically:**
-- Create PostgreSQL instance
-- Set `DATABASE_URL` environment variable
-- Connect to your services
+Это создаст первый сервис. Нам нужно **ДВА** сервиса (web и worker).
 
 ---
 
-## STEP 5: Add Environment Variables
+### Шаг 4: Настройте ПЕРВЫЙ Сервис (WEB)
 
-1. Click **"Variables"** tab (in your service or shared variables)
-2. Add the following variables:
-
-### Required Variables:
+1. Кликните на созданный сервис
+2. Нажмите **"Settings"**
+3. Измените имя на: **`web`**
+4. Прокрутите до **"Deploy"** секции
+5. **Start Command**:
+   ```bash
+   gunicorn --bind 0.0.0.0:$PORT --timeout 30 --log-level info wsgi:application
+   ```
+6. Нажмите **"Networking"** вкладку
+7. Нажмите **"Generate Domain"** (включает публичный доступ)
+8. Перейдите в **"Variables"** вкладку
+9. Добавьте следующие переменные (нажимайте "+ New Variable" для каждой):
 
 ```bash
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
-```
-
-**How to get these:**
-- **Bot Token**: Message @BotFather on Telegram → `/newbot`
-- **Chat ID**: Message @userinfobot → `/start` → Copy ID
-
-### Optional Variables (recommended):
-
-```bash
+TELEGRAM_BOT_TOKEN=8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw
+TELEGRAM_CHAT_ID=-4997297083
 DISPLAY_CURRENCY=USD
 USD_CONVERSION_RATE=0.0067
 SEARCH_INTERVAL=300
@@ -107,330 +64,214 @@ REQUEST_DELAY_MAX=3.5
 LOG_LEVEL=INFO
 ```
 
-### Auto-set by Railway:
+10. Нажмите **"Deploy"** или он автоматически задеплоится
+
+---
+
+### Шаг 5: Создайте ВТОРОЙ Сервис (WORKER)
+
+1. Вернитесь в основной вид проекта
+2. Нажмите **"+ New"** снова
+3. Выберите **"Empty Service"**
+4. Назовите его: **`worker`**
+5. Нажмите **"Settings"** → **"Source"**
+6. Нажмите **"Connect Repo"**
+7. Выберите: **`2extndd/MRS`**
+8. Branch: **`main`**
+9. Прокрутите до **"Deploy"** секции
+10. **Start Command**:
+    ```bash
+    python mercari_notifications.py worker
+    ```
+11. Перейдите в **"Variables"** вкладку
+12. Добавьте **ТЕ ЖЕ** переменные, что и в Шаге 4:
 
 ```bash
-DATABASE_URL=postgresql://...  (set by PostgreSQL service)
-PORT=3000  (or assigned port)
+TELEGRAM_BOT_TOKEN=8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw
+TELEGRAM_CHAT_ID=-4997297083
+DISPLAY_CURRENCY=USD
+USD_CONVERSION_RATE=0.0067
+SEARCH_INTERVAL=300
+MAX_ITEMS_PER_SEARCH=50
+REQUEST_DELAY_MIN=1.5
+REQUEST_DELAY_MAX=3.5
+LOG_LEVEL=INFO
 ```
+
+13. Нажмите **"Deploy"**
 
 ---
 
-## STEP 6: Create Two Services
+### Шаг 6: Проверьте Развертывание
 
-Railway needs **TWO separate services** for this project:
+#### Проверьте WEB сервис:
 
-### Service 1: WEB (Flask Dashboard)
+1. Перейдите в **web** сервис
+2. Нажмите **"Deployments"**
+3. Подождите зеленую галочку ✓ (1-2 минуты)
+4. Нажмите **"View Logs"**
+5. Должны увидеть:
+   ```
+   [INFO] Starting gunicorn 21.2.0
+   [INFO] Listening at: http://0.0.0.0:3000
+   ```
+6. Перейдите в **"Settings"** → **"Networking"**
+7. Скопируйте публичный домен (например, `web-production.up.railway.app`)
+8. Откройте в браузере → Должны увидеть MercariSearcher Dashboard ✓
 
-**Purpose:** Web UI for managing searches and viewing items
+#### Проверьте WORKER сервис:
 
-**Configuration:**
-1. Click **"+ New"** → **"Empty Service"**
-2. Name: `web`
-3. **Settings** → **Source**:
-   - Connect to: `2extndd/MRS`
-   - Branch: `main`
-4. **Settings** → **Deploy**:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn --bind 0.0.0.0:$PORT --timeout 30 --log-level info wsgi:application`
-5. **Settings** → **Networking**:
-   - Enable **"Public Networking"**
-   - Generate Domain (or use custom)
-6. **Settings** → **Variables**:
-   - Link to shared variables or copy all env vars
-7. Click **"Deploy"**
+1. Перейдите в **worker** сервис
+2. Нажмите **"Deployments"**
+3. Подождите зеленую галочку ✓ (1-2 минуты)
+4. Нажмите **"View Logs"**
+5. Должны увидеть:
+   ```
+   [INFO] MercariSearcher v1.0.0 Worker Starting...
+   [INFO] Tokyo timezone: 2024-11-16 ...
+   [INFO] Database: PostgreSQL connected
+   [INFO] Telegram: Bot connected
+   [INFO] Scheduler: Started (interval: 300s)
+   [INFO] Active searches: 0
+   ```
 
-**Expected Output in Logs:**
-```
-[INFO] Starting gunicorn 21.2.0
-[INFO] Listening at: http://0.0.0.0:3000
-[INFO] Booting worker with pid: 1
-```
+#### Проверьте PostgreSQL:
 
-**Test:**
-- Open Public Domain → Should see Dashboard
-
-### Service 2: WORKER (Background Scanner)
-
-**Purpose:** Scans Mercari.jp and sends Telegram notifications
-
-**Configuration:**
-1. Click **"+ New"** → **"Empty Service"**
-2. Name: `worker`
-3. **Settings** → **Source**:
-   - Connect to: `2extndd/MRS`
-   - Branch: `main`
-4. **Settings** → **Deploy**:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python mercari_notifications.py worker`
-5. **Settings** → **Networking**:
-   - **Disable** Public Networking (no HTTP port needed)
-6. **Settings** → **Variables**:
-   - Link to shared variables or copy all env vars
-7. Click **"Deploy"**
-
-**Expected Output in Logs:**
-```
-[INFO] MercariSearcher v1.0.0 Worker Starting...
-[INFO] Tokyo timezone: 2024-11-16 21:30:00 JST
-[INFO] Database: PostgreSQL connected
-[INFO] Telegram: Bot connected (@your_bot_name)
-[INFO] Scheduler: Started (interval: 300s)
-[INFO] Active searches: 0
-```
+1. Перейдите в **PostgreSQL** сервис
+2. Нажмите **"Data"** вкладку
+3. Должны увидеть имя базы данных
+4. Таблицы создадутся автоматически при первом запуске
 
 ---
 
-## STEP 7: Verify Both Services Are Running
+### Шаг 7: Добавьте Первый Поиск
 
-### Check WEB Service:
+1. Откройте **публичный домен web сервиса** в браузере
+2. Перейдите в: `/queries`
+3. Нажмите **"Add New Search"**
+4. Заполните форму:
 
-1. Railway Dashboard → **web** service
-2. **Deployments** tab → Latest deployment should be green ✓
-3. Click **"View Logs"**
-4. Should see Gunicorn started successfully
-5. **Settings** → **Networking** → Copy Public Domain
-6. Open in browser → Should see MercariSearcher Dashboard
-
-### Check WORKER Service:
-
-1. Railway Dashboard → **worker** service
-2. **Deployments** tab → Latest deployment should be green ✓
-3. Click **"View Logs"**
-4. Should see:
-   - Database connected
-   - Telegram bot connected
-   - Scheduler started
-5. No errors in logs
-
-### Check PostgreSQL:
-
-1. Railway Dashboard → **PostgreSQL** service
-2. **Data** tab → Should see database name
-3. Click **"Connect"** → Copy connection string
-4. Verify `DATABASE_URL` is in Variables tab of both web and worker
-
----
-
-## STEP 8: Add Your First Search
-
-### Via Web UI (Recommended):
-
-1. Open your Railway Public Domain (web service)
-2. Navigate to: `/queries`
-3. Click **"Add New Search"**
-4. Fill in the form:
-
-**Example:**
 ```
-Name: Julius Denim Under $120
+Name: Julius Denim
 URL: https://jp.mercari.com/search?keyword=julius&category_id=3088&price_max=17621
-Telegram Chat ID: -1001234567890
-Telegram Thread ID: (leave empty or add for topics)
-Active: ✓ Checked
+Telegram Chat ID: -4997297083
+Telegram Thread ID: (оставьте пустым или добавьте если используете топики)
+Active: ✓ Отмечено
 ```
 
-5. Click **"Add Search"**
-6. Should see search in list
+5. Нажмите **"Add Search"**
 
-### Via Database (Advanced):
+---
 
-1. Railway Dashboard → PostgreSQL → **Data**
-2. Click **"Query"**
-3. Run:
-```sql
-INSERT INTO searches (name, url, telegram_chat_id, is_active)
-VALUES (
-  'Julius Denim Under $120',
-  'https://jp.mercari.com/search?keyword=julius&category_id=3088&price_max=17621',
-  '-1001234567890',
-  true
-);
+### Шаг 8: Ждите Первое Уведомление
+
+- Сканер запускается каждые **5 минут** (300 секунд)
+- Проверьте логи worker'а, чтобы увидеть: `[INFO] Scanning search: Julius Denim`
+- Когда товары найдены → Telegram уведомление отправлено в чат ID: `-4997297083`
+- Проверьте ваш Telegram чат на уведомления!
+
+---
+
+## Ожидаемый Формат Telegram Уведомления
+
+```
+👔 JULIUS - Archive Distressed Denim Jacket
+
+💴 $98.50 (¥14,700)
+📏 Size: 2 (M)
+🏷️ Condition: Used - Good
+📦 Shipping: ¥700
+🔍 Search: Julius Denim
+
+[Фото товара]
+
+[Open Mercari] кнопка
 ```
 
 ---
 
-## STEP 9: Monitor for Items
+## 🔧 Решение Проблем
 
-### Watch Worker Logs:
+### Web сервис не запускается?
 
-1. Railway Dashboard → **worker** service → **Logs**
-2. Wait for next scan (default: 5 minutes)
-3. Should see:
+**Проверьте логи на ошибки:**
+- Отсутствует `DATABASE_URL` → Убедитесь, что PostgreSQL добавлен
+- Ошибки импорта → Проверьте, что nixpacks.toml есть в репозитории
+- Ошибка привязки порта → Railway автоматически устанавливает `$PORT`
+
+**Решение:**
+1. Settings → Danger Zone → **Clear Build Cache**
+2. **Redeploy**
+
+### Worker сервис не сканирует?
+
+**Проверьте логи:**
+- `[ERROR] TELEGRAM_BOT_TOKEN not set` → Добавьте в Variables
+- `[ERROR] Database connection failed` → Проверьте PostgreSQL
+- `[INFO] Active searches: 0` → Добавьте поиск через Web UI
+
+**Решение:**
+1. Проверьте, что все переменные окружения установлены
+2. Перезапустите worker сервис
+
+### Нет Telegram уведомлений?
+
+**Протестируйте токен бота:**
+```bash
+curl https://api.telegram.org/bot8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw/getMe
 ```
-[INFO] Scanning search: Julius Denim Under $120
-[INFO] Found 12 items from Mercari.jp
-[INFO] New items: 3
-[INFO] Sending Telegram notification for item: m63020522105
-[INFO] Telegram notification sent successfully
-```
 
-### Check Telegram:
+Должен вернуть информацию о боте.
 
-1. Open Telegram
-2. Go to your chat/group
-3. Should receive notification with:
-   - Photo of item
-   - Price (JPY + USD)
-   - Brand, Size, Condition
-   - Link to Mercari
-
-### Check Web UI:
-
-1. Open `/items` page
-2. Should see found items
-3. Can filter by search
-4. View photos and details
+**Проверьте:**
+- Бот добавлен в чат ID `-4997297083`
+- Бот имеет права "Send Messages"
+- Логи worker показывают: `[INFO] Telegram notification sent successfully`
 
 ---
 
-## TROUBLESHOOTING
+## 📋 Контрольный Список
 
-### Issue 1: Service Won't Start
-
-**Symptoms:**
-- Deployment fails
-- Logs show import errors
-
-**Solution:**
-1. Check `requirements.txt` is present
-2. Clear build cache (Settings → Danger Zone)
-3. Redeploy
-
-### Issue 2: Can't Connect to Database
-
-**Symptoms:**
-- Logs show: `WARNING: DATABASE_URL not set, using SQLite`
-
-**Solution:**
-1. Add PostgreSQL service
-2. Verify `DATABASE_URL` in Variables tab
-3. Restart both services
-
-### Issue 3: Telegram Not Sending
-
-**Symptoms:**
-- Worker logs show "Telegram error"
-- No notifications received
-
-**Solution:**
-1. Verify `TELEGRAM_BOT_TOKEN` is correct
-   - Test: `https://api.telegram.org/bot<TOKEN>/getMe`
-2. Verify `TELEGRAM_CHAT_ID` is correct
-3. Ensure bot is added to group/chat
-4. Check bot has "Send Messages" permission
-
-### Issue 4: No Items Found
-
-**Symptoms:**
-- Worker logs show: `Found 0 items`
-
-**Solution:**
-1. Check search URL is valid (test in browser)
-2. Check search is active in database
-3. Check Mercari.jp isn't blocking requests
-   - Enable proxies if needed
-4. Check logs for 403/429 errors
-
-### Issue 5: Build Cache Error (mise)
-
-**Symptoms:**
-```
-ERROR: no precompiled python found for core:python@3.11.0
-```
-
-**Solution:**
-1. Service → Settings → Danger Zone
-2. Click **"Clear Build Cache"**
-3. Verify `nixpacks.toml` exists in repo
-4. Redeploy
+- [ ] PostgreSQL база данных добавлена
+- [ ] GitHub репозиторий **2extndd/MRS** подключен
+- [ ] **web** сервис создан и развернут
+- [ ] **worker** сервис создан и развернут
+- [ ] Переменные окружения добавлены в оба сервиса
+- [ ] Публичный домен включен для **web** сервиса
+- [ ] Оба сервиса показывают зеленую ✓ в Deployments
+- [ ] Web UI доступен в браузере
+- [ ] Логи worker показывают "Scheduler: Started"
+- [ ] Первый поиск добавлен через Web UI
+- [ ] Telegram бот отвечает
 
 ---
 
-## ALTERNATIVE: Use Railway CLI (Local)
+## 🔗 Быстрые Ссылки
 
-If you want to use Railway CLI locally:
-
-### Install Railway CLI:
-
-```bash
-# macOS
-brew install railway
-
-# Or npm
-npm install -g @railway/cli
-```
-
-### Login:
-
-```bash
-railway login
-# Opens browser for authentication
-```
-
-### Link Project:
-
-```bash
-cd /Users/extndd/MRS
-railway link -p f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
-```
-
-### Deploy:
-
-```bash
-railway up
-```
-
-### Watch Logs:
-
-```bash
-railway logs --service web
-railway logs --service worker
-```
-
-### Add Variables:
-
-```bash
-railway variables set TELEGRAM_BOT_TOKEN=your_token
-railway variables set TELEGRAM_CHAT_ID=your_chat_id
-```
-
----
-
-## SUMMARY CHECKLIST
-
-Use this checklist to ensure everything is set up:
-
-- [ ] GitHub repository connected to Railway
-- [ ] PostgreSQL service added
-- [ ] Environment variables added (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
-- [ ] WEB service created and deployed
-- [ ] WORKER service created and deployed
-- [ ] Both services show green ✓ in Deployments
-- [ ] Web UI accessible via Public Domain
-- [ ] Worker logs show "Scheduler: Started"
-- [ ] At least one search added via Web UI
-- [ ] Telegram bot responding
-
----
-
-## USEFUL LINKS
-
-- **Railway Project**: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
+- **Railway Dashboard**: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
 - **GitHub Repo**: https://github.com/2extndd/MRS
-- **Railway Docs**: https://docs.railway.app
-- **Telegram Bot API**: https://core.telegram.org/bots/api
+- **Telegram Bot**: Проверьте через https://t.me/BotFather
 
 ---
 
-## NEED HELP?
+## ✅ Все Переменные Окружения
 
-1. Check `DEPLOYMENT_FIX.md` for common issues
-2. Check Railway logs for specific error messages
-3. Open issue on GitHub: https://github.com/2extndd/MRS/issues
+Скопируйте и вставьте в Railway Variables:
+
+```bash
+TELEGRAM_BOT_TOKEN=8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw
+TELEGRAM_CHAT_ID=-4997297083
+DISPLAY_CURRENCY=USD
+USD_CONVERSION_RATE=0.0067
+SEARCH_INTERVAL=300
+MAX_ITEMS_PER_SEARCH=50
+REQUEST_DELAY_MIN=1.5
+REQUEST_DELAY_MAX=3.5
+LOG_LEVEL=INFO
+```
 
 ---
 
-**Your MercariSearcher is ready to deploy on Railway!**
+**Ваш MercariSearcher готов сканировать Mercari.jp! 🚀**
 
-Follow these steps in order, and you'll be scanning Mercari.jp in minutes! 🚀
+Следуйте этим шагам, и вы будете получать Telegram уведомления в течение нескольких минут!
