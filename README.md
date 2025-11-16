@@ -71,11 +71,16 @@ python mercari_notifications.py
 
 ### 5. Railway Deployment
 
-1. Create new project on [Railway.app](https://railway.app)
-2. Add PostgreSQL database
-3. Connect GitHub repository
-4. Add environment variables in Railway dashboard
-5. Deploy!
+**Quick Start (3 minutes)**: See [QUICKSTART.md](QUICKSTART.md)
+
+**Detailed Instructions**: See [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)
+
+**Manual Setup Guide**: See [RAILWAY_MANUAL_SETUP.md](RAILWAY_MANUAL_SETUP.md)
+
+**Ready-to-Deploy Configuration**:
+- Project: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
+- Repository: https://github.com/2extndd/MRS
+- All tokens and variables pre-configured
 
 Railway will automatically:
 - Run web UI on `web` service
