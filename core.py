@@ -87,10 +87,14 @@ class MercariSearcher:
         logger.info("Starting search cycle")
         logger.info("=" * 60)
 
+        # Log to database
+        self.db.add_log_entry('INFO', 'Starting search cycle', 'core')
+
         # Get searches ready for scanning
         ready_searches = self.db.get_searches_ready_for_scan()
 
         logger.info(f"Searches ready for scan: {len(ready_searches)}")
+        self.db.add_log_entry('INFO', f'Found {len(ready_searches)} searches ready for scan', 'core')
 
         if not ready_searches:
             logger.info("No searches ready. Waiting for next cycle.")
@@ -131,9 +135,14 @@ class MercariSearcher:
                     results['new_items'] += items_result['new_items']
 
                     logger.info(f"✓ Search {search['id']} completed: {items_result['items_found']} items, {items_result['new_items']} new")
+                    self.db.add_log_entry('INFO',
+                        f"Search completed: {items_result['items_found']} items, {items_result['new_items']} new",
+                        'search', f"ID: {search['id']}, Keyword: {search.get('keyword', 'N/A')}")
                 else:
                     results['failed_searches'] += 1
-                    logger.warning(f"✗ Search {search['id']} failed: {items_result.get('error', 'Unknown error')}")
+                    error_msg = items_result.get('error', 'Unknown error')
+                    logger.warning(f"✗ Search {search['id']} failed: {error_msg}")
+                    self.db.add_log_entry('WARNING', f"Search failed: {error_msg}", 'search', f"ID: {search['id']}")
 
                 # Update search scan time
                 self.db.update_search_scan_time(search['id'])
@@ -143,6 +152,7 @@ class MercariSearcher:
 
             except Exception as e:
                 logger.error(f"Error processing search {search['id']}: {e}")
+                self.db.add_log_entry('ERROR', f"Error processing search: {str(e)}", 'search', f"ID: {search['id']}")
                 results['failed_searches'] += 1
                 self.total_errors += 1
                 self.shared_state.add_error(str(e))

@@ -554,6 +554,18 @@ class DatabaseManager:
         query = "INSERT INTO logs (level, message) VALUES (%s, %s)"
         self.execute_query(query, (level, message))
 
+    def add_log_entry(self, level: str, message: str, source: str = None, details: str = None):
+        """Add log entry with source and details (KufarSearch compatible)"""
+        # Combine source and details into message if provided
+        full_message = message
+        if source:
+            full_message = f"[{source}] {message}"
+        if details:
+            full_message = f"{full_message} - {details}"
+
+        query = "INSERT INTO logs (level, message, timestamp) VALUES (%s, %s, %s)"
+        self.execute_query(query, (level, full_message, get_tokyo_time()))
+
     def get_logs(self, limit=100, level=None):
         """Get recent logs"""
         if level:

@@ -185,7 +185,7 @@
 </div>
 
 <!-- Read-only Info -->
-<div class="card">
+<div class="card mb-4">
     <div class="card-header">
         <h5><i class="bi bi-info-circle"></i> System Information (Read-Only)</h5>
     </div>
@@ -203,6 +203,31 @@
                     <tr><td><strong>Display Currency:</strong></td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
                     <tr><td><strong>Log Level:</strong></td><td>{{ config.LOG_LEVEL }}</td></tr>
                     <tr><td><strong>Port:</strong></td><td>{{ config.PORT }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scanner Status -->
+<div class="card">
+    <div class="card-header">
+        <h5><i class="bi bi-activity"></i> Scanner Status</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <table class="table table-sm">
+                    <tr><td><strong>Scanner Running:</strong></td><td><span id="scanner-running">Checking...</span></td></tr>
+                    <tr><td><strong>Active Searches:</strong></td><td><span id="scanner-active">0</span></td></tr>
+                    <tr><td><strong>Total Scans:</strong></td><td><span id="scanner-scans">0</span></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <table class="table table-sm">
+                    <tr><td><strong>Items per Hour:</strong></td><td><span id="scanner-items-hour">0</span></td></tr>
+                    <tr><td><strong>Avg Scan Duration:</strong></td><td><span id="scanner-duration">0</span>s</td></tr>
+                    <tr><td><strong>Uptime:</strong></td><td><span id="scanner-uptime">N/A</span></td></tr>
                 </table>
             </div>
         </div>
@@ -356,5 +381,25 @@ function forceRedeploy() {
 
 // Auto-refresh Railway status every 30 seconds
 setInterval(refreshRailwayStatus, 30000);
+
+// Scanner Status
+function refreshScannerStatus() {
+    fetch('/api/stats')
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('scanner-running').textContent = data.scanner_running ? 'Yes' : 'No';
+            document.getElementById('scanner-active').textContent = data.database.active_searches || 0;
+            document.getElementById('scanner-scans').textContent = data.total_scans || 0;
+            document.getElementById('scanner-items-hour').textContent = data.items_per_hour || 0;
+            document.getElementById('scanner-duration').textContent = data.avg_scan_duration || 0;
+            document.getElementById('scanner-uptime').textContent = data.uptime_formatted || 'N/A';
+        }
+    });
+}
+
+// Initial load and auto-refresh every 10 seconds
+refreshScannerStatus();
+setInterval(refreshScannerStatus, 10000);
 </script>
 {% endblock %}

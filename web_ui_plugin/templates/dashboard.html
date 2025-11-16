@@ -47,39 +47,6 @@
     </div>
 </div>
 
-<div class="row mt-4 mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Scanner Status</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Running:</strong> {{ 'Yes' if state_stats.scanner_running else 'No' }}</p>
-                <p><strong>Active Searches:</strong> {{ state_stats.active_searches }}</p>
-                <p><strong>Total Scans:</strong> {{ state_stats.total_scans }}</p>
-                <p><strong>Items per Hour:</strong> {{ state_stats.items_per_hour }}</p>
-                <p><strong>Avg Scan Duration:</strong> {{ state_stats.avg_scan_duration }}s</p>
-                <p><strong>Uptime:</strong> <span class="uptime-display">{{ state_stats.uptime }}</span></p>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>System Info</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>App:</strong> {{ config.APP_NAME }} v{{ config.APP_VERSION }}</p>
-                <p><strong>Mercari URL:</strong> {{ config.MERCARI_BASE_URL }}</p>
-                <p><strong>Display Currency:</strong> {{ config.DISPLAY_CURRENCY }}</p>
-                <p><strong>Proxy Enabled:</strong> {{ 'Yes' if state_stats.proxy_enabled else 'No' }}</p>
-                <p><strong>Errors:</strong> {{ stats.unresolved_errors }}</p>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Recent Items Section (Auto-refresh every 30 seconds) -->
 <div class="row">
     <div class="col-12">
