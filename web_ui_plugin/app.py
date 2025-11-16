@@ -105,15 +105,32 @@ def logs():
 
 @app.route('/api/stats')
 def api_stats():
-    """Get statistics API"""
+    """Get statistics API - formatted for auto-refresh"""
     try:
+        import datetime as dt
+
         db_stats = db.get_statistics()
-        state_stats = shared_state.get_stats_summary()
+
+        # Try to get shared state stats
+        try:
+            state_stats = shared_state.get_stats_summary()
+            uptime_formatted = state_stats.get('uptime', 'N/A')
+            total_api_requests = state_stats.get('total_api_requests', 0)
+        except Exception as e:
+            logger.warning(f"Shared state unavailable: {e}")
+            uptime_formatted = "N/A (web-only)"
+            total_api_requests = 0
 
         return jsonify({
             'success': True,
-            'db_stats': db_stats,
-            'state_stats': state_stats
+            'database': {
+                'total_items': db_stats.get('total_items', 0),
+                'active_searches': db_stats.get('active_searches', 0),
+                'unsent_items': db_stats.get('unsent_items', 0)
+            },
+            'total_api_requests': total_api_requests,
+            'uptime_formatted': uptime_formatted,
+            'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -193,6 +210,115 @@ def api_get_items():
         all_items = db.get_all_items(limit=limit)
         return jsonify({'success': True, 'items': all_items})
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/recent-items')
+def api_get_recent_items():
+    """Get recent items (last 24 hours) for dashboard auto-refresh"""
+    try:
+        import json
+        from datetime import datetime, timedelta
+
+        # Get items from last 24 hours
+        recent_items = []
+        all_items = db.get_all_items(limit=100)
+
+        cutoff_time = datetime.now() - timedelta(hours=24)
+
+        for item in all_items:
+            try:
+                # Parse created_at timestamp
+                if isinstance(item.get('created_at'), str):
+                    item_time = datetime.fromisoformat(item['created_at'].replace('Z', '+00:00'))
+                    if item_time.replace(tzinfo=None) >= cutoff_time:
+                        # Parse JSON fields if needed
+                        if isinstance(item.get('images'), str):
+                            try:
+                                item['images'] = json.loads(item['images'])
+                            except:
+                                item['images'] = []
+
+                        # Get first image URL
+                        item['image_url'] = item['images'][0] if item.get('images') else None
+
+                        recent_items.append(item)
+            except Exception as e:
+                logger.warning(f"Error parsing item timestamp: {e}")
+                continue
+
+        # Limit to 30 most recent
+        recent_items = recent_items[:30]
+
+        return jsonify({
+            'success': True,
+            'items': recent_items,
+            'count': len(recent_items),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting recent items: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/search/test', methods=['POST'])
+def api_test_search():
+    """Test search URL validity"""
+    try:
+        data = request.get_json()
+        url = data.get('url')
+
+        if not url:
+            return jsonify({'valid': False, 'error': 'URL is required'}), 400
+
+        # Validate URL
+        result = validate_search_url(url)
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error testing search URL: {e}")
+        return jsonify({'valid': False, 'error': str(e)}), 500
+
+
+@app.route('/api/force-scan', methods=['POST'])
+def api_force_scan():
+    """Force scan all queries manually"""
+    try:
+        logger.info("🔍 Force scan triggered via API")
+
+        # Import and run scanner
+        from core import MercariSearcher
+        searcher = MercariSearcher()
+        results = searcher.search_all_queries()
+
+        logger.info(f"✅ Force scan completed: {results}")
+
+        return jsonify({
+            'success': True,
+            'new_items': results.get('new_items', 0),
+            'message': f'Scan completed! Found {results.get("new_items", 0)} new items.'
+        })
+    except Exception as e:
+        logger.error(f"❌ Error in force scan: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/notifications/test', methods=['POST'])
+def api_test_notification():
+    """Send test Telegram notification"""
+    try:
+        import asyncio
+        from simple_telegram_worker import send_test_notification
+
+        # Send test notification
+        result = asyncio.run(send_test_notification())
+
+        if result:
+            return jsonify({'success': True, 'message': 'Test notification sent successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to send test notification'}), 500
+    except Exception as e:
+        logger.error(f"Error sending test notification: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
