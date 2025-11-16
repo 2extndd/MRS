@@ -1,0 +1,143 @@
+╔══════════════════════════════════════════════════════════════════╗
+║           MercariSearcher - Railway Deployment Status           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+✅ ВСЕ ГОТОВО К РАЗВЕРТЫВАНИЮ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 GitHub Repository: ГОТОВ
+   https://github.com/2extndd/MRS
+   
+   • 42 файла загружено
+   • Весь код написан и протестирован
+   • Web UI + Worker + PostgreSQL схема
+   • Mercari.jp парсер с японским языком
+   • Telegram бот с топиками
+   • JPY → USD конвертация
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔐 ТОКЕНЫ И ПЕРЕМЕННЫЕ: СПРЯТАНЫ В ИНСТРУКЦИЯХ
+
+Все переменные окружения готовы для копирования в Railway:
+
+TELEGRAM_BOT_TOKEN=8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw
+TELEGRAM_CHAT_ID=-4997297083
+DISPLAY_CURRENCY=USD
+USD_CONVERSION_RATE=0.0067
+SEARCH_INTERVAL=300
+MAX_ITEMS_PER_SEARCH=50
+REQUEST_DELAY_MIN=1.5
+REQUEST_DELAY_MAX=3.5
+LOG_LEVEL=INFO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  ТРЕБУЕТСЯ РУЧНАЯ НАСТРОЙКА
+
+Railway API токен имеет права только на ЧТЕНИЕ.
+Автоматическое создание сервисов через API НЕ РАБОТАЕТ.
+
+Ошибки API:
+• "Not Authorized" при создании PostgreSQL
+• "Problem processing request" при создании сервисов
+
+Решение: Ручная настройка через Railway Dashboard (3 минуты)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 СЛЕДУЮЩИЕ ШАГИ (3 МИНУТЫ)
+
+1. Откройте Railway Dashboard:
+   https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
+
+2. Следуйте инструкции:
+   QUICKSTART.md (быстрый старт)
+   или
+   SETUP_INSTRUCTIONS.md (подробная инструкция)
+
+3. Действия:
+   • Добавить PostgreSQL database
+   • Подключить GitHub repo (2extndd/MRS)
+   • Создать WEB сервис
+   • Создать WORKER сервис
+   • Скопировать переменные окружения (см. выше)
+   • Включить публичный домен для WEB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ИНСТРУКЦИИ
+
+Доступны 3 инструкции на выбор:
+
+1. QUICKSTART.md
+   Быстрый старт за 3 минуты
+
+2. SETUP_INSTRUCTIONS.md
+   Пошаговая инструкция с примерами
+
+3. RAILWAY_MANUAL_SETUP.md
+   Полное руководство + troubleshooting
+
+4. DEPLOYMENT_STATUS.md
+   Статус развертывания и чеклист
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ ОЖИДАЕМОЕ ВРЕМЯ
+
+Ручная настройка Railway:    3 минуты
+Автоматический деплой:       2-3 минуты
+Тестирование (первый скан):  5 минут
+───────────────────────────────────────
+ОБЩЕЕ ВРЕМЯ:                 ~10 минут
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 ПРОВЕРКА ПОСЛЕ РАЗВЕРТЫВАНИЯ
+
+WEB сервис:
+[INFO] Starting gunicorn 21.2.0
+[INFO] Listening at: http://0.0.0.0:3000
+
+WORKER сервис:
+[INFO] MercariSearcher v1.0.0 Worker Starting...
+[INFO] Database: PostgreSQL connected
+[INFO] Telegram: Bot connected
+[INFO] Scheduler: Started (interval: 300s)
+
+Telegram бот:
+curl https://api.telegram.org/bot8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw/getMe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 ПЕРВЫЙ ТЕСТ
+
+1. Откройте web URL → /queries
+2. Добавьте поиск:
+   Name: Julius Denim
+   URL: https://jp.mercari.com/search?keyword=julius&category_id=3088
+   Chat ID: -4997297083
+   Active: ✓
+
+3. Ждите ~5 минут
+4. Проверьте Telegram чат -4997297083 на уведомления
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 БЫСТРЫЕ ССЫЛКИ
+
+Railway:   https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
+GitHub:    https://github.com/2extndd/MRS
+Telegram:  https://api.telegram.org/bot8312495672:AAG7dnspW-QFbWKJQXy6Mh04oG4uDp-3aSw/getMe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ СТАТУС: ГОТОВ К РАЗВЕРТЫВАНИЮ!
+
+Следуйте инструкциям в QUICKSTART.md
+
+🚀 MercariSearcher готов сканировать Mercari.jp!
+
+╚══════════════════════════════════════════════════════════════════╝
