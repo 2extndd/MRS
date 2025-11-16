@@ -5,62 +5,352 @@
 {% block content %}
 <h1 class="mb-4">Configuration</h1>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h5>Application Settings</h5></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><td>App Name</td><td>{{ config.APP_NAME }}</td></tr>
-                    <tr><td>Version</td><td>{{ config.APP_VERSION }}</td></tr>
-                    <tr><td>Mercari Base URL</td><td>{{ config.MERCARI_BASE_URL }}</td></tr>
-                    <tr><td>Display Currency</td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
-                    <tr><td>USD Conversion Rate</td><td>{{ config.USD_CONVERSION_RATE }}</td></tr>
-                </table>
+<!-- System Settings -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-gear"></i> System Settings</h5>
+    </div>
+    <div class="card-body">
+        <form id="systemSettingsForm">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Items Per Query</label>
+                    <input type="number" class="form-control" name="max_items_per_search"
+                           value="{{ config.MAX_ITEMS_PER_SEARCH }}" min="1" max="120">
+                    <small class="text-muted">Maximum number of items to fetch per search query</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Query Refresh Delay (seconds)</label>
+                    <input type="number" class="form-control" name="search_interval"
+                           value="{{ config.SEARCH_INTERVAL }}" min="60" max="3600">
+                    <small class="text-muted">Global delay between searches for all queries</small>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="saveSystemSettings()">
+                <i class="bi bi-save"></i> Save System Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Telegram Bot Settings -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-telegram"></i> Telegram Bot</h5>
+        <span class="badge bg-{{ 'success' if config.TELEGRAM_BOT_TOKEN else 'secondary' }}">
+            {{ 'Running' if config.TELEGRAM_BOT_TOKEN else 'Not Configured' }}
+        </span>
+    </div>
+    <div class="card-body">
+        <form id="telegramSettingsForm">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Bot Token</label>
+                    <input type="text" class="form-control" name="telegram_bot_token"
+                           value="{{ config.TELEGRAM_BOT_TOKEN or '' }}"
+                           placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                    <small class="text-muted">Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a></small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Chat ID</label>
+                    <input type="text" class="form-control" name="telegram_chat_id"
+                           value="{{ config.TELEGRAM_CHAT_ID or '' }}"
+                           placeholder="-1001234567890">
+                    <small class="text-muted">The chat ID where notifications will be sent</small>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary" onclick="saveTelegramSettings()">
+                    <i class="bi bi-save"></i> Save Telegram Settings
+                </button>
+                <button type="button" class="btn btn-outline-info" onclick="testTelegramBot()">
+                    <i class="bi bi-send"></i> Send Test Message
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Proxy Settings -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-shield"></i> Proxy System Status</h5>
+        <span class="badge bg-{{ 'success' if config.PROXY_ENABLED else 'secondary' }}">
+            {{ 'Enabled' if config.PROXY_ENABLED else 'Disabled' }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <strong>Status:</strong> <span id="proxy-status">{{ 'Active' if config.PROXY_ENABLED else 'Inactive' }}</span>
+            </div>
+            <div class="col-md-4">
+                <strong>Total Proxies:</strong> <span id="proxy-total">{{ config.PROXY_LIST|length }}</span>
+            </div>
+            <div class="col-md-4">
+                <strong>Current Proxy:</strong> <code class="small" id="proxy-current">{{ config.PROXY_LIST[0] if config.PROXY_LIST else 'None' }}</code>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h5>Scanner Settings</h5></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><td>Default Search Interval</td><td>{{ config.SEARCH_INTERVAL }}s</td></tr>
-                    <tr><td>Max Items Per Search</td><td>{{ config.MAX_ITEMS_PER_SEARCH }}</td></tr>
-                    <tr><td>Request Delay (Min)</td><td>{{ config.REQUEST_DELAY_MIN }}s</td></tr>
-                    <tr><td>Request Delay (Max)</td><td>{{ config.REQUEST_DELAY_MAX }}s</td></tr>
-                    <tr><td>Proxy Enabled</td><td>{{ 'Yes' if config.PROXY_ENABLED else 'No' }}</td></tr>
+        <form id="proxySettingsForm">
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="proxy_enabled"
+                           id="proxyEnabled" {{ 'checked' if config.PROXY_ENABLED else '' }}>
+                    <label class="form-check-label" for="proxyEnabled">
+                        Enable Proxy (Bot can work without proxy)
+                    </label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Proxy List (one per line)</label>
+                <textarea class="form-control" name="proxy_list" rows="5"
+                          placeholder="http://user:pass@host:port&#10;socks5://host:port">{{ config.PROXY_LIST|join('\n') if config.PROXY_LIST else '' }}</textarea>
+                <small class="text-muted">Format: protocol://user:pass@host:port</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary" onclick="saveProxySettings()">
+                    <i class="bi bi-save"></i> Save Proxy Settings
+                </button>
+                <button type="button" class="btn btn-outline-info" onclick="testProxies()">
+                    <i class="bi bi-check-circle"></i> Test Proxies
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Railway Auto-Redeploy System -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Railway Auto-Redeploy System</h5>
+        <span class="badge bg-info" id="redeploy-status">Active</span>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <strong>HTTP Errors:</strong>
+                <div class="mt-2">
+                    <span class="badge bg-danger">403: <span id="error-403">0</span></span>
+                    <span class="badge bg-warning">401: <span id="error-401">0</span></span>
+                    <span class="badge bg-info">429: <span id="error-429">0</span></span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <strong>Total Errors:</strong> <span id="total-errors" class="text-danger">0</span><br>
+                <small class="text-muted">Threshold: {{ config.MAX_ERRORS_BEFORE_REDEPLOY }}</small>
+            </div>
+            <div class="col-md-3">
+                <strong>First Error:</strong> <span id="first-error" class="small">None</span>
+            </div>
+            <div class="col-md-3">
+                <strong>Last Redeploy:</strong> <span id="last-redeploy" class="small">Never</span>
+            </div>
+        </div>
+
+        <form id="railwaySettingsForm">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Redeploy Threshold</label>
+                    <input type="number" class="form-control" name="max_errors_before_redeploy"
+                           value="{{ config.MAX_ERRORS_BEFORE_REDEPLOY }}" min="1" max="100">
+                    <small class="text-muted">Number of errors before triggering redeploy</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Railway Token</label>
+                    <input type="password" class="form-control" name="railway_token"
+                           value="{{ config.RAILWAY_TOKEN or '' }}"
+                           placeholder="Optional - for auto-redeploy">
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary" onclick="saveRailwaySettings()">
+                    <i class="bi bi-save"></i> Save Settings
+                </button>
+                <button type="button" class="btn btn-outline-info" onclick="refreshRailwayStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="forceRedeploy()">
+                    <i class="bi bi-exclamation-triangle"></i> Force Redeploy
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Read-only Info -->
+<div class="card">
+    <div class="card-header">
+        <h5><i class="bi bi-info-circle"></i> System Information (Read-Only)</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <table class="table table-sm">
+                    <tr><td><strong>App Name:</strong></td><td>{{ config.APP_NAME }}</td></tr>
+                    <tr><td><strong>Version:</strong></td><td>{{ config.APP_VERSION }}</td></tr>
+                    <tr><td><strong>Mercari URL:</strong></td><td><a href="{{ config.MERCARI_BASE_URL }}" target="_blank">{{ config.MERCARI_BASE_URL }}</a></td></tr>
+                    <tr><td><strong>Display Currency:</strong></td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <table class="table table-sm">
+                    <tr><td><strong>Database:</strong></td><td>{{ 'PostgreSQL' if config.DATABASE_URL else 'SQLite' }}</td></tr>
+                    <tr><td><strong>Request Delay:</strong></td><td>{{ config.REQUEST_DELAY_MIN }}s - {{ config.REQUEST_DELAY_MAX }}s</td></tr>
+                    <tr><td><strong>Log Level:</strong></td><td>{{ config.LOG_LEVEL }}</td></tr>
+                    <tr><td><strong>Port:</strong></td><td>{{ config.PORT }}</td></tr>
                 </table>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h5>Telegram Settings</h5></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><td>Bot Token</td><td>{{ '***' if config.TELEGRAM_BOT_TOKEN else 'Not set' }}</td></tr>
-                    <tr><td>Chat ID</td><td>{{ config.TELEGRAM_CHAT_ID or 'Not set' }}</td></tr>
-                    <tr><td>Thread ID</td><td>{{ config.TELEGRAM_THREAD_ID or 'Not set' }}</td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
+<script>
+// System Settings
+function saveSystemSettings() {
+    const form = document.getElementById('systemSettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
 
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h5>Database Settings</h5></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><td>Database URL</td><td>{{ '***' if config.DATABASE_URL else 'SQLite (local)' }}</td></tr>
-                    <tr><td>SQLite Path</td><td>{{ config.SQLITE_DB_PATH }}</td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+    fetch('/api/config/system', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert('System settings saved! Restart required.', 'success');
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+// Telegram Settings
+function saveTelegramSettings() {
+    const form = document.getElementById('telegramSettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    fetch('/api/config/telegram', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert('Telegram settings saved!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+function testTelegramBot() {
+    fetch('/api/notifications/test', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert('Test message sent! Check your Telegram.', 'success');
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+// Proxy Settings
+function saveProxySettings() {
+    const form = document.getElementById('proxySettingsForm');
+    const formData = new FormData(form);
+    const data = {
+        proxy_enabled: formData.get('proxy_enabled') === 'on',
+        proxy_list: formData.get('proxy_list').split('\n').filter(p => p.trim())
+    };
+
+    fetch('/api/config/proxy', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert('Proxy settings saved!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+function testProxies() {
+    window.showAlert('Testing proxies...', 'info');
+    fetch('/api/proxy/test', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert(`Proxy test complete! ${data.working} of ${data.total} working.`, 'success');
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+// Railway Settings
+function saveRailwaySettings() {
+    const form = document.getElementById('railwaySettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    fetch('/api/config/railway', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.showAlert('Railway settings saved!', 'success');
+        } else {
+            window.showAlert('Error: ' + data.error, 'danger');
+        }
+    });
+}
+
+function refreshRailwayStatus() {
+    fetch('/api/railway/status')
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('error-403').textContent = data.status.errors['403'] || 0;
+            document.getElementById('error-401').textContent = data.status.errors['401'] || 0;
+            document.getElementById('error-429').textContent = data.status.errors['429'] || 0;
+            document.getElementById('total-errors').textContent = data.status.total_errors || 0;
+            document.getElementById('first-error').textContent = data.status.first_error || 'None';
+            document.getElementById('last-redeploy').textContent = data.status.last_redeploy || 'Never';
+            window.showAlert('Status refreshed!', 'success');
+        }
+    });
+}
+
+function forceRedeploy() {
+    if (confirm('⚠️ Force redeploy Railway service? This will restart the application.')) {
+        fetch('/api/railway/redeploy', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                window.showAlert('Redeploy triggered! App will restart in a moment.', 'warning');
+            } else {
+                window.showAlert('Error: ' + data.error, 'danger');
+            }
+        });
+    }
+}
+
+// Auto-refresh Railway status every 30 seconds
+setInterval(refreshRailwayStatus, 30000);
+</script>
 {% endblock %}

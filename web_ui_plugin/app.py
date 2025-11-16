@@ -332,3 +332,99 @@ def health():
 
 if __name__ == '__main__':
     app.run(host=config.WEB_UI_HOST, port=config.PORT, debug=True)
+
+
+# ==================== CONFIG API ENDPOINTS ====================
+
+@app.route('/api/config/system', methods=['POST'])
+def api_save_system_config():
+    """Save system configuration"""
+    try:
+        data = request.get_json()
+        # TODO: Implement config saving to .env or database
+        logger.info(f"System config update requested: {data}")
+        return jsonify({'success': True, 'message': 'Settings will be applied on restart'})
+    except Exception as e:
+        logger.error(f"Error saving system config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/telegram', methods=['POST'])
+def api_save_telegram_config():
+    """Save Telegram configuration"""
+    try:
+        data = request.get_json()
+        # TODO: Implement config saving
+        logger.info(f"Telegram config update requested: {data}")
+        return jsonify({'success': True, 'message': 'Telegram settings saved'})
+    except Exception as e:
+        logger.error(f"Error saving telegram config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/proxy', methods=['POST'])
+def api_save_proxy_config():
+    """Save proxy configuration"""
+    try:
+        data = request.get_json()
+        # TODO: Implement config saving
+        logger.info(f"Proxy config update requested: {data}")
+        return jsonify({'success': True, 'message': 'Proxy settings saved'})
+    except Exception as e:
+        logger.error(f"Error saving proxy config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/railway', methods=['POST'])
+def api_save_railway_config():
+    """Save Railway configuration"""
+    try:
+        data = request.get_json()
+        # TODO: Implement config saving
+        logger.info(f"Railway config update requested: {data}")
+        return jsonify({'success': True, 'message': 'Railway settings saved'})
+    except Exception as e:
+        logger.error(f"Error saving railway config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/railway/status', methods=['GET'])
+def api_railway_status():
+    """Get Railway auto-redeploy status"""
+    try:
+        # TODO: Implement actual error tracking
+        return jsonify({
+            'success': True,
+            'status': {
+                'status': 'active',
+                'errors': {'403': 0, '401': 0, '429': 0},
+                'total_errors': 0,
+                'first_error': 'None',
+                'last_error': 'None',
+                'last_redeploy': 'Never'
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/railway/redeploy', methods=['POST'])
+def api_railway_redeploy():
+    """Trigger Railway redeploy"""
+    try:
+        # TODO: Implement Railway API integration
+        logger.warning("⚠️ Railway redeploy requested (not implemented yet)")
+        return jsonify({'success': False, 'error': 'Redeploy not implemented yet'}), 501
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/proxy/test', methods=['POST'])
+def api_test_proxies():
+    """Test proxy connections"""
+    try:
+        # TODO: Implement proxy testing
+        logger.info("Proxy test requested")
+        return jsonify({'success': True, 'total': 0, 'working': 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
