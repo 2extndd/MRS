@@ -20,7 +20,7 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Total Items</h5>
-                <h2>{{ stats.total_items }}</h2>
+                <h2 id="total-items">{{ stats.total_items }}</h2>
                 <small class="text-muted">{{ stats.unsent_items }} pending</small>
             </div>
         </div>
@@ -29,8 +29,9 @@
     <div class="col-md-3 mb-3">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Notifications Sent</h5>
-                <h2>{{ state_stats.total_notifications_sent }}</h2>
+                <h5 class="card-title">Active Queries</h5>
+                <h2 id="active-queries">{{ stats.active_searches }}</h2>
+                <small class="text-muted">monitored searches</small>
             </div>
         </div>
     </div>
@@ -38,14 +39,15 @@
     <div class="col-md-3 mb-3">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Errors</h5>
-                <h2>{{ stats.unresolved_errors }}</h2>
+                <h5 class="card-title">API Requests</h5>
+                <h2 id="api-requests">{{ state_stats.total_api_requests }}</h2>
+                <small class="text-muted">since start</small>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
+<div class="row mt-4 mb-4">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -57,7 +59,7 @@
                 <p><strong>Total Scans:</strong> {{ state_stats.total_scans }}</p>
                 <p><strong>Items per Hour:</strong> {{ state_stats.items_per_hour }}</p>
                 <p><strong>Avg Scan Duration:</strong> {{ state_stats.avg_scan_duration }}s</p>
-                <p><strong>Uptime:</strong> {{ state_stats.uptime }}</p>
+                <p><strong>Uptime:</strong> <span class="uptime-display">{{ state_stats.uptime }}</span></p>
             </div>
         </div>
     </div>
@@ -72,7 +74,39 @@
                 <p><strong>Mercari URL:</strong> {{ config.MERCARI_BASE_URL }}</p>
                 <p><strong>Display Currency:</strong> {{ config.DISPLAY_CURRENCY }}</p>
                 <p><strong>Proxy Enabled:</strong> {{ 'Yes' if state_stats.proxy_enabled else 'No' }}</p>
-                <p><strong>API Requests:</strong> {{ state_stats.total_api_requests }}</p>
+                <p><strong>Errors:</strong> {{ stats.unresolved_errors }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Items Section (Auto-refresh every 30 seconds) -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Recent Items (Last 24 Hours)
+                </h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-success" onclick="window.runSearch()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Force Scan All
+                    </button>
+                    <a href="/items" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-grid-3x3 me-1"></i>View All Items
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row" id="recent-items-container">
+                    <!-- Items will be loaded here by JavaScript auto-refresh -->
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading recent items...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
