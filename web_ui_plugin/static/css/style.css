@@ -1,0 +1,53 @@
+/* MercariSearcher Web UI Styles */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 2px solid #f0f0f0;
+    font-weight: 600;
+}
+
+.table {
+    background-color: white;
+}
+
+.badge {
+    padding: 0.5em 0.75em;
+}
+
+.btn {
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+h1, h2, h3, h4, h5 {
+    color: #333;
+}
+
+.card-body h2 {
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}

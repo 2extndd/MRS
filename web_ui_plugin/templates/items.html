@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Items - MercariSearcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Found Items</h1>
+
+<div class="row">
+    {% for item in items %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            {% if item.image_url %}
+            <img src="{{ item.image_url }}" class="card-img-top" alt="{{ item.title }}" style="height: 200px; object-fit: cover;">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ item.title[:50] }}...</h5>
+                <p class="card-text">
+                    <strong>Price:</strong> ¥{{ item.price }} (${{ (item.price * config.USD_CONVERSION_RATE)|round(2) }})<br>
+                    {% if item.brand %}<strong>Brand:</strong> {{ item.brand }}<br>{% endif %}
+                    {% if item.condition %}<strong>Condition:</strong> {{ item.condition }}<br>{% endif %}
+                    {% if item.size %}<strong>Size:</strong> {{ item.size }}<br>{% endif %}
+                </p>
+                <a href="{{ item.item_url }}" target="_blank" class="btn btn-primary btn-sm">View on Mercari</a>
+                <span class="badge bg-{{ 'success' if item.is_sent else 'warning' }}">
+                    {{ 'Sent' if item.is_sent else 'Pending' }}
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MercariSearcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Dashboard</h1>
+
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total Searches</h5>
+                <h2>{{ stats.total_searches }}</h2>
+                <small class="text-muted">{{ stats.active_searches }} active</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total Items</h5>
+                <h2>{{ stats.total_items }}</h2>
+                <small class="text-muted">{{ stats.unsent_items }} pending</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Notifications Sent</h5>
+                <h2>{{ state_stats.total_notifications_sent }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Errors</h5>
+                <h2>{{ stats.unresolved_errors }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Scanner Status</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Running:</strong> {{ 'Yes' if state_stats.scanner_running else 'No' }}</p>
+                <p><strong>Active Searches:</strong> {{ state_stats.active_searches }}</p>
+                <p><strong>Total Scans:</strong> {{ state_stats.total_scans }}</p>
+                <p><strong>Items per Hour:</strong> {{ state_stats.items_per_hour }}</p>
+                <p><strong>Avg Scan Duration:</strong> {{ state_stats.avg_scan_duration }}s</p>
+                <p><strong>Uptime:</strong> {{ state_stats.uptime }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>System Info</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>App:</strong> {{ config.APP_NAME }} v{{ config.APP_VERSION }}</p>
+                <p><strong>Mercari URL:</strong> {{ config.MERCARI_BASE_URL }}</p>
+                <p><strong>Display Currency:</strong> {{ config.DISPLAY_CURRENCY }}</p>
+                <p><strong>Proxy Enabled:</strong> {{ 'Yes' if state_stats.proxy_enabled else 'No' }}</p>
+                <p><strong>API Requests:</strong> {{ state_stats.total_api_requests }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

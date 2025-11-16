@@ -1,0 +1,592 @@
+"""
+Database Manager for MercariSearcher (MRS)
+Adapted from KufarSearcher for Mercari.jp marketplace
+
+Supports both PostgreSQL (Railway) and SQLite (local development)
+"""
+
+import os
+import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import datetime, timedelta
+import pytz
+from configuration_values import config
+
+# Tokyo timezone (UTC+9)
+TOKYO_TZ = pytz.timezone('Asia/Tokyo')
+
+
+def get_tokyo_time():
+    """Get current time in Tokyo timezone"""
+    return datetime.now(TOKYO_TZ)
+
+
+class DatabaseManager:
+    """Database manager supporting PostgreSQL and SQLite"""
+
+    def __init__(self):
+        self.db_type = None
+        self.conn = None
+        self.init_database()
+
+    def init_database(self):
+        """Initialize database connection and create tables"""
+        database_url = config.DATABASE_URL
+
+        # Detect Railway environment
+        is_railway = os.getenv('RAILWAY_ENVIRONMENT') is not None
+
+        try:
+            if database_url and database_url.startswith('postgres'):
+                # PostgreSQL (Railway)
+                self.db_type = 'postgresql'
+                self.conn = psycopg2.connect(database_url)
+                print(f"[DB] Connected to PostgreSQL")
+            else:
+                # SQLite (local)
+                self.db_type = 'sqlite'
+                db_path = config.SQLITE_DB_PATH
+                self.conn = sqlite3.connect(db_path, check_same_thread=False)
+                self.conn.row_factory = sqlite3.Row
+                print(f"[DB] Connected to SQLite: {db_path}")
+
+            self.create_tables()
+
+        except Exception as e:
+            print(f"[DB ERROR] Failed to connect: {e}")
+            if is_railway:
+                # Fallback to in-memory SQLite on Railway
+                print("[DB] Using in-memory SQLite as fallback")
+                self.db_type = 'sqlite'
+                self.conn = sqlite3.connect(':memory:', check_same_thread=False)
+                self.conn.row_factory = sqlite3.Row
+                self.create_tables()
+            else:
+                raise
+
+    def create_tables(self):
+        """Create database tables"""
+        # Searches table with Mercari-specific fields
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS searches (
+                id SERIAL PRIMARY KEY,
+                search_url TEXT NOT NULL,
+                keyword TEXT,
+                min_price INTEGER,
+                max_price INTEGER,
+                category_id TEXT,
+                brand TEXT,
+                condition TEXT,
+                size TEXT,
+                color TEXT,
+                shipping_payer TEXT,
+                item_status TEXT,
+                sort_order TEXT DEFAULT 'created_desc',
+                scan_interval INTEGER DEFAULT 300,
+                is_active BOOLEAN DEFAULT TRUE,
+                notify_on_price_drop BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_scanned_at TIMESTAMP,
+                total_scans INTEGER DEFAULT 0,
+                items_found INTEGER DEFAULT 0
+            )
+        """)
+
+        # Items table with Mercari-specific fields
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS items (
+                id SERIAL PRIMARY KEY,
+                mercari_id TEXT UNIQUE NOT NULL,
+                search_id INTEGER,
+                title TEXT NOT NULL,
+                price INTEGER NOT NULL,
+                currency TEXT DEFAULT 'JPY',
+                brand TEXT,
+                condition TEXT,
+                size TEXT,
+                shipping_cost INTEGER,
+                stock_quantity INTEGER DEFAULT 1,
+                item_url TEXT NOT NULL,
+                image_url TEXT,
+                seller_name TEXT,
+                seller_rating REAL,
+                location TEXT,
+                description TEXT,
+                category TEXT,
+                is_sent BOOLEAN DEFAULT FALSE,
+                sent_at TIMESTAMP,
+                found_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (search_id) REFERENCES searches(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Price history table for tracking price changes
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS price_history (
+                id SERIAL PRIMARY KEY,
+                item_id INTEGER NOT NULL,
+                price INTEGER NOT NULL,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Settings table
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Error tracking table
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS error_tracking (
+                id SERIAL PRIMARY KEY,
+                error_message TEXT,
+                error_type TEXT,
+                occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_resolved BOOLEAN DEFAULT FALSE
+            )
+        """)
+
+        # Logs table
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS logs (
+                id SERIAL PRIMARY KEY,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        self.conn.commit()
+        print("[DB] Tables created successfully")
+
+    def execute_query(self, query, params=None, fetch=False):
+        """Execute SQL query with proper parameter binding"""
+        try:
+            # Convert PostgreSQL placeholders to SQLite if needed
+            if self.db_type == 'sqlite' and params:
+                query = query.replace('%s', '?')
+                query = query.replace('SERIAL', 'INTEGER')
+                query = query.replace('BOOLEAN', 'INTEGER')
+                query = query.replace('TIMESTAMP', 'TEXT')
+
+            cursor = self.conn.cursor()
+
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+
+            if fetch:
+                if self.db_type == 'postgresql':
+                    return cursor.fetchall()
+                else:
+                    # Convert sqlite3.Row to dict
+                    return [dict(row) for row in cursor.fetchall()]
+
+            self.conn.commit()
+            return cursor
+
+        except Exception as e:
+            print(f"[DB ERROR] Query failed: {e}")
+            print(f"[DB ERROR] Query: {query}")
+            self.conn.rollback()
+            raise
+
+    # ==================== SEARCHES ====================
+
+    def add_search(self, search_url, **kwargs):
+        """Add new search query"""
+        query = """
+            INSERT INTO searches
+            (search_url, keyword, min_price, max_price, category_id, brand,
+             condition, size, color, shipping_payer, item_status, sort_order,
+             scan_interval, notify_on_price_drop)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        params = (
+            search_url,
+            kwargs.get('keyword'),
+            kwargs.get('min_price'),
+            kwargs.get('max_price'),
+            kwargs.get('category_id'),
+            kwargs.get('brand'),
+            kwargs.get('condition'),
+            kwargs.get('size'),
+            kwargs.get('color'),
+            kwargs.get('shipping_payer'),
+            kwargs.get('item_status'),
+            kwargs.get('sort_order', 'created_desc'),
+            kwargs.get('scan_interval', 300),
+            kwargs.get('notify_on_price_drop', False)
+        )
+        self.execute_query(query, params)
+        print(f"[DB] Search added: {kwargs.get('keyword', 'No keyword')}")
+
+    def get_all_searches(self):
+        """Get all searches"""
+        query = "SELECT * FROM searches ORDER BY created_at DESC"
+        return self.execute_query(query, fetch=True)
+
+    def get_active_searches(self):
+        """Get active searches"""
+        query = "SELECT * FROM searches WHERE is_active = %s ORDER BY created_at DESC"
+        return self.execute_query(query, (True,), fetch=True)
+
+    def get_searches_ready_for_scan(self):
+        """Get searches that are ready to be scanned based on their interval"""
+        current_time = get_tokyo_time()
+
+        query = """
+            SELECT * FROM searches
+            WHERE is_active = %s
+            AND (last_scanned_at IS NULL
+                 OR last_scanned_at < %s)
+            ORDER BY last_scanned_at ASC NULLS FIRST
+        """
+
+        # Get all active searches and filter by interval
+        all_searches = self.execute_query(
+            "SELECT * FROM searches WHERE is_active = %s",
+            (True,),
+            fetch=True
+        )
+
+        ready_searches = []
+        for search in all_searches:
+            if search['last_scanned_at'] is None:
+                ready_searches.append(search)
+            else:
+                # Parse timestamp
+                if isinstance(search['last_scanned_at'], str):
+                    last_scan = datetime.fromisoformat(search['last_scanned_at'].replace('Z', '+00:00'))
+                else:
+                    last_scan = search['last_scanned_at']
+
+                # Make timezone aware
+                if last_scan.tzinfo is None:
+                    last_scan = TOKYO_TZ.localize(last_scan)
+
+                interval = search.get('scan_interval', 300)
+                next_scan = last_scan + timedelta(seconds=interval)
+
+                if current_time >= next_scan:
+                    ready_searches.append(search)
+
+        return ready_searches
+
+    def update_search_scan_time(self, search_id):
+        """Update last scanned time for search"""
+        query = """
+            UPDATE searches
+            SET last_scanned_at = %s, total_scans = total_scans + 1
+            WHERE id = %s
+        """
+        self.execute_query(query, (get_tokyo_time(), search_id))
+
+    def update_search_stats(self, search_id, items_found):
+        """Update search statistics"""
+        query = """
+            UPDATE searches
+            SET items_found = items_found + %s
+            WHERE id = %s
+        """
+        self.execute_query(query, (items_found, search_id))
+
+    def toggle_search_active(self, search_id):
+        """Toggle search active status"""
+        query = "SELECT is_active FROM searches WHERE id = %s"
+        result = self.execute_query(query, (search_id,), fetch=True)
+
+        if result:
+            new_status = not result[0]['is_active']
+            query = "UPDATE searches SET is_active = %s WHERE id = %s"
+            self.execute_query(query, (new_status, search_id))
+            return new_status
+        return None
+
+    def delete_search(self, search_id):
+        """Delete search"""
+        query = "DELETE FROM searches WHERE id = %s"
+        self.execute_query(query, (search_id,))
+        print(f"[DB] Search {search_id} deleted")
+
+    # ==================== ITEMS ====================
+
+    def add_item(self, mercari_id, search_id, **kwargs):
+        """Add new item if not exists"""
+        # Check if item already exists
+        check_query = "SELECT id FROM items WHERE mercari_id = %s"
+        existing = self.execute_query(check_query, (mercari_id,), fetch=True)
+
+        if existing:
+            print(f"[DB] Item {mercari_id} already exists")
+            return None
+
+        query = """
+            INSERT INTO items
+            (mercari_id, search_id, title, price, currency, brand, condition,
+             size, shipping_cost, stock_quantity, item_url, image_url,
+             seller_name, seller_rating, location, description, category)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        params = (
+            mercari_id,
+            search_id,
+            kwargs.get('title'),
+            kwargs.get('price'),
+            kwargs.get('currency', 'JPY'),
+            kwargs.get('brand'),
+            kwargs.get('condition'),
+            kwargs.get('size'),
+            kwargs.get('shipping_cost'),
+            kwargs.get('stock_quantity', 1),
+            kwargs.get('item_url'),
+            kwargs.get('image_url'),
+            kwargs.get('seller_name'),
+            kwargs.get('seller_rating'),
+            kwargs.get('location'),
+            kwargs.get('description'),
+            kwargs.get('category')
+        )
+
+        cursor = self.execute_query(query, params)
+
+        # Get inserted item ID
+        if self.db_type == 'postgresql':
+            item_id = cursor.lastrowid if hasattr(cursor, 'lastrowid') else None
+        else:
+            item_id = cursor.lastrowid
+
+        # Add initial price to price_history
+        if item_id and kwargs.get('price'):
+            self.add_price_history(item_id, kwargs.get('price'))
+
+        print(f"[DB] Item added: {kwargs.get('title', 'No title')}")
+        return item_id
+
+    def get_unsent_items(self):
+        """Get items that haven't been sent to Telegram"""
+        query = """
+            SELECT i.*, s.keyword as search_keyword
+            FROM items i
+            LEFT JOIN searches s ON i.search_id = s.id
+            WHERE i.is_sent = %s
+            ORDER BY i.found_at ASC
+        """
+        return self.execute_query(query, (False,), fetch=True)
+
+    def mark_item_sent(self, item_id):
+        """Mark item as sent"""
+        query = "UPDATE items SET is_sent = %s, sent_at = %s WHERE id = %s"
+        self.execute_query(query, (True, get_tokyo_time(), item_id))
+
+    def get_all_items(self, limit=100):
+        """Get recent items"""
+        query = """
+            SELECT i.*, s.keyword as search_keyword
+            FROM items i
+            LEFT JOIN searches s ON i.search_id = s.id
+            ORDER BY i.found_at DESC
+            LIMIT %s
+        """
+        return self.execute_query(query, (limit,), fetch=True)
+
+    def get_item_by_mercari_id(self, mercari_id):
+        """Get item by Mercari ID"""
+        query = "SELECT * FROM items WHERE mercari_id = %s"
+        result = self.execute_query(query, (mercari_id,), fetch=True)
+        return result[0] if result else None
+
+    # ==================== PRICE HISTORY ====================
+
+    def add_price_history(self, item_id, price):
+        """Add price record to history"""
+        query = """
+            INSERT INTO price_history (item_id, price)
+            VALUES (%s, %s)
+        """
+        self.execute_query(query, (item_id, price))
+
+    def get_price_history(self, item_id):
+        """Get price history for item"""
+        query = """
+            SELECT * FROM price_history
+            WHERE item_id = %s
+            ORDER BY recorded_at DESC
+        """
+        return self.execute_query(query, (item_id,), fetch=True)
+
+    def check_price_drop(self, mercari_id, current_price):
+        """Check if price has dropped for item"""
+        item = self.get_item_by_mercari_id(mercari_id)
+        if not item:
+            return False, None
+
+        history = self.get_price_history(item['id'])
+        if len(history) < 2:
+            return False, None
+
+        previous_price = history[1]['price']  # Second most recent
+
+        if current_price < previous_price:
+            return True, previous_price
+
+        return False, None
+
+    # ==================== SETTINGS ====================
+
+    def get_setting(self, key, default=None):
+        """Get setting value"""
+        query = "SELECT value FROM settings WHERE key = %s"
+        result = self.execute_query(query, (key,), fetch=True)
+
+        if result:
+            return result[0]['value']
+        return default
+
+    def set_setting(self, key, value):
+        """Set setting value"""
+        # Try to update first
+        query = "UPDATE settings SET value = %s, updated_at = %s WHERE key = %s"
+        cursor = self.execute_query(query, (value, get_tokyo_time(), key))
+
+        # If no rows affected, insert
+        if cursor.rowcount == 0:
+            query = "INSERT INTO settings (key, value) VALUES (%s, %s)"
+            self.execute_query(query, (key, value))
+
+    # ==================== ERROR TRACKING ====================
+
+    def log_error(self, error_message, error_type='general'):
+        """Log error to database"""
+        query = """
+            INSERT INTO error_tracking (error_message, error_type)
+            VALUES (%s, %s)
+        """
+        self.execute_query(query, (error_message, error_type))
+
+    def get_recent_errors(self, limit=10):
+        """Get recent errors"""
+        query = """
+            SELECT * FROM error_tracking
+            ORDER BY occurred_at DESC
+            LIMIT %s
+        """
+        return self.execute_query(query, (limit,), fetch=True)
+
+    def get_unresolved_error_count(self):
+        """Get count of unresolved errors"""
+        query = "SELECT COUNT(*) as count FROM error_tracking WHERE is_resolved = %s"
+        result = self.execute_query(query, (False,), fetch=True)
+        return result[0]['count'] if result else 0
+
+    def clear_old_errors(self, days=7):
+        """Clear errors older than specified days"""
+        cutoff = get_tokyo_time() - timedelta(days=days)
+        query = "DELETE FROM error_tracking WHERE occurred_at < %s"
+        self.execute_query(query, (cutoff,))
+
+    # ==================== LOGS ====================
+
+    def add_log(self, level, message):
+        """Add log entry"""
+        query = "INSERT INTO logs (level, message) VALUES (%s, %s)"
+        self.execute_query(query, (level, message))
+
+    def get_logs(self, limit=100, level=None):
+        """Get recent logs"""
+        if level:
+            query = """
+                SELECT * FROM logs
+                WHERE level = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """
+            return self.execute_query(query, (level, limit), fetch=True)
+        else:
+            query = "SELECT * FROM logs ORDER BY timestamp DESC LIMIT %s"
+            return self.execute_query(query, (limit,), fetch=True)
+
+    def clear_old_logs(self, days=7):
+        """Clear logs older than specified days"""
+        cutoff = get_tokyo_time() - timedelta(days=days)
+        query = "DELETE FROM logs WHERE timestamp < %s"
+        self.execute_query(query, (cutoff,))
+
+    # ==================== CLEANUP ====================
+
+    def cleanup_old_data(self):
+        """Clean up old data"""
+        # Delete old logs (7 days)
+        self.clear_old_logs(7)
+
+        # Delete old errors (7 days)
+        self.clear_old_errors(7)
+
+        # Delete sent items older than 30 days
+        cutoff = get_tokyo_time() - timedelta(days=30)
+        query = "DELETE FROM items WHERE is_sent = %s AND sent_at < %s"
+        self.execute_query(query, (True, cutoff))
+
+        print("[DB] Old data cleaned up")
+
+    # ==================== STATISTICS ====================
+
+    def get_statistics(self):
+        """Get database statistics"""
+        stats = {}
+
+        # Total searches
+        result = self.execute_query("SELECT COUNT(*) as count FROM searches", fetch=True)
+        stats['total_searches'] = result[0]['count'] if result else 0
+
+        # Active searches
+        result = self.execute_query("SELECT COUNT(*) as count FROM searches WHERE is_active = %s", (True,), fetch=True)
+        stats['active_searches'] = result[0]['count'] if result else 0
+
+        # Total items
+        result = self.execute_query("SELECT COUNT(*) as count FROM items", fetch=True)
+        stats['total_items'] = result[0]['count'] if result else 0
+
+        # Unsent items
+        result = self.execute_query("SELECT COUNT(*) as count FROM items WHERE is_sent = %s", (False,), fetch=True)
+        stats['unsent_items'] = result[0]['count'] if result else 0
+
+        # Total errors
+        result = self.execute_query("SELECT COUNT(*) as count FROM error_tracking WHERE is_resolved = %s", (False,), fetch=True)
+        stats['unresolved_errors'] = result[0]['count'] if result else 0
+
+        return stats
+
+    def close(self):
+        """Close database connection"""
+        if self.conn:
+            self.conn.close()
+            print("[DB] Connection closed")
+
+
+# Global database instance
+_db_manager = None
+
+
+def get_db():
+    """Get global database instance"""
+    global _db_manager
+    if _db_manager is None:
+        _db_manager = DatabaseManager()
+    return _db_manager
+
+
+if __name__ == "__main__":
+    # Test database
+    db = get_db()
+    print("\n=== Database Statistics ===")
+    stats = db.get_statistics()
+    for key, value in stats.items():
+        print(f"{key}: {value}")

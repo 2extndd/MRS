@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - MercariSearcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">System Logs</h1>
+
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Level</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp }}</td>
+                <td>
+                    <span class="badge bg-{{ 'danger' if log.level == 'ERROR' else ('warning' if log.level == 'WARNING' else 'info') }}">
+                        {{ log.level }}
+                    </span>
+                </td>
+                <td>{{ log.message }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

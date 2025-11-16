@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Queries - MercariSearcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Search Queries</h1>
+
+<button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addQueryModal">
+    <i class="bi bi-plus-circle"></i> Add Query
+</button>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Keyword</th>
+                <th>Price Range</th>
+                <th>Brand</th>
+                <th>Interval</th>
+                <th>Active</th>
+                <th>Scans</th>
+                <th>Items Found</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for search in searches %}
+            <tr>
+                <td>{{ search.id }}</td>
+                <td>{{ search.keyword or 'N/A' }}</td>
+                <td>
+                    {% if search.min_price or search.max_price %}
+                        ¥{{ search.min_price or '0' }} - ¥{{ search.max_price or '∞' }}
+                    {% else %}
+                        Any
+                    {% endif %}
+                </td>
+                <td>{{ search.brand or '-' }}</td>
+                <td>{{ search.scan_interval }}s</td>
+                <td>
+                    <span class="badge bg-{{ 'success' if search.is_active else 'secondary' }}">
+                        {{ 'Active' if search.is_active else 'Inactive' }}
+                    </span>
+                </td>
+                <td>{{ search.total_scans }}</td>
+                <td>{{ search.items_found }}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="toggleQuery({{ search.id }})">
+                        <i class="bi bi-toggle-on"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteQuery({{ search.id }})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Query Modal -->
+<div class="modal fade" id="addQueryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Search Query</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addQueryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Search URL</label>
+                        <input type="text" class="form-control" name="search_url" required>
+                        <small class="text-muted">Paste Mercari search URL</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Scan Interval (seconds)</label>
+                        <input type="number" class="form-control" name="scan_interval" value="300">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addQuery()">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addQuery() {
+    const form = document.getElementById('addQueryForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    fetch('/api/queries/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+}
+
+function toggleQuery(id) {
+    fetch(`/api/queries/${id}/toggle`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+    });
+}
+
+function deleteQuery(id) {
+    if (confirm('Delete this query?')) {
+        fetch(`/api/queries/${id}/delete`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+        });
+    }
+}
+</script>
+{% endblock %}

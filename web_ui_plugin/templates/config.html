@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - MercariSearcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Configuration</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5>Application Settings</h5></div>
+            <div class="card-body">
+                <table class="table">
+                    <tr><td>App Name</td><td>{{ config.APP_NAME }}</td></tr>
+                    <tr><td>Version</td><td>{{ config.APP_VERSION }}</td></tr>
+                    <tr><td>Mercari Base URL</td><td>{{ config.MERCARI_BASE_URL }}</td></tr>
+                    <tr><td>Display Currency</td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
+                    <tr><td>USD Conversion Rate</td><td>{{ config.USD_CONVERSION_RATE }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5>Scanner Settings</h5></div>
+            <div class="card-body">
+                <table class="table">
+                    <tr><td>Default Search Interval</td><td>{{ config.SEARCH_INTERVAL }}s</td></tr>
+                    <tr><td>Max Items Per Search</td><td>{{ config.MAX_ITEMS_PER_SEARCH }}</td></tr>
+                    <tr><td>Request Delay (Min)</td><td>{{ config.REQUEST_DELAY_MIN }}s</td></tr>
+                    <tr><td>Request Delay (Max)</td><td>{{ config.REQUEST_DELAY_MAX }}s</td></tr>
+                    <tr><td>Proxy Enabled</td><td>{{ 'Yes' if config.PROXY_ENABLED else 'No' }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5>Telegram Settings</h5></div>
+            <div class="card-body">
+                <table class="table">
+                    <tr><td>Bot Token</td><td>{{ '***' if config.TELEGRAM_BOT_TOKEN else 'Not set' }}</td></tr>
+                    <tr><td>Chat ID</td><td>{{ config.TELEGRAM_CHAT_ID or 'Not set' }}</td></tr>
+                    <tr><td>Thread ID</td><td>{{ config.TELEGRAM_THREAD_ID or 'Not set' }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5>Database Settings</h5></div>
+            <div class="card-body">
+                <table class="table">
+                    <tr><td>Database URL</td><td>{{ '***' if config.DATABASE_URL else 'SQLite (local)' }}</td></tr>
+                    <tr><td>SQLite Path</td><td>{{ config.SQLITE_DB_PATH }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
