@@ -164,6 +164,8 @@ def api_add_query():
         # Add to database
         db.add_search(
             search_url=search_url,
+            name=data.get('name'),
+            thread_id=data.get('thread_id'),
             keyword=data.get('keyword') or validation.get('keyword'),
             min_price=data.get('min_price') or validation.get('min_price'),
             max_price=data.get('max_price') or validation.get('max_price'),

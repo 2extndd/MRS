@@ -1,10 +1,11 @@
 """
-Main Mercari API wrapper class
+Main Mercari API wrapper class using mercapi library
 """
 
 import time
 import random
 import logging
+import asyncio
 from typing import Optional, Dict, Any, List
 from .items import Item, Items
 from .exceptions import (
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class Mercari:
     """
-    Mercari API wrapper using web scraping
+    Mercari API wrapper using mercapi library
     Compatible interface with pyKufarVN
     """
 
@@ -28,7 +29,7 @@ class Mercari:
         Initialize Mercari API wrapper
 
         Args:
-            proxy: Proxy URL (e.g., 'http://proxy:port')
+            proxy: Proxy URL (e.g., 'http://proxy:port') - NOT USED (mercapi doesn't support proxies yet)
             scraper: Custom scraper instance (for dependency injection)
         """
         self.proxy = proxy
@@ -40,12 +41,27 @@ class Mercari:
         self.min_delay = 1.5
         self.max_delay = 3.5
 
-        # Initialize scraper if not provided
+        # Initialize mercapi
         if not self.scraper:
-            from mercari_scraper import MercariScraper
-            self.scraper = MercariScraper(proxy=proxy)
+            try:
+                from mercapi import Mercapi
+                # mercapi is async, we'll create instance when needed
+                self._mercapi_class = Mercapi
+                self._mercapi = None
+            except ImportError as e:
+                logger.error(f"mercapi library not installed: {e}")
+                raise MercariConnectionError("mercapi library required. Install with: pip install mercapi")
 
-        logger.info(f"Mercari API initialized (proxy: {bool(proxy)})")
+        if proxy:
+            logger.warning("Proxy support not available with mercapi library")
+
+        logger.info(f"Mercari API initialized (using mercapi library)")
+
+    def _get_mercapi(self):
+        """Get or create mercapi instance"""
+        if self._mercapi is None:
+            self._mercapi = self._mercapi_class()
+        return self._mercapi
 
     def _rate_limit(self):
         """Apply rate limiting between requests"""
@@ -65,14 +81,12 @@ class Mercari:
 
         Args:
             new_proxy: New proxy URL or None to disable
+
+        Note: mercapi doesn't support proxies yet
         """
         self.proxy = new_proxy
-
-        # Reinitialize scraper with new proxy
-        from mercari_scraper import MercariScraper
-        self.scraper = MercariScraper(proxy=new_proxy)
-
-        logger.info(f"Proxy changed: {bool(new_proxy)}")
+        if new_proxy:
+            logger.warning("Proxy support not available with mercapi library")
 
     def test_connection(self) -> bool:
         """
@@ -82,9 +96,16 @@ class Mercari:
             True if connection successful
         """
         try:
-            from configuration_values import config
-            html = self.scraper.get_page(config.MERCARI_BASE_URL)
-            return html is not None
+            # Try a simple search to test connection
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                m = self._get_mercapi()
+                # Search for common keyword
+                result = loop.run_until_complete(m.search('test'))
+                return result is not None
+            finally:
+                loop.close()
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
@@ -94,7 +115,7 @@ class Mercari:
         Search for items on Mercari
 
         Args:
-            search_url: Full Mercari search URL
+            search_url: Full Mercari search URL or keyword
             limit: Maximum number of items to return
 
         Returns:
@@ -109,13 +130,87 @@ class Mercari:
 
             logger.info(f"Searching Mercari: {search_url[:80]}...")
 
-            items_data = self.scraper.search_items(search_url, limit=limit)
+            # Extract keyword from URL if it's a full URL
+            keyword = self._extract_keyword_from_url(search_url)
 
-            if items_data is None:
-                raise MercariConnectionError("Failed to fetch search results")
+            # Run async search in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                m = self._get_mercapi()
+                results = loop.run_until_complete(m.search(keyword))
+
+                # Convert mercapi results to our Items format
+                items_data = []
+                item_count = 0
+
+                for item in results.items:
+                    if item_count >= limit:
+                        break
+
+                    # Get item attributes
+                    item_id = getattr(item, 'id_', None)
+                    if not item_id:
+                        continue
+
+                    # Build item data dict
+                    item_dict = {
+                        'mercari_id': item_id,
+                        'title': getattr(item, 'name', ''),
+                        'price': getattr(item, 'price', 0),
+                        'currency': 'JPY',
+                        'item_url': f"https://jp.mercari.com/item/{item_id}",
+                        'image_url': None,
+                        'brand': None,
+                        'condition': None,
+                        'size': None,
+                        'shipping_cost': 0,
+                        'stock_quantity': 1,
+                        'seller_name': None,
+                        'seller_rating': None,
+                        'location': None,
+                        'category': None,
+                        'description': ''
+                    }
+
+                    # Get thumbnail
+                    thumbnails = getattr(item, 'thumbnails', [])
+                    if thumbnails:
+                        item_dict['image_url'] = thumbnails[0]
+
+                    # Try to get full item details for first few items
+                    if item_count < 10:  # Only get full details for first 10 to save time
+                        try:
+                            full_item = loop.run_until_complete(item.full_item())
+
+                            # Update with full details
+                            item_dict['description'] = getattr(full_item, 'description', '')[:500]
+
+                            # Item condition
+                            if hasattr(full_item, 'item_condition') and full_item.item_condition:
+                                if hasattr(full_item.item_condition, 'name'):
+                                    item_dict['condition'] = full_item.item_condition.name
+
+                            # Category
+                            if hasattr(full_item, 'item_category') and full_item.item_category:
+                                if hasattr(full_item.item_category, 'name'):
+                                    item_dict['category'] = full_item.item_category.name
+
+                            # Seller
+                            if hasattr(full_item, 'seller') and full_item.seller:
+                                item_dict['seller_name'] = getattr(full_item.seller, 'name', None)
+                                item_dict['seller_rating'] = getattr(full_item.seller, 'rating', None)
+
+                        except Exception as e:
+                            logger.debug(f"Could not get full item details for {item_id}: {e}")
+
+                    items_data.append(item_dict)
+                    item_count += 1
+
+            finally:
+                loop.close()
 
             items = Items(items_data)
-
             logger.info(f"Found {len(items)} items")
 
             return items
@@ -126,12 +221,47 @@ class Mercari:
             logger.error(f"Search failed: {e}")
             raise MercariAPIError(f"Search error: {e}")
 
+    def _extract_keyword_from_url(self, search_url: str) -> str:
+        """
+        Extract keyword from Mercari search URL
+
+        Args:
+            search_url: Full URL or keyword
+
+        Returns:
+            Keyword string
+        """
+        # If it's not a URL, return as is
+        if not search_url.startswith('http'):
+            return search_url
+
+        # Parse URL to extract keyword parameter
+        from urllib.parse import urlparse, parse_qs
+
+        try:
+            parsed = urlparse(search_url)
+            params = parse_qs(parsed.query)
+
+            # Get keyword parameter
+            keyword = params.get('keyword', [''])[0]
+
+            if keyword:
+                return keyword.strip()
+
+            # If no keyword, use empty search (will return popular items)
+            logger.warning(f"No keyword found in URL: {search_url}")
+            return ""
+
+        except Exception as e:
+            logger.error(f"Failed to parse URL: {e}")
+            return ""
+
     def get_item(self, item_url: str) -> Optional[Item]:
         """
         Get detailed information for a specific item
 
         Args:
-            item_url: Full Mercari item URL
+            item_url: Full Mercari item URL or item ID
 
         Returns:
             Item object or None if not found
@@ -139,14 +269,66 @@ class Mercari:
         try:
             self._rate_limit()
 
-            logger.info(f"Getting item details: {item_url}")
+            # Extract item ID from URL
+            item_id = item_url
+            if '/item/' in item_url:
+                item_id = item_url.split('/item/')[-1].split('?')[0]
 
-            item_data = self.scraper.get_item_details(item_url)
+            logger.info(f"Getting item details: {item_id}")
 
-            if not item_data:
-                return None
+            # Run async in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                m = self._get_mercapi()
+                full_item = loop.run_until_complete(m.item(item_id))
 
-            return Item(item_data)
+                if not full_item:
+                    return None
+
+                # Convert to our Item format
+                item_data = {
+                    'mercari_id': item_id,
+                    'title': getattr(full_item, 'name', ''),
+                    'price': getattr(full_item, 'price', 0),
+                    'currency': 'JPY',
+                    'item_url': f"https://jp.mercari.com/item/{item_id}",
+                    'image_url': None,
+                    'description': getattr(full_item, 'description', ''),
+                    'brand': None,
+                    'condition': None,
+                    'size': None,
+                    'shipping_cost': 0,
+                    'stock_quantity': 1,
+                    'seller_name': None,
+                    'seller_rating': None,
+                    'location': None,
+                    'category': None
+                }
+
+                # Get photos
+                if hasattr(full_item, 'photos') and full_item.photos:
+                    item_data['image_url'] = full_item.photos[0]
+
+                # Item condition
+                if hasattr(full_item, 'item_condition') and full_item.item_condition:
+                    if hasattr(full_item.item_condition, 'name'):
+                        item_data['condition'] = full_item.item_condition.name
+
+                # Category
+                if hasattr(full_item, 'item_category') and full_item.item_category:
+                    if hasattr(full_item.item_category, 'name'):
+                        item_data['category'] = full_item.item_category.name
+
+                # Seller
+                if hasattr(full_item, 'seller') and full_item.seller:
+                    item_data['seller_name'] = getattr(full_item.seller, 'name', None)
+                    item_data['seller_rating'] = getattr(full_item.seller, 'rating', None)
+
+                return Item(item_data)
+
+            finally:
+                loop.close()
 
         except Exception as e:
             logger.error(f"Failed to get item: {e}")
@@ -227,11 +409,12 @@ class Mercari:
             'proxy_enabled': bool(self.proxy),
             'proxy': self.proxy if self.proxy else 'None',
             'min_delay': self.min_delay,
-            'max_delay': self.max_delay
+            'max_delay': self.max_delay,
+            'library': 'mercapi'
         }
 
     def __repr__(self):
-        return f"<Mercari API (requests: {self.request_count}, proxy: {bool(self.proxy)})>"
+        return f"<Mercari API (mercapi) (requests: {self.request_count})>"
 
 
 if __name__ == "__main__":
@@ -245,14 +428,15 @@ if __name__ == "__main__":
 
     # Test search URL building
     search_url = api.build_search_url(
-        keyword='ナイキ',
+        keyword='Y-3',
         min_price=1000,
-        max_price=10000
+        max_price=50000
     )
     print(f"Search URL: {search_url}")
 
     # Test search
-    # items = api.search(search_url, limit=5)
-    # print(f"Found {len(items)} items")
-    # for item in items:
-    #     print(f"  - {item}")
+    print("\nTesting search...")
+    items = api.search(search_url, limit=5)
+    print(f"Found {len(items)} items")
+    for item in items:
+        print(f"  - {item}")

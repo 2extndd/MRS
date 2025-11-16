@@ -72,6 +72,8 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS searches (
                 id SERIAL PRIMARY KEY,
                 search_url TEXT NOT NULL,
+                name TEXT,
+                thread_id TEXT,
                 keyword TEXT,
                 min_price INTEGER,
                 max_price INTEGER,
@@ -92,6 +94,21 @@ class DatabaseManager:
                 items_found INTEGER DEFAULT 0
             )
         """)
+
+        # Migrate existing searches table if it doesn't have name/thread_id
+        try:
+            self.execute_query("""
+                ALTER TABLE searches ADD COLUMN IF NOT EXISTS name TEXT
+            """)
+        except:
+            pass
+
+        try:
+            self.execute_query("""
+                ALTER TABLE searches ADD COLUMN IF NOT EXISTS thread_id TEXT
+            """)
+        except:
+            pass
 
         # Items table with Mercari-specific fields
         self.execute_query("""
@@ -204,13 +221,15 @@ class DatabaseManager:
         """Add new search query"""
         query = """
             INSERT INTO searches
-            (search_url, keyword, min_price, max_price, category_id, brand,
+            (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
              condition, size, color, shipping_payer, item_status, sort_order,
              scan_interval, notify_on_price_drop)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         params = (
             search_url,
+            kwargs.get('name'),
+            kwargs.get('thread_id'),
             kwargs.get('keyword'),
             kwargs.get('min_price'),
             kwargs.get('max_price'),
@@ -226,7 +245,8 @@ class DatabaseManager:
             kwargs.get('notify_on_price_drop', False)
         )
         self.execute_query(query, params)
-        print(f"[DB] Search added: {kwargs.get('keyword', 'No keyword')}")
+        search_name = kwargs.get('name') or kwargs.get('keyword', 'No name')
+        print(f"[DB] Search added: {search_name}")
 
     def get_all_searches(self):
         """Get all searches"""
