@@ -184,6 +184,49 @@ def api_add_query():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/queries/<int:query_id>', methods=['GET'])
+def api_get_query(query_id):
+    """Get single query details"""
+    try:
+        query = db.get_search_by_id(query_id)
+        if not query:
+            return jsonify({'success': False, 'error': 'Query not found'}), 404
+        return jsonify({'success': True, 'query': query})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/queries/<int:query_id>', methods=['PUT'])
+def api_update_query(query_id):
+    """Update query"""
+    try:
+        data = request.get_json()
+        search_url = data.get('search_url')
+
+        if not search_url:
+            return jsonify({'success': False, 'error': 'search_url required'}), 400
+
+        # Validate URL
+        validation = validate_search_url(search_url)
+        if not validation.get('valid'):
+            return jsonify({'success': False, 'error': validation.get('error', 'Invalid URL')}), 400
+
+        # Update query
+        db.update_search(
+            query_id,
+            search_url=search_url,
+            name=data.get('name'),
+            thread_id=data.get('thread_id'),
+            keyword=data.get('keyword') or validation.get('keyword')
+        )
+
+        return jsonify({'success': True, 'message': 'Query updated successfully'})
+
+    except Exception as e:
+        logger.error(f"Error updating query: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/queries/<int:query_id>/toggle', methods=['POST'])
 def api_toggle_query(query_id):
     """Toggle query active status"""

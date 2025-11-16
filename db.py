@@ -330,6 +330,41 @@ class DatabaseManager:
             return new_status
         return None
 
+    def get_search_by_id(self, search_id):
+        """Get single search by ID"""
+        query = "SELECT * FROM searches WHERE id = %s"
+        result = self.execute_query(query, (search_id,), fetch=True)
+        return result[0] if result else None
+
+    def update_search(self, search_id, **kwargs):
+        """Update search query"""
+        updates = []
+        params = []
+
+        if 'search_url' in kwargs:
+            updates.append("search_url = %s")
+            params.append(kwargs['search_url'])
+
+        if 'name' in kwargs:
+            updates.append("name = %s")
+            params.append(kwargs['name'])
+
+        if 'thread_id' in kwargs:
+            updates.append("thread_id = %s")
+            params.append(kwargs['thread_id'])
+
+        if 'keyword' in kwargs:
+            updates.append("keyword = %s")
+            params.append(kwargs['keyword'])
+
+        if not updates:
+            return
+
+        params.append(search_id)
+        query = f"UPDATE searches SET {', '.join(updates)} WHERE id = %s"
+        self.execute_query(query, tuple(params))
+        print(f"[DB] Search {search_id} updated")
+
     def delete_search(self, search_id):
         """Delete search"""
         query = "DELETE FROM searches WHERE id = %s"
