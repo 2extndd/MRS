@@ -5,28 +5,54 @@
 {% block content %}
 <h1 class="mb-4">System Logs</h1>
 
+<!-- Filter Controls -->
+<div class="mb-3">
+    <div class="btn-group" role="group">
+        <a href="/logs" class="btn btn-sm btn-outline-secondary {{ 'active' if not request.args.get('level') else '' }}">All</a>
+        <a href="/logs?level=INFO" class="btn btn-sm btn-outline-info {{ 'active' if request.args.get('level') == 'INFO' else '' }}">INFO</a>
+        <a href="/logs?level=WARNING" class="btn btn-sm btn-outline-warning {{ 'active' if request.args.get('level') == 'WARNING' else '' }}">WARNING</a>
+        <a href="/logs?level=ERROR" class="btn btn-sm btn-outline-danger {{ 'active' if request.args.get('level') == 'ERROR' else '' }}">ERROR</a>
+    </div>
+</div>
+
 <div class="table-responsive">
-    <table class="table table-sm">
-        <thead>
+    <table class="table table-sm table-hover">
+        <thead class="table-light">
             <tr>
-                <th>Timestamp</th>
-                <th>Level</th>
+                <th style="width: 180px;">Timestamp</th>
+                <th style="width: 100px;">Level</th>
                 <th>Message</th>
             </tr>
         </thead>
         <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.timestamp }}</td>
-                <td>
-                    <span class="badge bg-{{ 'danger' if log.level == 'ERROR' else ('warning' if log.level == 'WARNING' else 'info') }}">
-                        {{ log.level }}
-                    </span>
-                </td>
-                <td>{{ log.message }}</td>
-            </tr>
-            {% endfor %}
+            {% if logs %}
+                {% for log in logs %}
+                <tr>
+                    <td><small class="text-muted">{{ log.timestamp }}</small></td>
+                    <td>
+                        <span class="badge bg-{{ 'danger' if log.level == 'ERROR' else ('warning' if log.level == 'WARNING' else 'info') }}">
+                            {{ log.level }}
+                        </span>
+                    </td>
+                    <td>{{ log.message }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">No logs available yet</p>
+                        <small>Logs will appear here as the bot runs searches and processes items</small>
+                    </td>
+                </tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
+
+{% if logs and logs|length >= 100 %}
+<div class="alert alert-info mt-3">
+    <i class="bi bi-info-circle"></i> Showing last 100 logs. Older logs are automatically cleaned up.
+</div>
+{% endif %}
 {% endblock %}
