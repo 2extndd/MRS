@@ -32,7 +32,23 @@ def index():
     """Dashboard"""
     try:
         stats = db.get_statistics()
-        state_stats = shared_state.get_stats_summary()
+        # Try to get shared_state stats with timeout fallback
+        try:
+            state_stats = shared_state.get_stats_summary()
+        except Exception as e:
+            logger.warning(f"Shared state unavailable (web-only mode?): {e}")
+            # Provide default stats for web-only mode
+            state_stats = {
+                "scanner_running": False,
+                "scanner_paused": False,
+                "uptime": "N/A (web-only mode)",
+                "total_scans": 0,
+                "total_items_found": 0,
+                "items_per_hour": 0,
+                "avg_scan_duration": 0,
+                "worker_status": "not running",
+                "telegram_connected": False
+            }
 
         return render_template('dashboard.html',
                              stats=stats,

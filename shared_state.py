@@ -156,9 +156,12 @@ class SharedState:
 
     def get_stats_summary(self):
         """Get formatted stats summary"""
+        # Get uptime outside of lock to avoid deadlock
+        uptime_formatted = self.get_uptime_formatted()
+
         with self._lock:
             return {
-                "uptime": self.get_uptime_formatted(),
+                "uptime": uptime_formatted,
                 "total_scans": self._state.get("total_scans", 0),
                 "total_items_found": self._state.get("total_items_found", 0),
                 "total_notifications_sent": self._state.get("total_notifications_sent", 0),
