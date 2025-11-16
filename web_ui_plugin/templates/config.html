@@ -13,17 +13,23 @@
     <div class="card-body">
         <form id="systemSettingsForm">
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     <label class="form-label">Items Per Query</label>
                     <input type="number" class="form-control" name="max_items_per_search"
                            value="{{ config.MAX_ITEMS_PER_SEARCH }}" min="1" max="120">
-                    <small class="text-muted">Maximum number of items to fetch per search query</small>
+                    <small class="text-muted">How many items to scan per query</small>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Query Refresh Delay (seconds)</label>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Query Delay (seconds)</label>
                     <input type="number" class="form-control" name="search_interval"
                            value="{{ config.SEARCH_INTERVAL }}" min="60" max="3600">
-                    <small class="text-muted">Global delay between searches for all queries</small>
+                    <small class="text-muted">Global delay between all queries</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">JPY to USD Rate</label>
+                    <input type="number" step="0.0001" class="form-control" name="usd_conversion_rate"
+                           value="{{ config.USD_CONVERSION_RATE }}" min="0.0001" max="1">
+                    <small class="text-muted">Current: 159¥ ≈ 1$ (0.0063)</small>
                 </div>
             </div>
             <button type="button" class="btn btn-primary" onclick="saveSystemSettings()">
@@ -190,13 +196,11 @@
                     <tr><td><strong>App Name:</strong></td><td>{{ config.APP_NAME }}</td></tr>
                     <tr><td><strong>Version:</strong></td><td>{{ config.APP_VERSION }}</td></tr>
                     <tr><td><strong>Mercari URL:</strong></td><td><a href="{{ config.MERCARI_BASE_URL }}" target="_blank">{{ config.MERCARI_BASE_URL }}</a></td></tr>
-                    <tr><td><strong>Display Currency:</strong></td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
                 </table>
             </div>
             <div class="col-md-6">
                 <table class="table table-sm">
-                    <tr><td><strong>Database:</strong></td><td>{{ 'PostgreSQL' if config.DATABASE_URL else 'SQLite' }}</td></tr>
-                    <tr><td><strong>Request Delay:</strong></td><td>{{ config.REQUEST_DELAY_MIN }}s - {{ config.REQUEST_DELAY_MAX }}s</td></tr>
+                    <tr><td><strong>Display Currency:</strong></td><td>{{ config.DISPLAY_CURRENCY }}</td></tr>
                     <tr><td><strong>Log Level:</strong></td><td>{{ config.LOG_LEVEL }}</td></tr>
                     <tr><td><strong>Port:</strong></td><td>{{ config.PORT }}</td></tr>
                 </table>
