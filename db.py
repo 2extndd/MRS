@@ -179,6 +179,15 @@ class DatabaseManager:
             )
         """)
 
+        # Key-value store for configuration
+        self.execute_query("""
+            CREATE TABLE IF NOT EXISTS key_value_store (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         self.conn.commit()
         print("[DB] Tables created successfully")
 
