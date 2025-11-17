@@ -131,58 +131,7 @@ class Mercari:
             # Extract keyword from URL if it's a full URL
             keyword = self._extract_keyword_from_url(search_url)
 
-            # Run async search in sync context using asyncio.run()
-            async def _perform_search():
-                m = self._get_mercapi()
-                results = await m.search(keyword)
-
-                # Convert mercapi results to our Items format
-                items_data = []
-                item_count = 0
-
-                for item in results.items:
-                    if item_count >= limit:
-                        break
-
-                    # Get item attributes
-                    item_id = getattr(item, 'id_', None)
-                    if not item_id:
-                        continue
-
-                    # Build item data dict
-                    item_dict = {
-                        'mercari_id': item_id,
-                        'title': getattr(item, 'name', ''),
-                        'price': getattr(item, 'price', 0),
-                        'currency': 'JPY',
-                        'item_url': f"https://jp.mercari.com/item/{item_id}",
-                        'image_url': None,
-                        'brand': None,
-                        'condition': None,
-                        'size': None,
-                        'shipping_cost': 0,
-                        'stock_quantity': 1,
-                        'seller_name': None,
-                        'seller_rating': None,
-                        'location': None,
-                        'category': None,
-                        'description': ''
-                    }
-
-                    # Get thumbnail
-                    thumbnails = getattr(item, 'thumbnails', [])
-                    if thumbnails:
-                        item_dict['image_url'] = thumbnails[0]
-
-                    # Disabled: Fetching full item details to avoid nested async issues
-                    # Can be re-enabled later if needed with proper async handling
-
-                    items_data.append(item_dict)
-                    item_count += 1
-
-                return items_data
-
-            items_data = asyncio.run(_perform_search())
+            # Run async search in sync context
             # Try to get existing event loop, create new one if needed
             try:
                 loop = asyncio.get_event_loop()
@@ -342,12 +291,11 @@ class Mercari:
             logger.info(f"Getting item details: {item_id}")
 
             # Run async in sync context
-            async def _get_item():
-                m = self._get_mercapi()
-                return await m.item(item_id)
-
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                full_item = asyncio.run(_get_item())
+                m = self._get_mercapi()
+                full_item = loop.run_until_complete(m.item(item_id))
 
                 if not full_item:
                     return None
@@ -392,6 +340,9 @@ class Mercari:
                     item_data['seller_rating'] = getattr(full_item.seller, 'rating', None)
 
                 return Item(item_data)
+
+            finally:
+                loop.close()
 
         except Exception as e:
             logger.error(f"Failed to get item: {e}")
