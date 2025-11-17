@@ -98,18 +98,23 @@ def configuration():
                 config_dict[clean_key] = int(value)
             except (ValueError, TypeError):
                 # Try bool
-                if value.lower() in ('true', 'false'):
+                if isinstance(value, str) and value.lower() in ('true', 'false'):
                     config_dict[clean_key] = value.lower() == 'true'
                 else:
                     # Keep as string
                     config_dict[clean_key] = value
     except Exception as e:
         logger.error(f"Error loading config from database: {e}")
-        # Fall back to default config if DB fails
-        config_dict = config
 
-    # Merge with default config (use DB values if available, otherwise defaults)
-    final_config = {**config, **config_dict}
+    # Create final config dict from Config class attributes + DB overrides
+    final_config = {
+        'SEARCH_INTERVAL': config_dict.get('scan_interval', config.SEARCH_INTERVAL),
+        'MAX_ITEMS_PER_SEARCH': config_dict.get('max_items', config.MAX_ITEMS_PER_SEARCH),
+        'REQUEST_DELAY_MIN': config_dict.get('request_delay', config.REQUEST_DELAY_MIN),
+        'PROXY_ENABLED': config_dict.get('proxy_enabled', config.PROXY_ENABLED),
+        'TELEGRAM_BOT_TOKEN': config.TELEGRAM_BOT_TOKEN,
+        'TELEGRAM_CHAT_ID': config.TELEGRAM_CHAT_ID,
+    }
 
     return render_template('config.html', config=final_config)
 
