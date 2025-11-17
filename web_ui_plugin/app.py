@@ -402,7 +402,7 @@ def api_save_system_config():
         return jsonify({
             'success': True,
             'message': f'Saved {saved_count} settings to database',
-            'note': 'Some settings (like intervals) require service restart to take effect'
+            'note': 'Settings will be applied automatically within 10 seconds'
         })
     except Exception as e:
         logger.error(f"Error saving system config: {e}")

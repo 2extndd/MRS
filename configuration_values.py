@@ -4,14 +4,18 @@ Adapted from KufarSearcher for Mercari.jp marketplace
 """
 
 import os
+import time
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 
 class Config:
-    """Configuration class for Mercari Scanner"""
+    """Configuration class for Mercari Scanner with hot reload support"""
 
     # Application Info
     APP_NAME = "MercariSearcher"
@@ -58,6 +62,11 @@ class Config:
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE = os.getenv("LOG_FILE", "mercari_scanner.log")
+
+    # Hot reload state
+    _config_cache = {}
+    _last_reload_time = 0
+    _reload_interval = 10  # Check every 10 seconds
 
     # Currency Settings
     DEFAULT_CURRENCY = "JPY"
@@ -107,6 +116,49 @@ class Config:
         if cls.DISPLAY_CURRENCY == "USD":
             return "$"
         return cls.CURRENCY_SYMBOL
+
+    @classmethod
+    def reload_if_needed(cls):
+        """Hot reload config from database if enough time has passed"""
+        current_time = time.time()
+
+        if current_time - cls._last_reload_time < cls._reload_interval:
+            return False  # Too soon to check again
+
+        cls._last_reload_time = current_time
+
+        try:
+            # Import here to avoid circular dependency
+            from db import get_db
+
+            db = get_db()
+            new_config = db.get_all_config()
+
+            if new_config != cls._config_cache:
+                logger.info("[CONFIG] Configuration changed, hot reloading...")
+
+                # Update runtime settings from database
+                if 'config_scan_interval' in new_config:
+                    cls.SEARCH_INTERVAL = int(new_config['config_scan_interval'])
+
+                if 'config_max_items' in new_config:
+                    cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items'])
+
+                if 'config_request_delay' in new_config:
+                    cls.REQUEST_DELAY_MIN = float(new_config['config_request_delay'])
+                    cls.REQUEST_DELAY_MAX = float(new_config['config_request_delay']) + 2.0
+
+                if 'config_proxy_enabled' in new_config:
+                    cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
+
+                cls._config_cache = new_config
+                logger.info(f"[CONFIG] ✅ Hot reload complete! scan_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}")
+                return True
+
+        except Exception as e:
+            logger.error(f"[CONFIG] Hot reload failed: {e}")
+
+        return False
 
     @classmethod
     def validate_config(cls):

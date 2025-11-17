@@ -167,6 +167,9 @@ class MercariNotificationApp:
 
         while True:
             try:
+                # HOT RELOAD CONFIG EVERY ITERATION
+                config.reload_if_needed()
+
                 schedule.run_pending()
                 time.sleep(1)
             except KeyboardInterrupt:
