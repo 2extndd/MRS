@@ -29,9 +29,9 @@
     <div class="col-md-3 mb-3">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Active Queries</h5>
-                <h2 id="active-queries">{{ stats.active_searches }}</h2>
-                <small class="text-muted">monitored searches</small>
+                <h5 class="card-title">API Requests</h5>
+                <h2 id="api-requests">{{ state_stats.total_api_requests }}</h2>
+                <small class="text-muted">since start</small>
             </div>
         </div>
     </div>
@@ -39,9 +39,9 @@
     <div class="col-md-3 mb-3">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">API Requests</h5>
-                <h2 id="api-requests">{{ state_stats.total_api_requests }}</h2>
-                <small class="text-muted">since start</small>
+                <h5 class="card-title">System Uptime</h5>
+                <h2 id="uptime">{{ state_stats.uptime }}</h2>
+                <small class="text-muted">hours:minutes:seconds</small>
             </div>
         </div>
     </div>

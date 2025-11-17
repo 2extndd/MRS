@@ -640,6 +640,66 @@ class DatabaseManager:
             self.conn.close()
             print("[DB] Connection closed")
 
+    # ==================== CONFIG MANAGEMENT ====================
+
+    def save_config(self, key, value):
+        """Save configuration value to database"""
+        import json
+        try:
+            value_str = json.dumps(value) if not isinstance(value, str) else value
+            query = """
+                INSERT INTO key_value_store (key, value, updated_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = CURRENT_TIMESTAMP
+            """
+            if self.db_type == 'sqlite':
+                query = """
+                    INSERT OR REPLACE INTO key_value_store (key, value, updated_at)
+                    VALUES (?, ?, datetime('now'))
+                """
+                self.execute_query(query, (key, value_str, value_str))
+            else:
+                self.execute_query(query, (key, value_str, value_str))
+            print(f"[DB] Config saved: {key}")
+            return True
+        except Exception as e:
+            print(f"[DB ERROR] Failed to save config {key}: {e}")
+            return False
+
+    def load_config(self, key, default=None):
+        """Load configuration value from database"""
+        import json
+        try:
+            query = "SELECT value FROM key_value_store WHERE key = %s"
+            result = self.execute_query(query, (key,), fetch=True)
+            if result and len(result) > 0:
+                value_str = result[0]['value']
+                try:
+                    return json.loads(value_str)
+                except:
+                    return value_str
+            return default
+        except Exception as e:
+            print(f"[DB ERROR] Failed to load config {key}: {e}")
+            return default
+
+    def get_all_config(self):
+        """Get all configuration values"""
+        import json
+        try:
+            query = "SELECT key, value FROM key_value_store"
+            results = self.execute_query(query, fetch=True)
+            config_dict = {}
+            for row in results:
+                try:
+                    config_dict[row['key']] = json.loads(row['value'])
+                except:
+                    config_dict[row['key']] = row['value']
+            return config_dict
+        except Exception as e:
+            print(f"[DB ERROR] Failed to load all config: {e}")
+            return {}
+
 
 # Global database instance
 _db_manager = None

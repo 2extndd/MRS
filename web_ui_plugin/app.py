@@ -391,9 +391,19 @@ def api_save_system_config():
     """Save system configuration"""
     try:
         data = request.get_json()
-        # TODO: Implement config saving to .env or database
         logger.info(f"System config update requested: {data}")
-        return jsonify({'success': True, 'message': 'Settings will be applied on restart'})
+
+        # Save each config value to database
+        saved_count = 0
+        for key, value in data.items():
+            if db.save_config(f"config_{key}", value):
+                saved_count += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Saved {saved_count} settings to database',
+            'note': 'Some settings (like intervals) require service restart to take effect'
+        })
     except Exception as e:
         logger.error(f"Error saving system config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
