@@ -85,7 +85,33 @@ def items():
 @app.route('/config')
 def configuration():
     """Configuration page"""
-    return render_template('config.html', config=config)
+    # Load config from database
+    config_dict = {}
+    try:
+        all_config = db.get_all_config()
+        for key, value in all_config.items():
+            # Remove 'config_' prefix if present
+            clean_key = key.replace('config_', '')
+            # Try to convert to appropriate type
+            try:
+                # Try int first
+                config_dict[clean_key] = int(value)
+            except (ValueError, TypeError):
+                # Try bool
+                if value.lower() in ('true', 'false'):
+                    config_dict[clean_key] = value.lower() == 'true'
+                else:
+                    # Keep as string
+                    config_dict[clean_key] = value
+    except Exception as e:
+        logger.error(f"Error loading config from database: {e}")
+        # Fall back to default config if DB fails
+        config_dict = config
+
+    # Merge with default config (use DB values if available, otherwise defaults)
+    final_config = {**config, **config_dict}
+
+    return render_template('config.html', config=final_config)
 
 
 @app.route('/logs')

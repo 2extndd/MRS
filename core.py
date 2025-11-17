@@ -124,7 +124,16 @@ class MercariSearcher:
 
         for search in ready_searches:
             try:
-                logger.info(f"\n--- Processing search ID {search['id']}: {search.get('keyword', 'No keyword')} ---")
+                # Get query name for better logging
+                query_name = search.get('name', search.get('keyword', f"Query ID {search['id']}"))
+
+                logger.info(f"\n{'='*60}")
+                logger.info(f"[SCAN] 🔍 Scanning query: {query_name}")
+                logger.info(f"[SCAN] Query ID: {search['id']}")
+                logger.info(f"[SCAN] Search URL: {search.get('search_url', 'N/A')[:80]}...")
+                logger.info(f"{'='*60}")
+
+                self.db.add_log_entry('INFO', f"🔍 Scanning query: {query_name}", 'scanner', f"ID: {search['id']}")
 
                 # Perform search
                 items_result = self.search_query(search)
@@ -134,15 +143,24 @@ class MercariSearcher:
                     results['total_items_found'] += items_result['items_found']
                     results['new_items'] += items_result['new_items']
 
-                    logger.info(f"✓ Search {search['id']} completed: {items_result['items_found']} items, {items_result['new_items']} new")
+                    logger.info(f"[SCAN] ✅ Search completed: {items_result['items_found']} total items, {items_result['new_items']} NEW items")
+
+                    # Log names of new items found
+                    if items_result.get('items_data'):
+                        logger.info(f"[SCAN] 📦 New items found:")
+                        for idx, item in enumerate(items_result['items_data'][:10], 1):  # Log first 10
+                            logger.info(f"[SCAN]    {idx}. {item.get('title', 'Unknown')} - ¥{item.get('price', 0)}")
+                        if len(items_result['items_data']) > 10:
+                            logger.info(f"[SCAN]    ... and {len(items_result['items_data']) - 10} more")
+
                     self.db.add_log_entry('INFO',
-                        f"Search completed: {items_result['items_found']} items, {items_result['new_items']} new",
-                        'search', f"ID: {search['id']}, Keyword: {search.get('keyword', 'N/A')}")
+                        f"✅ Found {items_result['items_found']} items ({items_result['new_items']} new) in {query_name}",
+                        'search', f"ID: {search['id']}")
                 else:
                     results['failed_searches'] += 1
                     error_msg = items_result.get('error', 'Unknown error')
-                    logger.warning(f"✗ Search {search['id']} failed: {error_msg}")
-                    self.db.add_log_entry('WARNING', f"Search failed: {error_msg}", 'search', f"ID: {search['id']}")
+                    logger.warning(f"[SCAN] ❌ Search failed: {error_msg}")
+                    self.db.add_log_entry('WARNING', f"Search failed: {error_msg}", 'search', f"ID: {search['id']}, Query: {query_name}")
 
                 # Update search scan time
                 self.db.update_search_scan_time(search['id'])

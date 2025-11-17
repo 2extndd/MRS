@@ -142,14 +142,12 @@ class MercariNotificationApp:
         """Run the scheduler"""
         logger.info("\n" + "=" * 60)
         logger.info("Starting scheduler")
-        logger.info(f"Search cycle will run every 60 seconds")
+        logger.info(f"Search cycle will run every {config.SEARCH_INTERVAL} seconds (Query Delay)")
         logger.info(f"Individual queries use their own scan intervals")
         logger.info("=" * 60 + "\n")
 
-        # Schedule tasks
-        schedule.every(60).seconds.do(self.search_and_notify)
-        schedule.every().day.at("03:00").do(self.cleanup_old_data)
-        schedule.every(2).hours.do(self.refresh_proxies)
+        # Initial schedule setup
+        self._setup_schedule()
 
         # Send startup notification
         try:
@@ -173,10 +171,17 @@ class MercariNotificationApp:
         logger.info(f"[STARTUP] Config hot reload: enabled (every {config._reload_interval}s)")
         logger.info("="*60)
 
+        last_interval = config.SEARCH_INTERVAL
+
         while True:
             try:
                 # HOT RELOAD CONFIG EVERY ITERATION
-                config.reload_if_needed()
+                if config.reload_if_needed():
+                    # If search interval changed, recreate schedule
+                    if config.SEARCH_INTERVAL != last_interval:
+                        logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
+                        self._setup_schedule()
+                        last_interval = config.SEARCH_INTERVAL
 
                 schedule.run_pending()
                 time.sleep(1)
@@ -189,6 +194,18 @@ class MercariNotificationApp:
 
         # Cleanup
         self.shutdown()
+
+    def _setup_schedule(self):
+        """Setup or recreate the schedule with current config"""
+        # Clear existing jobs
+        schedule.clear()
+
+        # Schedule tasks - use config.SEARCH_INTERVAL (Query Delay)
+        schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_and_notify)
+        schedule.every().day.at("03:00").do(self.cleanup_old_data)
+        schedule.every(2).hours.do(self.refresh_proxies)
+
+        logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
 
     def shutdown(self):
         """Shutdown application"""
