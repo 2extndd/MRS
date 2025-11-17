@@ -249,7 +249,8 @@ function saveSystemSettings() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            window.showAlert('System settings saved! Restart required.', 'success');
+            const message = data.message + (data.note ? '\n' + data.note : '');
+            window.showAlert(message, 'success');
         } else {
             window.showAlert('Error: ' + data.error, 'danger');
         }
