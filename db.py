@@ -222,13 +222,24 @@ class DatabaseManager:
 
     def add_search(self, search_url, **kwargs):
         """Add new search query"""
-        query = """
-            INSERT INTO searches
-            (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
-             condition, size, color, shipping_payer, item_status, sort_order,
-             scan_interval, notify_on_price_drop)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
+        if self.db_type == 'postgresql':
+            query = """
+                INSERT INTO searches
+                (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
+                 condition, size, color, shipping_payer, item_status, sort_order,
+                 scan_interval, notify_on_price_drop)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """
+        else:
+            query = """
+                INSERT INTO searches
+                (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
+                 condition, size, color, shipping_payer, item_status, sort_order,
+                 scan_interval, notify_on_price_drop)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
         params = (
             search_url,
             kwargs.get('name'),
@@ -247,9 +258,17 @@ class DatabaseManager:
             kwargs.get('scan_interval', 300),
             kwargs.get('notify_on_price_drop', False)
         )
-        self.execute_query(query, params)
+
+        if self.db_type == 'postgresql':
+            result = self.execute_query(query, params, fetch=True)
+            search_id = result[0]['id'] if result else None
+        else:
+            self.execute_query(query, params)
+            search_id = self.conn.cursor().lastrowid
+
         search_name = kwargs.get('name') or kwargs.get('keyword', 'No name')
-        print(f"[DB] Search added: {search_name}")
+        print(f"[DB] ✅ Search added: {search_name} (ID: {search_id})")
+        return search_id
 
     def get_all_searches(self):
         """Get all searches"""
