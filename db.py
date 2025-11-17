@@ -41,7 +41,7 @@ class DatabaseManager:
             if database_url and database_url.startswith('postgres'):
                 # PostgreSQL (Railway)
                 self.db_type = 'postgresql'
-                self.conn = psycopg2.connect(database_url)
+                self.conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
                 print(f"[DB] Connected to PostgreSQL")
             else:
                 # SQLite (local)
@@ -200,11 +200,14 @@ class DatabaseManager:
                 cursor.execute(query)
 
             if fetch:
-                if self.db_type == 'postgresql':
-                    return cursor.fetchall()
-                else:
+                # Both PostgreSQL (with RealDictCursor) and SQLite (with Row factory) return dict-like objects
+                results = cursor.fetchall()
+                if self.db_type == 'sqlite':
                     # Convert sqlite3.Row to dict
-                    return [dict(row) for row in cursor.fetchall()]
+                    return [dict(row) for row in results]
+                else:
+                    # PostgreSQL with RealDictCursor already returns dict-like objects
+                    return results
 
             self.conn.commit()
             return cursor
