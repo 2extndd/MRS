@@ -137,6 +137,9 @@ class SharedState:
 
     def update_scan_stats(self, duration, items_found):
         """Update scanning statistics"""
+        # Get uptime outside of lock to avoid deadlock
+        uptime_hours = self.get_uptime() / 3600
+
         with self._lock:
             self._state["last_scan_time"] = datetime.now()
             self._state["last_scan_duration"] = duration
@@ -150,7 +153,6 @@ class SharedState:
             self._state["avg_scan_duration"] = new_avg
 
             # Calculate items per hour
-            uptime_hours = self.get_uptime() / 3600
             if uptime_hours > 0:
                 self._state["items_per_hour"] = self._state["total_items_found"] / uptime_hours
 
