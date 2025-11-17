@@ -282,9 +282,16 @@ def api_get_recent_items():
 
         for item in all_items:
             try:
-                # Parse created_at timestamp
-                if isinstance(item.get('created_at'), str):
-                    item_time = datetime.fromisoformat(item['created_at'].replace('Z', '+00:00'))
+                # Parse found_at timestamp
+                if isinstance(item.get('found_at'), str):
+                    # Try parsing RFC 2822 format (e.g., "Mon, 17 Nov 2025 16:21:17 GMT")
+                    from email.utils import parsedate_to_datetime
+                    try:
+                        item_time = parsedate_to_datetime(item['found_at'])
+                    except:
+                        # Fallback to ISO format
+                        item_time = datetime.fromisoformat(item['found_at'].replace('Z', '+00:00'))
+
                     if item_time.replace(tzinfo=None) >= cutoff_time:
                         # Parse JSON fields if needed
                         if isinstance(item.get('images'), str):
