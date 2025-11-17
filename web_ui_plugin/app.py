@@ -151,18 +151,24 @@ def api_add_query():
     """Add new query"""
     try:
         data = request.get_json()
+        logger.info(f"[API] /api/queries/add called with data: {data}")
+
         search_url = data.get('search_url')
 
         if not search_url:
+            logger.error("[API] No search_url provided!")
             return jsonify({'success': False, 'error': 'search_url required'}), 400
 
         # Validate URL
+        logger.info(f"[API] Validating URL: {search_url}")
         validation = validate_search_url(search_url)
         if not validation.get('valid'):
+            logger.error(f"[API] URL validation failed: {validation.get('error')}")
             return jsonify({'success': False, 'error': validation.get('error', 'Invalid URL')}), 400
 
         # Add to database
-        db.add_search(
+        logger.info(f"[API] Adding search to database: {data.get('name')}")
+        search_id = db.add_search(
             search_url=search_url,
             name=data.get('name'),
             thread_id=data.get('thread_id'),
@@ -177,10 +183,13 @@ def api_add_query():
             notify_on_price_drop=data.get('notify_on_price_drop', False)
         )
 
-        return jsonify({'success': True, 'message': 'Query added successfully'})
+        logger.info(f"[API] ✅ Query added successfully! ID: {search_id}")
+        return jsonify({'success': True, 'message': 'Query added successfully', 'id': search_id})
 
     except Exception as e:
-        logger.error(f"Error adding query: {e}")
+        logger.error(f"[API] ❌ Error adding query: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -391,13 +400,19 @@ def api_save_system_config():
     """Save system configuration"""
     try:
         data = request.get_json()
-        logger.info(f"System config update requested: {data}")
+        logger.info(f"[CONFIG] /api/config/system called with data: {data}")
 
         # Save each config value to database
         saved_count = 0
         for key, value in data.items():
+            logger.info(f"[CONFIG] Saving config_{key} = {value}")
             if db.save_config(f"config_{key}", value):
                 saved_count += 1
+                logger.info(f"[CONFIG] ✅ Saved config_{key}")
+            else:
+                logger.error(f"[CONFIG] ❌ Failed to save config_{key}")
+
+        logger.info(f"[CONFIG] Total saved: {saved_count}/{len(data)}")
 
         return jsonify({
             'success': True,
@@ -405,7 +420,9 @@ def api_save_system_config():
             'note': 'Settings will be applied automatically within 10 seconds'
         })
     except Exception as e:
-        logger.error(f"Error saving system config: {e}")
+        logger.error(f"[CONFIG] ❌ Error saving system config: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

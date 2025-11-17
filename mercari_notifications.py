@@ -153,17 +153,25 @@ class MercariNotificationApp:
 
         # Send startup notification
         try:
+            active_searches = self.db.get_active_searches()
+            logger.info(f"[STARTUP] ✅ Active searches: {len(active_searches)}")
+            for search in active_searches:
+                logger.info(f"[STARTUP]    - {search.get('name')} (ID: {search.get('id')})")
+
             send_system_message(
-                f"MercariSearcher started\n"
+                f"🚀 MercariSearcher started\n"
                 f"Version: {config.APP_VERSION}\n"
                 f"Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}\n"
-                f"Active searches: {len(self.db.get_active_searches())}"
+                f"Active searches: {len(active_searches)}"
             )
+            logger.info(f"[STARTUP] ✅ Startup notification sent to Telegram")
         except Exception as e:
-            logger.warning(f"Failed to send startup notification: {e}")
+            logger.warning(f"[STARTUP] ⚠️  Failed to send startup notification: {e}")
 
         # Run scheduler loop
-        logger.info("Scheduler is running. Press Ctrl+C to stop.")
+        logger.info("[STARTUP] ✅ Scheduler is running. Press Ctrl+C to stop.")
+        logger.info(f"[STARTUP] Config hot reload: enabled (every {config._reload_interval}s)")
+        logger.info("="*60)
 
         while True:
             try:
