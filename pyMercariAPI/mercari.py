@@ -346,52 +346,51 @@ class Mercari:
                 m = self._get_mercapi()
                 return await m.item(item_id)
 
-            try:
-                full_item = asyncio.run(_get_item())
+            full_item = asyncio.run(_get_item())
 
-                if not full_item:
-                    return None
+            if not full_item:
+                return None
 
-                # Convert to our Item format
-                item_data = {
-                    'mercari_id': item_id,
-                    'title': getattr(full_item, 'name', ''),
-                    'price': getattr(full_item, 'price', 0),
-                    'currency': 'JPY',
-                    'item_url': f"https://jp.mercari.com/item/{item_id}",
-                    'image_url': None,
-                    'description': getattr(full_item, 'description', ''),
-                    'brand': None,
-                    'condition': None,
-                    'size': None,
-                    'shipping_cost': 0,
-                    'stock_quantity': 1,
-                    'seller_name': None,
-                    'seller_rating': None,
-                    'location': None,
-                    'category': None
-                }
+            # Convert to our Item format
+            item_data = {
+                'mercari_id': item_id,
+                'title': getattr(full_item, 'name', ''),
+                'price': getattr(full_item, 'price', 0),
+                'currency': 'JPY',
+                'item_url': f"https://jp.mercari.com/item/{item_id}",
+                'image_url': None,
+                'description': getattr(full_item, 'description', ''),
+                'brand': None,
+                'condition': None,
+                'size': None,
+                'shipping_cost': 0,
+                'stock_quantity': 1,
+                'seller_name': None,
+                'seller_rating': None,
+                'location': None,
+                'category': None
+            }
 
-                # Get photos
-                if hasattr(full_item, 'photos') and full_item.photos:
-                    item_data['image_url'] = full_item.photos[0]
+            # Get photos
+            if hasattr(full_item, 'photos') and full_item.photos:
+                item_data['image_url'] = full_item.photos[0]
 
-                # Item condition
-                if hasattr(full_item, 'item_condition') and full_item.item_condition:
-                    if hasattr(full_item.item_condition, 'name'):
-                        item_data['condition'] = full_item.item_condition.name
+            # Item condition
+            if hasattr(full_item, 'item_condition') and full_item.item_condition:
+                if hasattr(full_item.item_condition, 'name'):
+                    item_data['condition'] = full_item.item_condition.name
 
-                # Category
-                if hasattr(full_item, 'item_category') and full_item.item_category:
-                    if hasattr(full_item.item_category, 'name'):
-                        item_data['category'] = full_item.item_category.name
+            # Category
+            if hasattr(full_item, 'item_category') and full_item.item_category:
+                if hasattr(full_item.item_category, 'name'):
+                    item_data['category'] = full_item.item_category.name
 
-                # Seller
-                if hasattr(full_item, 'seller') and full_item.seller:
-                    item_data['seller_name'] = getattr(full_item.seller, 'name', None)
-                    item_data['seller_rating'] = getattr(full_item.seller, 'rating', None)
+            # Seller
+            if hasattr(full_item, 'seller') and full_item.seller:
+                item_data['seller_name'] = getattr(full_item.seller, 'name', None)
+                item_data['seller_rating'] = getattr(full_item.seller, 'rating', None)
 
-                return Item(item_data)
+            return Item(item_data)
 
         except Exception as e:
             logger.error(f"Failed to get item: {e}")
