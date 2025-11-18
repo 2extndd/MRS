@@ -151,8 +151,16 @@ class Config:
                 if 'config_proxy_enabled' in new_config:
                     cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
 
+                # Telegram settings
+                if 'config_telegram_chat_id' in new_config:
+                    cls.TELEGRAM_CHAT_ID = str(new_config['config_telegram_chat_id'])
+                    logger.info(f"[CONFIG] Updated Telegram Chat ID: {cls.TELEGRAM_CHAT_ID}")
+
+                if 'config_telegram_bot_token' in new_config:
+                    cls.TELEGRAM_BOT_TOKEN = str(new_config['config_telegram_bot_token'])
+
                 cls._config_cache = new_config
-                logger.info(f"[CONFIG] ✅ Hot reload complete! scan_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}")
+                logger.info(f"[CONFIG] ✅ Hot reload complete! scan_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}, telegram_chat_id={cls.TELEGRAM_CHAT_ID}")
                 return True
 
         except Exception as e:
