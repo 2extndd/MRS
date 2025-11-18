@@ -134,10 +134,35 @@ def configuration():
 def logs():
     """Logs page"""
     try:
+        import pytz
+        from datetime import datetime
+
         limit = request.args.get('limit', 100, type=int)
         level = request.args.get('level', None)
         all_logs = db.get_logs(limit=limit, level=level)
-        return render_template('logs.html', logs=all_logs, config=config)
+
+        # Format timestamps to Moscow timezone (GMT+3)
+        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+        formatted_logs = []
+        for log in all_logs:
+            log_copy = dict(log)
+            if log_copy.get('timestamp'):
+                ts = log_copy['timestamp']
+                # If timestamp is timezone-aware, convert to Moscow time
+                if isinstance(ts, datetime):
+                    if ts.tzinfo is None:
+                        # Assume it's already Moscow time from database
+                        ts = MOSCOW_TZ.localize(ts)
+                    else:
+                        ts = ts.astimezone(MOSCOW_TZ)
+                    # Format as "YYYY-MM-DD HH:MM:SS GMT+3"
+                    log_copy['timestamp'] = ts.strftime('%Y-%m-%d %H:%M:%S GMT+3')
+                elif isinstance(ts, str):
+                    # Already formatted
+                    log_copy['timestamp'] = ts
+            formatted_logs.append(log_copy)
+
+        return render_template('logs.html', logs=formatted_logs, config=config)
     except Exception as e:
         logger.error(f"Logs page error: {e}")
         return f"Error: {e}", 500
