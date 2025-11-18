@@ -1,15 +1,12 @@
 """
 Telegram Worker for MercariSearcher
-Sends item notifications via Telegram bot
+Sends item notifications via Telegram bot using direct HTTP requests
 Adapted from KufarSearcher with USD price display
 """
 
-import asyncio
 import logging
+import requests
 from typing import List, Dict, Any, Optional
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import TelegramError, RetryAfter, TimedOut
-from telegram.constants import ParseMode
 import time
 
 from configuration_values import config
@@ -31,7 +28,7 @@ class TelegramWorker:
         if not self.bot_token or not self.chat_id:
             raise ValueError("Telegram bot token and chat ID are required")
 
-        self.bot = Bot(token=self.bot_token)
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.db = get_db()
         self.shared_state = get_shared_state()
 
@@ -40,7 +37,7 @@ class TelegramWorker:
 
         logger.info("TelegramWorker initialized")
 
-    async def send_item_notification(self, item: Dict[str, Any]) -> bool:
+    def send_item_notification(self, item: Dict[str, Any]) -> bool:
         """
         Send notification for single item
 
@@ -59,41 +56,29 @@ class TelegramWorker:
 
             # Send with photo if available
             if item.get('image_url'):
-                await self._send_with_photo(
+                success = self._send_with_photo(
                     message=message,
                     photo_url=item['image_url'],
                     keyboard=keyboard
                 )
             else:
-                await self._send_message(
+                success = self._send_message(
                     message=message,
                     keyboard=keyboard
                 )
 
-            # Mark as sent in database
-            if item.get('id'):
-                self.db.mark_item_sent(item['id'])
+            if success:
+                # Mark as sent in database
+                if item.get('id'):
+                    self.db.mark_item_sent(item['id'])
 
-            # Update stats
-            self.shared_state.increment('total_notifications_sent')
-            self.shared_state.set('last_telegram_send_time', time.time())
+                # Update stats
+                self.shared_state.increment('total_notifications_sent')
+                self.shared_state.set('last_telegram_send_time', time.time())
 
-            logger.info(f"Notification sent for item: {item.get('title', 'Unknown')[:50]}")
+                logger.info(f"Notification sent for item: {item.get('title', 'Unknown')[:50]}")
 
-            return True
-
-        except RetryAfter as e:
-            logger.warning(f"Rate limit hit, waiting {e.retry_after}s")
-            await asyncio.sleep(e.retry_after)
-            return False
-
-        except TimedOut:
-            logger.warning("Telegram request timed out")
-            return False
-
-        except TelegramError as e:
-            logger.error(f"Telegram error: {e}")
-            return False
+            return success
 
         except Exception as e:
             logger.error(f"Failed to send notification: {e}")
@@ -168,7 +153,7 @@ class TelegramWorker:
 
         return "\n".join(lines)
 
-    def _create_item_keyboard(self, item: Dict[str, Any]) -> InlineKeyboardMarkup:
+    def _create_item_keyboard(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Create inline keyboard for item
 
@@ -176,23 +161,24 @@ class TelegramWorker:
             item: Item dictionary
 
         Returns:
-            InlineKeyboardMarkup
+            Keyboard dictionary in Telegram API format
         """
-        buttons = []
+        if not item.get('item_url'):
+            return None
 
-        # View on Mercari button
-        if item.get('item_url'):
-            buttons.append([
-                InlineKeyboardButton(
-                    text="🛒 View on Mercari",
-                    url=item['item_url']
-                )
-            ])
+        return {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🛒 View on Mercari",
+                        "url": item['item_url']
+                    }
+                ]
+            ]
+        }
 
-        return InlineKeyboardMarkup(buttons)
-
-    async def _send_with_photo(self, message: str, photo_url: str,
-                               keyboard: Optional[InlineKeyboardMarkup] = None) -> bool:
+    def _send_with_photo(self, message: str, photo_url: str,
+                         keyboard: Optional[Dict[str, Any]] = None) -> bool:
         """
         Send message with photo
 
@@ -206,30 +192,49 @@ class TelegramWorker:
         """
         for attempt in range(self.max_retries):
             try:
-                await self.bot.send_photo(
-                    chat_id=self.chat_id,
-                    photo=photo_url,
-                    caption=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard,
-                    message_thread_id=self.thread_id if self.thread_id else None
-                )
-                return True
+                url = f"{self.base_url}/sendPhoto"
+
+                payload = {
+                    "chat_id": self.chat_id,
+                    "photo": photo_url,
+                    "caption": message,
+                    "parse_mode": "HTML"
+                }
+
+                if keyboard:
+                    payload["reply_markup"] = keyboard
+
+                if self.thread_id:
+                    payload["message_thread_id"] = self.thread_id
+
+                response = requests.post(url, json=payload, timeout=30)
+
+                if response.status_code == 200:
+                    return True
+
+                # Handle rate limiting
+                if response.status_code == 429:
+                    retry_after = response.json().get('parameters', {}).get('retry_after', self.retry_delay)
+                    logger.warning(f"Rate limit hit, waiting {retry_after}s")
+                    time.sleep(retry_after)
+                    continue
+
+                logger.warning(f"Failed to send photo (attempt {attempt + 1}/{self.max_retries}): {response.status_code} - {response.text[:200]}")
 
             except Exception as e:
                 logger.warning(f"Failed to send photo (attempt {attempt + 1}/{self.max_retries}): {e}")
 
-                if attempt < self.max_retries - 1:
-                    await asyncio.sleep(self.retry_delay)
-                else:
-                    # Fall back to text message
-                    logger.info("Falling back to text message")
-                    return await self._send_message(message, keyboard)
+            if attempt < self.max_retries - 1:
+                time.sleep(self.retry_delay)
+            else:
+                # Fall back to text message
+                logger.info("Falling back to text message")
+                return self._send_message(message, keyboard)
 
         return False
 
-    async def _send_message(self, message: str,
-                           keyboard: Optional[InlineKeyboardMarkup] = None) -> bool:
+    def _send_message(self, message: str,
+                      keyboard: Optional[Dict[str, Any]] = None) -> bool:
         """
         Send text message
 
@@ -242,25 +247,44 @@ class TelegramWorker:
         """
         for attempt in range(self.max_retries):
             try:
-                await self.bot.send_message(
-                    chat_id=self.chat_id,
-                    text=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard,
-                    disable_web_page_preview=True,
-                    message_thread_id=self.thread_id if self.thread_id else None
-                )
-                return True
+                url = f"{self.base_url}/sendMessage"
+
+                payload = {
+                    "chat_id": self.chat_id,
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True
+                }
+
+                if keyboard:
+                    payload["reply_markup"] = keyboard
+
+                if self.thread_id:
+                    payload["message_thread_id"] = self.thread_id
+
+                response = requests.post(url, json=payload, timeout=30)
+
+                if response.status_code == 200:
+                    return True
+
+                # Handle rate limiting
+                if response.status_code == 429:
+                    retry_after = response.json().get('parameters', {}).get('retry_after', self.retry_delay)
+                    logger.warning(f"Rate limit hit, waiting {retry_after}s")
+                    time.sleep(retry_after)
+                    continue
+
+                logger.warning(f"Failed to send message (attempt {attempt + 1}/{self.max_retries}): {response.status_code} - {response.text[:200]}")
 
             except Exception as e:
                 logger.warning(f"Failed to send message (attempt {attempt + 1}/{self.max_retries}): {e}")
 
-                if attempt < self.max_retries - 1:
-                    await asyncio.sleep(self.retry_delay)
+            if attempt < self.max_retries - 1:
+                time.sleep(self.retry_delay)
 
         return False
 
-    async def send_system_message(self, message: str) -> bool:
+    def send_system_message(self, message: str) -> bool:
         """
         Send system/status message
 
@@ -273,20 +297,26 @@ class TelegramWorker:
         try:
             formatted_message = f"🤖 <b>MercariSearcher</b>\n\n{message}"
 
-            await self.bot.send_message(
-                chat_id=self.chat_id,
-                text=formatted_message,
-                parse_mode=ParseMode.HTML,
-                message_thread_id=self.thread_id if self.thread_id else None
-            )
+            url = f"{self.base_url}/sendMessage"
 
-            return True
+            payload = {
+                "chat_id": self.chat_id,
+                "text": formatted_message,
+                "parse_mode": "HTML"
+            }
+
+            if self.thread_id:
+                payload["message_thread_id"] = self.thread_id
+
+            response = requests.post(url, json=payload, timeout=30)
+
+            return response.status_code == 200
 
         except Exception as e:
             logger.error(f"Failed to send system message: {e}")
             return False
 
-    async def process_pending_notifications(self) -> Dict[str, int]:
+    def process_pending_notifications(self) -> Dict[str, int]:
         """
         Process all pending notifications from database
 
@@ -311,7 +341,7 @@ class TelegramWorker:
         logger.info(f"Found {len(unsent_items)} pending notifications")
 
         for item in unsent_items:
-            success = await self.send_item_notification(item)
+            success = self.send_item_notification(item)
 
             if success:
                 stats['sent'] += 1
@@ -319,7 +349,7 @@ class TelegramWorker:
                 stats['failed'] += 1
 
             # Rate limiting between messages
-            await asyncio.sleep(1)
+            time.sleep(1)
 
         logger.info(f"Processed {stats['sent']}/{stats['total']} notifications")
 
@@ -329,7 +359,7 @@ class TelegramWorker:
 # Synchronous wrapper functions
 def send_notification_for_item(item: Dict[str, Any]) -> bool:
     """
-    Synchronous wrapper for sending item notification
+    Send notification for single item
 
     Args:
         item: Item dictionary
@@ -338,19 +368,12 @@ def send_notification_for_item(item: Dict[str, Any]) -> bool:
         True if sent successfully
     """
     worker = TelegramWorker()
-
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(worker.send_item_notification(item))
+    return worker.send_item_notification(item)
 
 
 def send_notifications(items: List[Dict[str, Any]]) -> Dict[str, int]:
     """
-    Synchronous wrapper for sending multiple notifications
+    Send multiple notifications
 
     Args:
         items: List of item dictionaries
@@ -366,14 +389,8 @@ def send_notifications(items: List[Dict[str, Any]]) -> Dict[str, int]:
         'failed': 0
     }
 
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
     for item in items:
-        success = loop.run_until_complete(worker.send_item_notification(item))
+        success = worker.send_item_notification(item)
 
         if success:
             stats['sent'] += 1
@@ -387,25 +404,18 @@ def send_notifications(items: List[Dict[str, Any]]) -> Dict[str, int]:
 
 def process_pending_notifications() -> Dict[str, int]:
     """
-    Synchronous wrapper for processing pending notifications
+    Process pending notifications from database
 
     Returns:
         Dictionary with statistics
     """
     worker = TelegramWorker()
-
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(worker.process_pending_notifications())
+    return worker.process_pending_notifications()
 
 
 def send_system_message(message: str) -> bool:
     """
-    Synchronous wrapper for sending system message
+    Send system message
 
     Args:
         message: Message text
@@ -414,14 +424,7 @@ def send_system_message(message: str) -> bool:
         True if sent successfully
     """
     worker = TelegramWorker()
-
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(worker.send_system_message(message))
+    return worker.send_system_message(message)
 
 
 if __name__ == "__main__":
