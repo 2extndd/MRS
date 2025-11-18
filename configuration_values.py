@@ -138,10 +138,15 @@ class Config:
                 logger.info("[CONFIG] Configuration changed, hot reloading...")
 
                 # Update runtime settings from database
-                if 'config_scan_interval' in new_config:
+                # Check both old and new key names for compatibility
+                if 'config_search_interval' in new_config:
+                    cls.SEARCH_INTERVAL = int(new_config['config_search_interval'])
+                elif 'config_scan_interval' in new_config:
                     cls.SEARCH_INTERVAL = int(new_config['config_scan_interval'])
 
-                if 'config_max_items' in new_config:
+                if 'config_max_items_per_search' in new_config:
+                    cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items_per_search'])
+                elif 'config_max_items' in new_config:
                     cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items'])
 
                 if 'config_request_delay' in new_config:
