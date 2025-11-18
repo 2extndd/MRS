@@ -21,8 +21,8 @@ from railway_redeploy import redeployer
 from metrics_storage import metrics_storage
 from proxies import proxy_manager
 
-# Tokyo timezone
-TOKYO_TZ = pytz.timezone('Asia/Tokyo')
+# Moscow timezone (GMT+3 / UTC+3)
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 # Setup logging
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -93,7 +93,7 @@ class MercariNotificationApp:
     def search_and_notify(self):
         """Main search cycle with notifications"""
         logger.info("\n" + "=" * 60)
-        logger.info(f"Starting search cycle at {datetime.now(TOKYO_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        logger.info(f"Starting search cycle at {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')}")
         logger.info("=" * 60)
 
         try:

@@ -13,13 +13,13 @@ from datetime import datetime, timedelta
 import pytz
 from configuration_values import config
 
-# Tokyo timezone (UTC+9)
-TOKYO_TZ = pytz.timezone('Asia/Tokyo')
+# Moscow timezone (GMT+3 / UTC+3)
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 
-def get_tokyo_time():
-    """Get current time in Tokyo timezone"""
-    return datetime.now(TOKYO_TZ)
+def get_moscow_time():
+    """Get current time in Moscow timezone (GMT+3)"""
+    return datetime.now(MOSCOW_TZ)
 
 
 class DatabaseManager:
@@ -291,7 +291,7 @@ class DatabaseManager:
 
     def get_searches_ready_for_scan(self):
         """Get searches that are ready to be scanned based on their interval"""
-        current_time = get_tokyo_time()
+        current_time = get_moscow_time()
 
         query = """
             SELECT * FROM searches
@@ -321,7 +321,7 @@ class DatabaseManager:
 
                 # Make timezone aware
                 if last_scan.tzinfo is None:
-                    last_scan = TOKYO_TZ.localize(last_scan)
+                    last_scan = MOSCOW_TZ.localize(last_scan)
 
                 interval = search.get('scan_interval', 300)
                 next_scan = last_scan + timedelta(seconds=interval)
@@ -338,7 +338,7 @@ class DatabaseManager:
             SET last_scanned_at = %s, total_scans = total_scans + 1
             WHERE id = %s
         """
-        self.execute_query(query, (get_tokyo_time(), search_id))
+        self.execute_query(query, (get_moscow_time(), search_id))
 
     def update_search_stats(self, search_id, items_found):
         """Update search statistics"""
@@ -470,7 +470,7 @@ class DatabaseManager:
     def mark_item_sent(self, item_id):
         """Mark item as sent"""
         query = "UPDATE items SET is_sent = %s, sent_at = %s WHERE id = %s"
-        self.execute_query(query, (True, get_tokyo_time(), item_id))
+        self.execute_query(query, (True, get_moscow_time(), item_id))
 
     def get_all_items(self, limit=100):
         """Get recent items"""
@@ -540,7 +540,7 @@ class DatabaseManager:
         """Set setting value"""
         # Try to update first
         query = "UPDATE settings SET value = %s, updated_at = %s WHERE key = %s"
-        cursor = self.execute_query(query, (value, get_tokyo_time(), key))
+        cursor = self.execute_query(query, (value, get_moscow_time(), key))
 
         # If no rows affected, insert
         if cursor.rowcount == 0:
@@ -574,7 +574,7 @@ class DatabaseManager:
 
     def clear_old_errors(self, days=7):
         """Clear errors older than specified days"""
-        cutoff = get_tokyo_time() - timedelta(days=days)
+        cutoff = get_moscow_time() - timedelta(days=days)
         query = "DELETE FROM error_tracking WHERE occurred_at < %s"
         self.execute_query(query, (cutoff,))
 
@@ -595,7 +595,7 @@ class DatabaseManager:
             full_message = f"{full_message} - {details}"
 
         query = "INSERT INTO logs (level, message, timestamp) VALUES (%s, %s, %s)"
-        self.execute_query(query, (level, full_message, get_tokyo_time()))
+        self.execute_query(query, (level, full_message, get_moscow_time()))
 
     def get_logs(self, limit=100, level=None):
         """Get recent logs"""
@@ -613,7 +613,7 @@ class DatabaseManager:
 
     def clear_old_logs(self, days=7):
         """Clear logs older than specified days"""
-        cutoff = get_tokyo_time() - timedelta(days=days)
+        cutoff = get_moscow_time() - timedelta(days=days)
         query = "DELETE FROM logs WHERE timestamp < %s"
         self.execute_query(query, (cutoff,))
 
@@ -628,7 +628,7 @@ class DatabaseManager:
         self.clear_old_errors(7)
 
         # Delete sent items older than 30 days
-        cutoff = get_tokyo_time() - timedelta(days=30)
+        cutoff = get_moscow_time() - timedelta(days=30)
         query = "DELETE FROM items WHERE is_sent = %s AND sent_at < %s"
         self.execute_query(query, (True, cutoff))
 
@@ -727,6 +727,33 @@ class DatabaseManager:
         except Exception as e:
             print(f"[DB ERROR] Failed to load all config: {e}")
             return {}
+
+    def increment_api_counter(self):
+        """Increment API request counter in database (for cross-process visibility)"""
+        try:
+            # Get current value
+            current = self.load_config('api_request_count', 0)
+            if isinstance(current, str):
+                current = int(current) if current.isdigit() else 0
+
+            # Increment and save
+            new_value = current + 1
+            self.save_config('api_request_count', new_value)
+            return new_value
+        except Exception as e:
+            print(f"[DB ERROR] Failed to increment API counter: {e}")
+            return 0
+
+    def get_api_counter(self):
+        """Get current API request count from database"""
+        try:
+            count = self.load_config('api_request_count', 0)
+            if isinstance(count, str):
+                return int(count) if count.isdigit() else 0
+            return int(count) if count else 0
+        except Exception as e:
+            print(f"[DB ERROR] Failed to get API counter: {e}")
+            return 0
 
 
 # Global database instance

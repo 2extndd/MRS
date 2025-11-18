@@ -107,13 +107,24 @@ def configuration():
         logger.error(f"Error loading config from database: {e}")
 
     # Create final config dict from Config class attributes + DB overrides
+    # ВАЖНО: Ключи должны совпадать с именами полей в форме!
     final_config = {
-        'SEARCH_INTERVAL': config_dict.get('scan_interval', config.SEARCH_INTERVAL),
-        'MAX_ITEMS_PER_SEARCH': config_dict.get('max_items', config.MAX_ITEMS_PER_SEARCH),
-        'REQUEST_DELAY_MIN': config_dict.get('request_delay', config.REQUEST_DELAY_MIN),
+        'SEARCH_INTERVAL': config_dict.get('search_interval', config.SEARCH_INTERVAL),
+        'MAX_ITEMS_PER_SEARCH': config_dict.get('max_items_per_search', config.MAX_ITEMS_PER_SEARCH),
+        'USD_CONVERSION_RATE': config_dict.get('usd_conversion_rate', config.USD_CONVERSION_RATE),
+        'MAX_ERRORS_BEFORE_REDEPLOY': config_dict.get('max_errors_before_redeploy', config.MAX_ERRORS_BEFORE_REDEPLOY),
         'PROXY_ENABLED': config_dict.get('proxy_enabled', config.PROXY_ENABLED),
-        'TELEGRAM_BOT_TOKEN': config.TELEGRAM_BOT_TOKEN,
-        'TELEGRAM_CHAT_ID': config.TELEGRAM_CHAT_ID,
+        'PROXY_LIST': config_dict.get('proxy_list', config.PROXY_LIST),
+        'TELEGRAM_BOT_TOKEN': config_dict.get('telegram_bot_token', config.TELEGRAM_BOT_TOKEN),
+        'TELEGRAM_CHAT_ID': config_dict.get('telegram_chat_id', config.TELEGRAM_CHAT_ID),
+        'RAILWAY_TOKEN': config_dict.get('railway_token', config.RAILWAY_TOKEN),
+        # Read-only values from config class
+        'APP_NAME': config.APP_NAME,
+        'APP_VERSION': config.APP_VERSION,
+        'MERCARI_BASE_URL': config.MERCARI_BASE_URL,
+        'DISPLAY_CURRENCY': config.DISPLAY_CURRENCY,
+        'LOG_LEVEL': config.LOG_LEVEL,
+        'PORT': config.PORT,
     }
 
     return render_template('config.html', config=final_config)
@@ -146,11 +157,12 @@ def api_stats():
         try:
             state_stats = shared_state.get_stats_summary()
             uptime_formatted = state_stats.get('uptime', 'N/A')
-            total_api_requests = state_stats.get('total_api_requests', 0)
         except Exception as e:
             logger.warning(f"Shared state unavailable: {e}")
             uptime_formatted = "N/A (web-only)"
-            total_api_requests = 0
+
+        # Get API request count from database (cross-process visibility)
+        total_api_requests = db.get_api_counter()
 
         return jsonify({
             'success': True,
@@ -304,12 +316,17 @@ def api_get_recent_items():
     try:
         import json
         from datetime import datetime, timedelta
+        import pytz
+
+        # Moscow timezone (GMT+3)
+        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
         # Get items from last 24 hours
         recent_items = []
         all_items = db.get_all_items(limit=100)
 
-        cutoff_time = datetime.now() - timedelta(hours=24)
+        # Use Moscow timezone for cutoff
+        cutoff_time = datetime.now(MOSCOW_TZ) - timedelta(hours=24)
 
         for item in all_items:
             try:
@@ -319,11 +336,17 @@ def api_get_recent_items():
                     from email.utils import parsedate_to_datetime
                     try:
                         item_time = parsedate_to_datetime(item['found_at'])
+                        # Make timezone-aware if needed
+                        if item_time.tzinfo is None:
+                            item_time = MOSCOW_TZ.localize(item_time)
                     except:
                         # Fallback to ISO format
                         item_time = datetime.fromisoformat(item['found_at'].replace('Z', '+00:00'))
+                        if item_time.tzinfo is None:
+                            item_time = MOSCOW_TZ.localize(item_time)
 
-                    if item_time.replace(tzinfo=None) >= cutoff_time:
+                    # Compare timezone-aware datetimes
+                    if item_time >= cutoff_time:
                         # Parse JSON fields if needed
                         if isinstance(item.get('images'), str):
                             try:
@@ -346,7 +369,7 @@ def api_get_recent_items():
             'success': True,
             'items': recent_items,
             'count': len(recent_items),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(MOSCOW_TZ).isoformat()
         })
     except Exception as e:
         logger.error(f"Error getting recent items: {e}")
