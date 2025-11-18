@@ -459,7 +459,7 @@ class DatabaseManager:
     def get_unsent_items(self):
         """Get items that haven't been sent to Telegram"""
         query = """
-            SELECT i.*, s.keyword as search_keyword
+            SELECT i.*, s.keyword as search_keyword, s.thread_id as search_thread_id
             FROM items i
             LEFT JOIN searches s ON i.search_id = s.id
             WHERE i.is_sent = %s

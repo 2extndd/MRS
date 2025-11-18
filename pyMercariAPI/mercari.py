@@ -174,107 +174,15 @@ class Mercari:
                     if thumbnails:
                         item_dict['image_url'] = thumbnails[0]
 
-                    # Disabled: Fetching full item details to avoid nested async issues
-                    # Can be re-enabled later if needed with proper async handling
-
                     items_data.append(item_dict)
                     item_count += 1
 
                 return items_data
 
+            # Execute async search
             items_data = asyncio.run(_perform_search())
-            # Try to get existing event loop, create new one if needed
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    should_close_loop = True
-                else:
-                    should_close_loop = False
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                should_close_loop = True
 
-            try:
-                m = self._get_mercapi()
-                results = loop.run_until_complete(m.search(keyword))
-
-                # Convert mercapi results to our Items format
-                items_data = []
-                item_count = 0
-
-                for item in results.items:
-                    if item_count >= limit:
-                        break
-
-                    # Get item attributes
-                    item_id = getattr(item, 'id_', None)
-                    if not item_id:
-                        continue
-
-                    # Build item data dict
-                    item_dict = {
-                        'mercari_id': item_id,
-                        'title': getattr(item, 'name', ''),
-                        'price': getattr(item, 'price', 0),
-                        'currency': 'JPY',
-                        'item_url': f"https://jp.mercari.com/item/{item_id}",
-                        'image_url': None,
-                        'brand': None,
-                        'condition': None,
-                        'size': None,
-                        'shipping_cost': 0,
-                        'stock_quantity': 1,
-                        'seller_name': None,
-                        'seller_rating': None,
-                        'location': None,
-                        'category': None,
-                        'description': ''
-                    }
-
-                    # Get thumbnail
-                    thumbnails = getattr(item, 'thumbnails', [])
-                    if thumbnails:
-                        item_dict['image_url'] = thumbnails[0]
-
-                    # Try to get full item details for first few items
-                    if item_count < 10:  # Only get full details for first 10 to save time
-                        try:
-                            # Make sure loop is still running
-                            if not loop.is_closed():
-                                full_item = loop.run_until_complete(item.full_item())
-
-                                # Update with full details
-                                item_dict['description'] = getattr(full_item, 'description', '')[:500]
-
-                                # Item condition
-                                if hasattr(full_item, 'item_condition') and full_item.item_condition:
-                                    if hasattr(full_item.item_condition, 'name'):
-                                        item_dict['condition'] = full_item.item_condition.name
-
-                                # Category
-                                if hasattr(full_item, 'item_category') and full_item.item_category:
-                                    if hasattr(full_item.item_category, 'name'):
-                                        item_dict['category'] = full_item.item_category.name
-
-                                # Seller
-                                if hasattr(full_item, 'seller') and full_item.seller:
-                                    item_dict['seller_name'] = getattr(full_item.seller, 'name', None)
-                                    item_dict['seller_rating'] = getattr(full_item.seller, 'rating', None)
-
-                        except Exception as e:
-                            logger.debug(f"Could not get full item details for {item_id}: {e}")
-
-                    items_data.append(item_dict)
-                    item_count += 1
-
-            finally:
-                # Only close loop if we created it
-                if should_close_loop and not loop.is_closed():
-                    loop.close()
-
+            # Convert to Items object
             items = Items(items_data)
             logger.info(f"Found {len(items)} items")
 

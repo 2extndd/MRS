@@ -48,6 +48,9 @@ class TelegramWorker:
             True if sent successfully
         """
         try:
+            # Get thread_id from item's search or use global default
+            thread_id = item.get('search_thread_id') or self.thread_id
+            
             # Format message
             message = self._format_item_message(item)
 
@@ -59,12 +62,14 @@ class TelegramWorker:
                 success = self._send_with_photo(
                     message=message,
                     photo_url=item['image_url'],
-                    keyboard=keyboard
+                    keyboard=keyboard,
+                    thread_id=thread_id
                 )
             else:
                 success = self._send_message(
                     message=message,
-                    keyboard=keyboard
+                    keyboard=keyboard,
+                    thread_id=thread_id
                 )
 
             if success:
@@ -178,7 +183,8 @@ class TelegramWorker:
         }
 
     def _send_with_photo(self, message: str, photo_url: str,
-                         keyboard: Optional[Dict[str, Any]] = None) -> bool:
+                         keyboard: Optional[Dict[str, Any]] = None,
+                         thread_id: Optional[str] = None) -> bool:
         """
         Send message with photo
 
@@ -186,6 +192,7 @@ class TelegramWorker:
             message: Message text
             photo_url: Photo URL
             keyboard: Optional inline keyboard
+            thread_id: Optional thread ID for topic-based chats
 
         Returns:
             True if sent successfully
@@ -204,8 +211,9 @@ class TelegramWorker:
                 if keyboard:
                     payload["reply_markup"] = keyboard
 
-                if self.thread_id:
-                    payload["message_thread_id"] = self.thread_id
+                # Use provided thread_id or fall back to instance thread_id
+                if thread_id or self.thread_id:
+                    payload["message_thread_id"] = thread_id or self.thread_id
 
                 response = requests.post(url, json=payload, timeout=30)
 
@@ -229,18 +237,20 @@ class TelegramWorker:
             else:
                 # Fall back to text message
                 logger.info("Falling back to text message")
-                return self._send_message(message, keyboard)
+                return self._send_message(message, keyboard, thread_id)
 
         return False
 
     def _send_message(self, message: str,
-                      keyboard: Optional[Dict[str, Any]] = None) -> bool:
+                      keyboard: Optional[Dict[str, Any]] = None,
+                      thread_id: Optional[str] = None) -> bool:
         """
         Send text message
 
         Args:
             message: Message text
             keyboard: Optional inline keyboard
+            thread_id: Optional thread ID for topic-based chats
 
         Returns:
             True if sent successfully
@@ -259,8 +269,9 @@ class TelegramWorker:
                 if keyboard:
                     payload["reply_markup"] = keyboard
 
-                if self.thread_id:
-                    payload["message_thread_id"] = self.thread_id
+                # Use provided thread_id or fall back to instance thread_id
+                if thread_id or self.thread_id:
+                    payload["message_thread_id"] = thread_id or self.thread_id
 
                 response = requests.post(url, json=payload, timeout=30)
 
