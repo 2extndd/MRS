@@ -952,7 +952,7 @@ def get_item_image(item_id):
 
         # Query item from database
         query = "SELECT image_data, image_url FROM items WHERE id = %s"
-        result = db.query(query, (item_id,))
+        result = db.execute_query(query, (item_id,), fetch=True)
 
         if not result or len(result) == 0:
             logger.warning(f"Item {item_id} not found")
