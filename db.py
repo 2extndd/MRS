@@ -681,7 +681,10 @@ class DatabaseManager:
         self.execute_query(query, (level, full_message, get_moscow_time()))
 
     def get_logs(self, limit=100, level=None):
-        """Get recent logs"""
+        """Get recent logs - FAST with smaller default limit"""
+        # Limit to max 500 logs to avoid performance issues
+        limit = min(limit, 500)
+        
         if level:
             query = """
                 SELECT * FROM logs

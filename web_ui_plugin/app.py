@@ -147,7 +147,9 @@ def logs():
         import pytz
         from datetime import datetime
 
-        limit = request.args.get('limit', 100, type=int)
+        # Limit to 200 logs by default for fast page load
+        limit = request.args.get('limit', 200, type=int)
+        limit = min(limit, 500)  # Max 500 to avoid performance issues
         level = request.args.get('level', None)
         all_logs = db.get_logs(limit=limit, level=level)
 
