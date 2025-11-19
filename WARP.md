@@ -701,32 +701,80 @@ This helps future agents avoid repeating mistakes!
 - **NOT working:** Telegram notifications (103 unsent items) ❌
 - **Cause:** TELEGRAM_BOT_TOKEN possibly not set on Railway worker
 
-### Session 5.5 - Database Image Storage Solution:
+### Session 5.5 - Database Image Storage Solution (COMPLETED ✅):
 **Problem:** ALL Cloudflare attempts failed (proxy, w_800, /orig/) - Railway IPs blocked
 **Solution:** Save photos in database as base64 during scanning
 
-**Changes:**
-- Created `image_utils.py` with `download_and_encode_image()` function
-- Downloads images with proper headers during item scanning
-- Stores as base64 data URIs in database (max 500KB per image)
-- Added `/api/image/<item_id>` endpoint to serve images from DB
-- Updated templates to use `/api/image/` instead of direct URLs
-- Added `image_data TEXT` column to items table
-- Modified `core.py` to download images before saving to DB
-- Modified `db.py add_item()` to accept image_data parameter
+**✅ Implementation COMPLETED:**
 
-**Deployment:**
-- Latest commit: f5af0b8 (feat: Store images in database to bypass Cloudflare blocking)
-- Migration needed: `ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT`
-- Service renamed: "MRS" → "worker" on Railway
-- Need to deploy: both web (auto) + worker (manual `railway up --service worker`)
+1. **Code Files Created/Modified:**
+   - `image_utils.py` - download_and_encode_image() function with Cloudflare bypass headers
+   - `core.py:386-416` - downloads images before saving to DB
+   - `db.py:438-455` - accepts image_data parameter in add_item()
+   - `web_ui_plugin/app.py:944-999` - /api/image/<item_id> endpoint serves images from DB
+   - `templates/items.html:26` - uses /api/image/<id> instead of direct URLs
+   - `templates/dashboard.html:109` - uses /api/image/<id> instead of direct URLs
+
+2. **Migration Scripts Created:**
+   - `add_image_column.sql` - SQL migration for image_data column
+   - `migrate_db.py` - Python migration runner (Railway-aware)
+   - `quick_migrate.py` - Minimal psycopg2 migration script
+   - `execute_migration.py` - Railway API + psycopg2 migration
+
+3. **Git Commits:**
+   - f5af0b8: feat: Store images in database to bypass Cloudflare blocking
+   - f5a24f5: docs: Update WARP.md with Session 5.5
+   - 25212ec: docs: Add deployment status
+   - 719cb49: feat: Add migration scripts for image_data column
+   - All pushed to GitHub ✅
+
+4. **Railway Deployment:**
+   - ✅ `railway up -s Worker --detach` - Worker service deploying
+   - ✅ `railway up -s web --detach` - Web service deploying
+   - Build logs: Check Railway Dashboard for completion
+
+**⏳ PENDING TASKS FOR NEXT AGENT:**
+
+1. **Run Database Migration:**
+   After web service finishes deploying (5-10 minutes), run:
+   ```bash
+   railway run -s web python migrate_db.py
+   ```
+   This will add image_data column and create index.
+
+   Alternative if railway run fails:
+   ```bash
+   railway connect Postgres-T-E-
+   # Then paste:
+   ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT;
+   CREATE INDEX IF NOT EXISTS idx_items_image_data ON items(id) WHERE image_data IS NOT NULL;
+   ```
+
+2. **Verify Deployment:**
+   - Check Worker logs: `railway logs -s Worker`
+   - Should see: "📥 Downloading image:" and "✅ Image saved (XXX KB base64)"
+   - Check Web UI: https://web-production-fe38.up.railway.app/
+   - Images should load without 403 errors
+
+3. **Database Check:**
+   ```sql
+   SELECT COUNT(*) FROM items WHERE image_data IS NOT NULL;
+   ```
+   Should increment as worker scans new items.
+
+**Key Technical Details:**
+- Base64 encoding adds ~33% overhead (200KB image → 270KB stored)
+- 500KB size limit prevents DB bloat
+- /api/image endpoint has 30-day cache headers
+- Fallback: if no image_data, redirects to original URL
+- Existing 103 items: will show 403 until re-scanned or deleted
 
 **Key Lessons:**
 - Cloudflare blocks ALL Railway IPs - no proxy/header workaround works
 - Database storage is reliable solution (no external dependencies)
 - Images downloaded DURING scanning (not lazy load) for guaranteed availability
-- Base64 adds ~33% size overhead but worth it for reliability
-- 500KB limit prevents database bloat (most Mercari images <200KB)
+- Railway services: "Worker" (not "worker"), "Postgres-T-E-" for DB
+- `railway up -s ServiceName` works, but Railway Dashboard more reliable for verification
 
 ### Working Features:
 - ✅ Items добавляются в БД
