@@ -220,7 +220,8 @@ class MercariNotificationApp:
         schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
         
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
-        schedule.every(5).seconds.do(self.telegram_cycle)
+        # Increased to 10 seconds to avoid race conditions
+        schedule.every(10).seconds.do(self.telegram_cycle)
         
         # 3. Maintenance tasks
         schedule.every().day.at("03:00").do(self.cleanup_old_data)
