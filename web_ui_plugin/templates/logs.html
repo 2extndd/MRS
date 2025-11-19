@@ -15,8 +15,22 @@
     </div>
 </div>
 
+<style>
+    /* Compact log rows */
+    .table-compact tbody tr {
+        line-height: 1.2;
+    }
+    .table-compact tbody td {
+        padding: 0.25rem 0.5rem !important;
+        vertical-align: middle;
+    }
+    .table-compact thead th {
+        padding: 0.4rem 0.5rem !important;
+    }
+</style>
+
 <div class="table-responsive">
-    <table class="table table-sm table-hover">
+    <table class="table table-sm table-hover table-compact">
         <thead class="table-light">
             <tr>
                 <th style="width: 180px;">Timestamp</th>
