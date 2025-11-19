@@ -634,6 +634,7 @@ This helps future agents avoid repeating mistakes!
 ### После слов "запомни" сохранять в WARP.md:
 
 1. **НЕ сохранять кучу лишней документации** - только критический контекст
-2. **Railway два сервиса:** web (автодеплой ✅) + worker (нужен `railway up` ❌)
-3. **После коммита worker НЕ обновляется** - обязательно `railway up --service worker`
-4. **Контекст последней работы** - всегда добавлять в "Recent Changes Log"
+2. **Railway работает ТОЛЬКО с PostgreSQL** - нет SQLite на production
+3. **Railway два сервиса:** web (автодеплой ✅) + worker (нужен `railway up` ❌)
+4. **После коммита worker НЕ обновляется** - обязательно `railway up --service worker`
+5. **Контекст последней работы** - всегда добавлять в "Recent Changes Log"

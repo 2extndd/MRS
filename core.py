@@ -278,9 +278,15 @@ class MercariSearcher:
 
         for item in items:
             try:
+                # Get item ID (mercapi uses id_, our Item class uses id)
+                item_id = getattr(item, 'id_', None) or getattr(item, 'id', None)
+                if not item_id:
+                    logger.error(f"❌ Item has no ID, skipping")
+                    continue
+                
                 # Get FULL item details including SIZE and ORIGINAL PHOTOS
-                logger.info(f"📦 Getting full details for item: {item.id}")
-                full_item = self.api.get_item(item.id)
+                logger.info(f"📦 Getting full details for item: {item_id}")
+                full_item = self.api.get_item(item_id)
                 
                 # Increment API counter for get_item() call
                 self.total_api_requests += 1
@@ -288,8 +294,14 @@ class MercariSearcher:
                 self.db.increment_api_counter()
                 
                 if not full_item:
-                    logger.warning(f"⚠️ Could not get full details for {item.id}, using search data")
+                    logger.warning(f"⚠️ Could not get full details for {item_id}, using search data")
                     full_item = item
+                
+                # Get mercari_id from full_item (mercapi uses id_, our Item uses id)
+                mercari_id = getattr(full_item, 'id_', None) or getattr(full_item, 'id', None)
+                if not mercari_id:
+                    logger.error(f"❌ Full item has no ID, skipping")
+                    continue
                 
                 # Convert to dict
                 item_dict = full_item.to_dict()
@@ -309,8 +321,8 @@ class MercariSearcher:
                 logger.info(f"   Photo: {'ORIGINAL' if '/orig/' in (image_url or '') else 'thumbnail'}")
                 
                 # Add to database
-                item_id = self.db.add_item(
-                    mercari_id=full_item.id,
+                db_item_id = self.db.add_item(
+                    mercari_id=mercari_id,
                     search_id=search_id,
                     title=full_item.title,
                     price=full_item.price,
@@ -330,15 +342,19 @@ class MercariSearcher:
                 )
 
                 # If item was added (new), add to list
-                if item_id:
-                    item_dict['db_id'] = item_id
+                if db_item_id:
+                    item_dict['db_id'] = db_item_id
                     new_items.append(item_dict)
                     self.total_items_found += 1
+                    logger.info(f"✅ NEW item added to DB: {full_item.title[:50]}")
+                else:
+                    logger.info(f"⏭️ Item already exists: {mercari_id}")
 
             except Exception as e:
-                logger.error(f"Failed to process item {item.id}: {e}")
+                item_id_str = item_id if 'item_id' in locals() else 'unknown'
+                logger.error(f"Failed to process item {item_id_str}: {e}")
                 # Log to database for tracking
-                self.db.log_error(f"Failed to process item {item.id}: {str(e)}", 'item_processing')
+                self.db.log_error(f"Failed to process item {item_id_str}: {str(e)}", 'item_processing')
                 import traceback
                 logger.error(traceback.format_exc())
                 continue
