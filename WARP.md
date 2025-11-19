@@ -692,13 +692,27 @@ This helps future agents avoid repeating mistakes!
 - **Testing needed:** Verify deployment with `railway logs` + check items in DB
 - **Issue:** Railway CLI logs hang/timeout - may need Railway Dashboard check
 
-### Latest Actions (Session end):
+### Latest Actions (Session 5.3 FINAL):
 - **Worker recreated:** New service MRS (1d82b0ac-1281-4b31-9a5d-cb3148ff77d0)
 - **Variables set:** DATABASE_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, RAILWAY_SERVICE_NAME
 - **GitHub Actions removed:** .github/workflows/ deleted (blocked auto-deploy)
-- **Latest commit:** 01c9442 (fix: Remove GitHub Actions workflow)
-- **Status:** Worker deployed but items not adding (0 items after force scan)
-- **Problem:** Code may still be old (no "📦 Getting full details" in logs)
+- **Latest commit:** c79ff52 (fix: Enforce items limit)
+- **Status:** ✅ WORKING! Items adding to DB with full details
+- **Fixed bugs:** 3 critical bugs (item.id_, Items iteration, items limit)
+- **Results:** Items add to DB with Size, orig photos, full data
+
+### Working Features:
+- ✅ Items добавляются в БД
+- ✅ get_item() вызывается для полной инфо
+- ✅ Оригинальные фото (/orig/ URLs)
+- ✅ Size extraction (when present in description)
+- ✅ Items limit = 6 (не 50)
+- ✅ Config hot reload работает
+
+### Known Issues:
+- Size может быть None если продавец не указал в description
+- mercapi не поддерживает Mercari Shops items (get_item returns None)
+- Railway CLI logs зависают (нужен Dashboard для просмотра)
 
 ### CRITICAL: Verify Deployment
 Railway Dashboard → MRS service → Deployments → Check commit hash:
