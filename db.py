@@ -550,9 +550,15 @@ class DatabaseManager:
         self.execute_query(query, (True, get_moscow_time(), item_id))
 
     def get_all_items(self, limit=100):
-        """Get recent items"""
+        """Get recent items - FAST: without heavy image_data column"""
         query = """
-            SELECT i.*, s.keyword as search_keyword
+            SELECT 
+                i.id, i.mercari_id, i.search_id, i.title, i.price, i.currency,
+                i.brand, i.condition, i.size, i.shipping_cost, i.stock_quantity,
+                i.item_url, i.image_url, 
+                i.seller_name, i.seller_rating, i.location, i.description, i.category,
+                i.is_sent, i.sent_at, i.found_at,
+                s.keyword as search_keyword
             FROM items i
             LEFT JOIN searches s ON i.search_id = s.id
             ORDER BY i.found_at DESC
