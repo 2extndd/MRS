@@ -464,22 +464,26 @@ class Mercari:
         
         description = getattr(item, 'description', '') or ''
         
-        # Common size patterns in Japanese
+        # Common size patterns in Japanese (ordered by priority)
         size_patterns = [
             r'サイズ[:\s]*([A-Z0-9]+)',  # サイズ: XS, サイズ M
             r'size[:\s]*([A-Z0-9]+)',     # size: L, size XL
-            r'^([A-Z]{1,3})[サイズsize\s]',  # XL サイズ, M size
-            r'\b([XS|S|M|L|XL|XXL|XXXL])\b',  # Standalone: S, M, L, XL
-            r'([0-9]+\.?[0-9]*\s?cm)',   # 80cm, 90.5cm
+            r'([0-9]+\.?[0-9]*)\s?cm',   # 80cm, 90.5cm
+            r'\b(XS|XXL|XXXL|XL|L|M|S)\b',  # Standalone (must be exact word)
+            r'フリーサイズ',  # Japanese "free size"
         ]
         
         for pattern in size_patterns:
             match = re.search(pattern, description, re.IGNORECASE)
             if match:
+                if pattern == r'フリーサイズ':
+                    return 'FREE'
                 size = match.group(1).strip().upper()
-                # Validate size
-                if size and len(size) <= 10:  # Reasonable size length
-                    return size
+                # Validate size - exclude common words that might match
+                if size and len(size) <= 10:
+                    # Exclude if it's part of a brand name or common word
+                    if size not in ['IS', 'AS', 'US', 'IN', 'ON', 'OR', 'SO', 'TO']:
+                        return size
         
         return None
 
