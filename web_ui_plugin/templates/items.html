@@ -21,13 +21,15 @@
             <div class="card h-100">
                 <!-- Clickable Image with 4:5 aspect ratio - OPENS MERCARI -->
                 <a href="{{ item.item_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none position-relative d-block">
-                    {% if item.id %}
+                    {% if item.image_url %}
                         <div style="aspect-ratio: 4/5; overflow: hidden; position: relative; background: #f8f9fa;">
-                            <img src="/api/image/{{ item.id }}"
+                            <img src="{{ item.image_url }}"
                                  class="d-block w-100 h-100"
                                  alt="{{ item.title }}"
                                  style="object-fit: cover; object-position: center;"
                                  loading="lazy"
+                                 referrerpolicy="no-referrer"
+                                 crossorigin="anonymous"
                                  onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\'d-flex align-items-center justify-content-center h-100 flex-column\'><i class=\'bi bi-image\' style=\'font-size: 2rem; color: #999;\'></i><small class=\'text-muted mt-2\'>Click to view</small></div>';">
                         </div>
                     {% else %}
