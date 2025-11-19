@@ -218,13 +218,19 @@ class MercariSearcher:
             logger.info(f"Searching: {search_url[:100]}...")
 
             # Perform search
-            items = self.api.search(search_url, limit=limit)
+            items_result = self.api.search(search_url, limit=limit)
 
             # Increment API request counter (in both memory and database for cross-process visibility)
             self.total_api_requests += 1
             self.shared_state.increment('total_api_requests')
             self.db.increment_api_counter()
 
+            # Extract items list from Items object
+            if hasattr(items_result, 'items'):
+                items = items_result.items
+            else:
+                items = items_result if isinstance(items_result, list) else []
+            
             items_found = len(items)
             logger.info(f"API returned {items_found} items")
 
