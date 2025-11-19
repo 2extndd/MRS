@@ -196,9 +196,12 @@ class MercariSearcher:
                 }
 
         # Execute searches in parallel using thread pool
-        # Max workers = min(number of searches, 5) to avoid rate limiting
-        max_workers = min(len(ready_searches), 5)
+        # Max workers = min(number of searches, 10) - can handle more now!
+        max_workers = min(len(ready_searches), 10)
         logger.info(f"[PARALLEL] Processing {len(ready_searches)} searches with {max_workers} parallel threads")
+        
+        if len(ready_searches) > max_workers:
+            logger.info(f"[PARALLEL] Note: {len(ready_searches) - max_workers} searches will be processed in next batch")
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all searches
