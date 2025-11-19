@@ -204,26 +204,33 @@ class Mercari:
                         'description': ''
                     }
 
-                    # Get best available image
-                    # mercapi structure: item might have photos array or thumbnail string
+                    # Get HIGH RESOLUTION image
+                    # mercapi returns small thumbnails, construct full-size URL
                     photos = getattr(item, 'photos', [])
                     thumbnails = getattr(item, 'thumbnails', [])
                     thumbnail = getattr(item, 'thumbnail', None)
                     
-                    # Try to get highest quality image
+                    # Try to get any image first
+                    base_image = None
                     if photos and len(photos) > 0:
-                        # photos array - use first photo (usually highest quality)
-                        item_dict['image_url'] = photos[0]
+                        base_image = photos[0]
                     elif thumbnail:
-                        # Single thumbnail string - often higher quality than thumbnails array
-                        item_dict['image_url'] = thumbnail
+                        base_image = thumbnail
                     elif thumbnails and len(thumbnails) > 0:
-                        # thumbnails array - fallback
-                        item_dict['image_url'] = thumbnails[0]
+                        base_image = thumbnails[0]
                     
-                    # Log what we got for debugging
-                    if not item_dict['image_url']:
-                        logger.debug(f"No image for item {item_id}: photos={bool(photos)}, thumbnail={bool(thumbnail)}, thumbnails={bool(thumbnails)}")
+                    # Convert thumbnail URL to full-size image
+                    if base_image:
+                        # Mercari image URLs: replace thumbnail size with original
+                        # Example: .../c_limit,f_auto,fl_progressive,q_90,w_240/... → w_1200 or remove size params
+                        import re
+                        # Remove size parameters to get full image
+                        full_image = re.sub(r'w_\d+', 'w_1200', base_image)  # 1200px width
+                        full_image = re.sub(r'h_\d+', 'h_1200', full_image)  # 1200px height
+                        item_dict['image_url'] = full_image
+                    else:
+                        item_dict['image_url'] = None
+                        logger.debug(f"No image for item {item_id}")
 
                     items_data.append(item_dict)
                     item_count += 1
