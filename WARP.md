@@ -502,7 +502,19 @@ railway logs --service worker | head -20
 
 ## 🔄 Recent Changes Log
 
-### 2025-11-19: Major UI overhaul
+### 2025-11-19 (Session 2): Photo quality fix + optimization
+- **High-res photos:** Regex replace w_240→w_1200 in URLs (5x better!)
+- **Recent Items:** Instant load - NO filtering, just get_all_items(30)
+- **Config cleanup:** Removed System Information & Scanner Status sections
+- **API counter:** Already working correctly (increments after each search)
+- **Items page:** Photo links open Mercari
+
+### Key lessons:
+- Don't fetch full item details for photos - just manipulate URL (faster!)
+- Recent Items: simpler = faster (no time filtering needed)
+- API counter was already correct, just moved to right place
+
+### 2025-11-19 (Session 1): Major UI overhaul
 - Items page redesigned: 6 cards/row, 4:5 format (like KS1)
 - Recent Items optimized: simple query instead of complex SQL
 - Telegram format minimized: only Title, Price, Size, Query
