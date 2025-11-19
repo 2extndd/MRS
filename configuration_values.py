@@ -155,24 +155,33 @@ class Config:
                 # Check both old and new key names for compatibility
                 if 'config_search_interval' in new_config:
                     old_val = cls.SEARCH_INTERVAL
-                    cls.SEARCH_INTERVAL = int(new_config['config_search_interval'])
-                    logger.info(f"[CONFIG] SEARCH_INTERVAL: {old_val} → {cls.SEARCH_INTERVAL}")
+                    new_val = int(new_config['config_search_interval'])
+                    if old_val != new_val:
+                        cls.SEARCH_INTERVAL = new_val
+                        logger.info(f"[config] Search interval changed: {old_val}s → {cls.SEARCH_INTERVAL}s")
+                    else:
+                        cls.SEARCH_INTERVAL = new_val  # Update anyway but don't log
                 elif 'config_scan_interval' in new_config:
                     old_val = cls.SEARCH_INTERVAL
-                    cls.SEARCH_INTERVAL = int(new_config['config_scan_interval'])
-                    logger.info(f"[CONFIG] SEARCH_INTERVAL (old key): {old_val} → {cls.SEARCH_INTERVAL}")
+                    new_val = int(new_config['config_scan_interval'])
+                    if old_val != new_val:
+                        cls.SEARCH_INTERVAL = new_val
+                        logger.info(f"[config] Search interval changed: {old_val}s → {cls.SEARCH_INTERVAL}s")
 
                 if 'config_max_items_per_search' in new_config:
                     old_val = cls.MAX_ITEMS_PER_SEARCH
                     new_val = int(new_config['config_max_items_per_search'])
-                    cls.MAX_ITEMS_PER_SEARCH = new_val
-                    logger.info(f"[CONFIG] ✅ MAX_ITEMS_PER_SEARCH: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
                     if old_val != new_val:
-                        logger.warning(f"[CONFIG] ⚠️  CRITICAL: Items per search changed from {old_val} to {new_val}!")
+                        cls.MAX_ITEMS_PER_SEARCH = new_val
+                        logger.info(f"[config] Max items per search changed: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
+                    else:
+                        cls.MAX_ITEMS_PER_SEARCH = new_val  # Update anyway but don't log
                 elif 'config_max_items' in new_config:
                     old_val = cls.MAX_ITEMS_PER_SEARCH
-                    cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items'])
-                    logger.info(f"[CONFIG] MAX_ITEMS_PER_SEARCH (old key): {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
+                    new_val = int(new_config['config_max_items'])
+                    if old_val != new_val:
+                        cls.MAX_ITEMS_PER_SEARCH = new_val
+                        logger.info(f"[config] Max items per search changed: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
 
                 if 'config_request_delay' in new_config:
                     cls.REQUEST_DELAY_MIN = float(new_config['config_request_delay'])
