@@ -295,20 +295,27 @@ class MercariSearcher:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
-                # Get FULL item details including SIZE and ORIGINAL PHOTOS
-                logger.info(f"📦 Getting full details for item: {item_id}")
-                full_item = self.api.get_item(item_id)
-                
-                # Increment API counter for get_item() call
-                self.total_api_requests += 1
-                self.shared_state.increment('total_api_requests')
-                self.db.increment_api_counter()
-                
-                if not full_item:
-                    logger.warning(f"⚠️ Could not get full details for {item_id} (maybe Mercari Shops), using search data")
-                    full_item = item
-                else:
-                    logger.info(f"✅ Got full details for {item_id}")
+                # Try to get FULL item details (SIZE, ORIGINAL PHOTOS)
+                # If it fails, use search data (lower quality but item still added)
+                full_item = item  # Default to search data
+                try:
+                    logger.info(f"📦 Getting full details for item: {item_id}")
+                    full_item_result = self.api.get_item(item_id)
+                    
+                    # Increment API counter for get_item() call
+                    self.total_api_requests += 1
+                    self.shared_state.increment('total_api_requests')
+                    self.db.increment_api_counter()
+                    
+                    if full_item_result:
+                        full_item = full_item_result
+                        logger.info(f"✅ Got full details for {item_id}")
+                    else:
+                        logger.warning(f"⚠️ get_item returned None for {item_id}, using search data")
+                        
+                except Exception as get_item_error:
+                    logger.warning(f"⚠️ get_item failed for {item_id}: {get_item_error}, using search data")
+                    # full_item already = item (search data)
                 
                 # Get mercari_id from full_item (mercapi uses id_, our Item uses id)
                 mercari_id = getattr(full_item, 'id_', None) or getattr(full_item, 'id', None)
