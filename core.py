@@ -276,6 +276,18 @@ class MercariSearcher:
                 # Convert to dict
                 item_dict = item.to_dict()
 
+                # Try to get full item details for better image quality
+                try:
+                    # Get full item details which may have higher res photos
+                    full_item = self.api.get_item_details(item.id)
+                    if full_item and full_item.get('image_url'):
+                        image_url = full_item['image_url']
+                    else:
+                        image_url = item.image_url
+                except Exception as e:
+                    logger.debug(f"Could not get full item details for {item.id}, using thumbnail: {e}")
+                    image_url = item.image_url
+                
                 # Add to database
                 item_id = self.db.add_item(
                     mercari_id=item.id,
@@ -289,7 +301,7 @@ class MercariSearcher:
                     shipping_cost=item.shipping_cost,
                     stock_quantity=item.stock_quantity,
                     item_url=item.url,
-                    image_url=item.image_url,
+                    image_url=image_url,
                     seller_name=item.seller_name,
                     seller_rating=item.seller_rating,
                     location=item.location,

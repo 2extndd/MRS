@@ -351,8 +351,10 @@ def api_get_recent_items():
 
         # Get items directly from DB with SQL filter (MUCH FASTER!)
         if db.db_type == 'postgresql':
+            # Use index on found_at for super fast query
             query = """
-                SELECT i.*, s.keyword as search_keyword
+                SELECT i.id, i.title, i.price, i.image_url, i.item_url, i.found_at,
+                       s.keyword as search_keyword
                 FROM items i
                 LEFT JOIN searches s ON i.search_id = s.id
                 WHERE i.found_at >= %s
@@ -360,34 +362,22 @@ def api_get_recent_items():
                 LIMIT 30
             """
             recent_items = db.execute_query(query, (cutoff_time,), fetch=True)
-        else:
-            # SQLite fallback - get recent and filter
-            all_items = db.get_all_items(limit=100)
-            recent_items = []
             
-            for item in all_items:
-                try:
-                    if item.get('found_at'):
-                        item_time = None
-                        
-                        if isinstance(item['found_at'], str):
-                            try:
-                                item_time = datetime.fromisoformat(item['found_at'])
-                            except:
-                                pass
-                        elif isinstance(item['found_at'], datetime):
-                            item_time = item['found_at']
-                        
-                        if item_time:
-                            if item_time.tzinfo is None:
-                                item_time = MOSCOW_TZ.localize(item_time)
-                            
-                            if item_time >= cutoff_time:
-                                recent_items.append(item)
-                                if len(recent_items) >= 30:
-                                    break
-                except:
-                    continue
+            # Convert to list of dicts for JSON
+            recent_items = [dict(row) for row in recent_items]
+        else:
+            # SQLite - simpler query, let DB do the filtering
+            query = """
+                SELECT i.id, i.title, i.price, i.image_url, i.item_url, i.found_at,
+                       s.keyword as search_keyword
+                FROM items i
+                LEFT JOIN searches s ON i.search_id = s.id
+                WHERE datetime(i.found_at) >= datetime(?)
+                ORDER BY i.found_at DESC
+                LIMIT 30
+            """
+            recent_items = db.execute_query(query, (cutoff_time.strftime('%Y-%m-%d %H:%M:%S'),), fetch=True)
+            recent_items = [dict(row) for row in recent_items]
 
         return jsonify({
             'success': True,

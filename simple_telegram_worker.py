@@ -91,7 +91,7 @@ class TelegramWorker:
 
     def _format_item_message(self, item: Dict[str, Any]) -> str:
         """
-        Format item message with USD price conversion
+        Format item message with USD price conversion - MINIMAL FORMAT
 
         Args:
             item: Item dictionary
@@ -106,55 +106,20 @@ class TelegramWorker:
         price_jpy = item.get('price', 0)
         price_usd = round(price_jpy * config.USD_CONVERSION_RATE, 2)
 
-        # Format price text
-        if config.DISPLAY_CURRENCY == 'USD':
-            price_text = f"${price_usd} (¥{price_jpy:,})"
-        else:
-            price_text = f"¥{price_jpy:,} (${price_usd})"
-
-        # Build message
+        # Build message - MINIMAL FORMAT
         lines = [
             f"<b>{title}</b>",
             "",
-            f"💴 <b>Price:</b> {price_text}"
+            f"💶: ${price_usd} (¥{price_jpy:,})"
         ]
 
-        # Brand
-        if item.get('brand'):
-            lines.append(f"👔 <b>Brand:</b> {item['brand']}")
-
-        # Condition
-        if item.get('condition'):
-            lines.append(f"✨ <b>Condition:</b> {item['condition']}")
-
-        # Size
+        # Size (if available)
         if item.get('size'):
-            lines.append(f"📏 <b>Size:</b> {item['size']}")
-
-        # Shipping cost
-        if item.get('shipping_cost'):
-            shipping_jpy = item['shipping_cost']
-            shipping_usd = round(shipping_jpy * config.USD_CONVERSION_RATE, 2)
-            lines.append(f"📦 <b>Shipping:</b> ¥{shipping_jpy:,} (${shipping_usd})")
-
-        # Seller
-        if item.get('seller_name'):
-            seller_text = item['seller_name']
-            if item.get('seller_rating'):
-                seller_text += f" ({item['seller_rating']}⭐)"
-            lines.append(f"👤 <b>Seller:</b> {seller_text}")
-
-        # Location
-        if item.get('location'):
-            lines.append(f"📍 <b>Location:</b> {item['location']}")
-
-        # Category
-        if item.get('category'):
-            lines.append(f"🏷 <b>Category:</b> {item['category']}")
+            lines.append(f"📏 Size: {item['size']}")
 
         # Search keyword
         if item.get('search_keyword'):
-            lines.append(f"🔍 <b>Search:</b> {item['search_keyword']}")
+            lines.append(f"🔍: {item['search_keyword']}")
 
         return "\n".join(lines)
 
