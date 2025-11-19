@@ -320,29 +320,35 @@ INSERT INTO items (...) VALUES (...) RETURNING id
 
 ### Оставшиеся проблемы
 
-#### ❓ "То 5, то 50 items" в логах
+#### ✅ "То 5, то 50 items" в логах - ОБЪЯСНЕНО
 **Симптом**: В логах то `Found 5 items`, то `Found 50 items`
 
-**Возможные причины**:
-1. Web UI Config не применяется (hot-reload не работает)
-2. Разные процессы используют разные значения
-3. Кеш конфига не обновляется между запросами
+**ПРИЧИНА**: `mercapi` библиотека **НЕ принимает параметр limit**!
 
-**Что проверить**:
-```bash
-railway logs | grep "MAX_ITEMS\|Hot reload"
+**Как работает**:
+- `mercapi.search(query="keyword")` возвращает сколько найдёт (обычно 5-120)
+- Потом `pyMercariAPI` обрезает до `limit`
+- Если mercapi нашёл 5 товаров → вернёт 5 (даже если limit=50)
+- Если mercapi нашёл 120 товаров → обрежет до 50 (если limit=50)
+
+**Это НОРМАЛЬНО!** Количество зависит от того, сколько товаров Mercari вернул по запросу.
+
+**В логах теперь**:
+```
+mercapi returned 5 items, will limit to 6
+API returned 5 items (limit: 6)
+Found 5 items (2 new)
 ```
 
-Должно быть:
+или
+
 ```
-[CONFIG] ✅ Hot reload complete! search_interval=60s, max_items=6
-Searching: ... (limit: 6)
+mercapi returned 120 items, will limit to 6
+API returned 6 items (limit: 6)
+Found 6 items (3 new)
 ```
 
-Если видишь `(limit: 50)` - значит:
-- Конфиг не сохранён в Web UI
-- Hot-reload не сработал
-- Используется дефолтное значение
+**Итог**: Если `limit=6` в настройках, бот возьмёт максимум 6 товаров, даже если mercapi вернул 120.
 
 #### ❓ "new items = 1, а вещей 2" 
 **Симптом**: Добавляется 2 товара, но в логах `(1 new)`
