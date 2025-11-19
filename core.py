@@ -385,7 +385,30 @@ class MercariSearcher:
 
                 # If item was added (new), add to list
                 if db_item_id:
-                    item_dict = full_item.to_dict()
+                    # Convert to dict - check if it's our Item class or raw mercapi object
+                    if hasattr(full_item, 'to_dict'):
+                        item_dict = full_item.to_dict()
+                    else:
+                        # Raw mercapi object - create dict manually
+                        item_dict = {
+                            'mercari_id': mercari_id,
+                            'title': full_item.title,
+                            'price': full_item.price,
+                            'currency': full_item.currency,
+                            'item_url': full_item.url,
+                            'image_url': image_url,
+                            'brand': full_item.brand,
+                            'condition': full_item.condition,
+                            'size': full_item.size,
+                            'shipping_cost': full_item.shipping_cost,
+                            'stock_quantity': full_item.stock_quantity,
+                            'seller_name': full_item.seller_name,
+                            'seller_rating': full_item.seller_rating,
+                            'location': full_item.location,
+                            'category': full_item.category,
+                            'description': full_item.description
+                        }
+                    
                     item_dict['db_id'] = db_item_id
                     item_dict['image_data'] = image_data  # Include for notifications
                     new_items.append(item_dict)
