@@ -302,33 +302,28 @@ class MercariSearcher:
                 full_item = item
                 needs_get_item = False
                 
-                # Try to get high-res photo URL from search data
+                # Try to get good quality photo URL from search data
+                # NOTE: /orig/ URLs are blocked by Cloudflare (403), use w_800 instead
                 search_photo = getattr(item, 'image_url', None) or getattr(item, 'image', None)
                 if search_photo:
                     import re
-                    # Try URL manipulation to get /orig/ or /large/
+                    # Try URL manipulation to get better quality (but not /orig/ - Cloudflare blocks it!)
                     if 'mercari-shops-static.com' in search_photo:
                         # Mercari Shops: small → large
                         search_photo = re.sub(r'/-/small/', '/-/large/', search_photo)
                         logger.info(f"   📸 Mercari Shops: upgraded to /large/")
                     elif 'mercdn.net' in search_photo:
-                        # Regular Mercari: upgrade to /orig/ (ORIGINAL quality, no resize)
-                        if '/thumb/' in search_photo or 'w_' in search_photo or '/c/' in search_photo:
-                            # Remove all size params and use /orig/
-                            search_photo = re.sub(r'/thumb/[^/]+/', '/item/detail/orig/photos/', search_photo)
-                            search_photo = re.sub(r'/c/w=\d+/[^/]+/', '/item/detail/orig/photos/', search_photo)
-                            search_photo = re.sub(r'\?w=\d+.*$', '', search_photo)  # Remove query params
-                            search_photo = re.sub(r'w_\d+', 'orig', search_photo)  # Replace w_240 with orig
-                            # Ensure proper path structure
-                            if '/item/detail/orig/photos/' not in search_photo:
-                                # Fallback: just replace path segments
-                                search_photo = search_photo.replace('/thumb/', '/item/detail/orig/photos/')
-                                search_photo = search_photo.replace('/c/', '/item/detail/orig/photos/')
-                            logger.info(f"   📸 URL upgraded to /orig/ (original quality)")
-                        elif '/orig/' in search_photo:
-                            logger.info(f"   📸 Already /orig/ quality")
+                        # Regular Mercari: upgrade to w_800 (good quality, not blocked)
+                        if 'w_' in search_photo:
+                            # Replace w_240 with w_800
+                            search_photo = re.sub(r'w_\d+', 'w_800', search_photo)
+                            logger.info(f"   📸 URL upgraded to w_800 (high quality, not blocked)")
+                        elif '/thumb/' in search_photo:
+                            # Replace /thumb/ with better resolution
+                            search_photo = search_photo.replace('/thumb/', '/c_limit,f_auto,fl_progressive,q_90,w_800/')
+                            logger.info(f"   📸 URL upgraded from /thumb/ to w_800")
                         else:
-                            needs_get_item = True  # Unknown format, need get_item
+                            logger.info(f"   📸 Using original search photo URL")
                     else:
                         needs_get_item = True  # Unknown domain
                     
@@ -371,23 +366,22 @@ class MercariSearcher:
                 # Image URL is already ORIGINAL from get_item() (mercapi photos field)
                 image_url = full_item.image_url
                 
-                # Ensure it's original/high quality
+                # Ensure it's good quality (but NOT /orig/ - Cloudflare blocks it!)
                 if image_url:
                     import re
-                    
+
                     # For Mercari Shops items: replace /small/ with /large/ (best available)
                     if 'mercari-shops-static.com' in image_url:
                         image_url = re.sub(r'/-/small/', '/-/large/', image_url)
                         logger.info(f"   Mercari Shops: using /large/ quality")
-                    
-                    # For regular Mercari items: ensure /orig/
-                    elif '/orig/' not in image_url:
-                        image_url = re.sub(r'/thumb/', '/orig/', image_url)
-                        image_url = re.sub(r'w_\d+', 'w_1200', image_url)
-                        image_url = re.sub(r'h_\d+', 'h_1200', image_url)
-                
+
+                    # For regular Mercari items: use w_800 (good quality, not blocked)
+                    elif 'w_' in image_url:
+                        image_url = re.sub(r'w_\d+', 'w_800', image_url)
+                        image_url = re.sub(r'h_\d+', 'h_800', image_url)
+
                 logger.info(f"   Size: {full_item.size or 'N/A'}")
-                logger.info(f"   Photo: {'ORIGINAL' if '/orig/' in (image_url or '') else 'thumbnail'}")
+                logger.info(f"   Photo: {('w_800' if 'w_800' in (image_url or '') else 'thumbnail')}")
                 
                 # Add to database
                 db_item_id = self.db.add_item(
