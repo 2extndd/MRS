@@ -337,9 +337,13 @@ class Mercari:
                 'category': None
             }
 
-            # Get photos
+            # Get ORIGINAL FULL SIZE photos (not thumbnails!)
             if hasattr(full_item, 'photos') and full_item.photos:
+                # photos already contains full-size /orig/ URLs from mercapi
                 item_data['image_url'] = full_item.photos[0]
+            
+            # Extract SIZE from description or item attributes
+            item_data['size'] = self._extract_size(full_item)
 
             # Item condition
             if hasattr(full_item, 'item_condition') and full_item.item_condition:
@@ -354,7 +358,12 @@ class Mercari:
             # Seller
             if hasattr(full_item, 'seller') and full_item.seller:
                 item_data['seller_name'] = getattr(full_item.seller, 'name', None)
-                item_data['seller_rating'] = getattr(full_item.seller, 'rating', None)
+                if hasattr(full_item.seller, 'ratings'):
+                    ratings = full_item.seller.ratings
+                    good = getattr(ratings, 'good', 0)
+                    total = getattr(full_item.seller, 'num_ratings', 0)
+                    if total > 0:
+                        item_data['seller_rating'] = f"{good}/{total}"
 
             return Item(item_data)
 
@@ -440,6 +449,39 @@ class Mercari:
             'max_delay': self.max_delay,
             'library': 'mercapi'
         }
+
+    def _extract_size(self, item) -> Optional[str]:
+        """
+        Extract size from item description or attributes
+        
+        Args:
+            item: mercapi item object
+            
+        Returns:
+            Size string or None
+        """
+        import re
+        
+        description = getattr(item, 'description', '') or ''
+        
+        # Common size patterns in Japanese
+        size_patterns = [
+            r'サイズ[:\s]*([A-Z0-9]+)',  # サイズ: XS, サイズ M
+            r'size[:\s]*([A-Z0-9]+)',     # size: L, size XL
+            r'^([A-Z]{1,3})[サイズsize\s]',  # XL サイズ, M size
+            r'\b([XS|S|M|L|XL|XXL|XXXL])\b',  # Standalone: S, M, L, XL
+            r'([0-9]+\.?[0-9]*\s?cm)',   # 80cm, 90.5cm
+        ]
+        
+        for pattern in size_patterns:
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                size = match.group(1).strip().upper()
+                # Validate size
+                if size and len(size) <= 10:  # Reasonable size length
+                    return size
+        
+        return None
 
     def __repr__(self):
         return f"<Mercari API (mercapi) (requests: {self.request_count})>"

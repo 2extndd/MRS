@@ -509,6 +509,27 @@ railway logs --service worker | head -20
 
 ## 🔄 Recent Changes Log
 
+### 2025-01-XX (Session 5): FULL item details, size extraction, original photos
+- **КРИТИЧНО:** Теперь получаем ПОЛНУЮ инфу о каждом товаре через get_item()
+- **Размер:** Извлекается из description (regex patterns для японских размеров)
+- **ОРИГИНАЛЬНЫЕ ФОТО:** mercapi возвращает /orig/ URLs (full resolution)
+- **Telegram:** Размер отображается в уведомлениях и Web UI
+- **Recent Items:** Исправлено - добавлен JavaScript блок в dashboard.html
+- **Navbar:** Исправлено отображение "powered by extndd"
+- **Configuration:** Проверка hot reload (Items Per Query, Query Delay, USD Rate)
+
+### Технические детали:
+- core.py: для каждого item вызывается api.get_item() для получения size + orig photos
+- mercapi photos field: содержит https://static.mercdn.net/item/detail/orig/...
+- Size extraction: regex patterns для "サイズ: XS", "size: M", "80cm" и т.д.
+- Логирование: "📦 Getting full details", "Size: XS", "Photo: ORIGINAL"
+- Hot reload работает для: search_interval, max_items_per_search, telegram_chat_id
+
+### Важно:
+- Получение полной инфы = +1 API запрос на каждый товар (медленнее, но полные данные)
+- Размер может отсутствовать если не указан в description
+- WARP.md defaults устарели - реальные значения берутся из Web UI config page
+
 ### 2025-01-XX (Session 4): Photo quality, pagination, error logging, UI branding
 - **CRITICAL FIX:** config.html missing {% endblock %} - caused 500 error on entire site
 - **Favicon:** Blue circle with 'M' letter (favicon.svg)

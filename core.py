@@ -265,6 +265,7 @@ class MercariSearcher:
     def _process_new_items(self, items, search_id: int) -> List[Dict[str, Any]]:
         """
         Process items and save new ones to database
+        Gets FULL item details (size, original photos) for each item
 
         Args:
             items: Items object from API
@@ -277,36 +278,50 @@ class MercariSearcher:
 
         for item in items:
             try:
+                # Get FULL item details including SIZE and ORIGINAL PHOTOS
+                logger.info(f"📦 Getting full details for item: {item.id}")
+                full_item = self.api.get_item(item.id)
+                
+                if not full_item:
+                    logger.warning(f"⚠️ Could not get full details for {item.id}, using search data")
+                    full_item = item
+                
                 # Convert to dict
-                item_dict = item.to_dict()
+                item_dict = full_item.to_dict()
 
-                # Ensure HIGH RESOLUTION image - force w_1200
-                image_url = item.image_url
-                if image_url:
+                # Image URL is already ORIGINAL from get_item() (mercapi photos field)
+                image_url = full_item.image_url
+                
+                # Ensure it's original quality
+                if image_url and '/orig/' not in image_url:
                     import re
-                    # Replace any width parameter with w_1200 for high-res
+                    # Force original if somehow not already
+                    image_url = re.sub(r'/thumb/', '/orig/', image_url)
                     image_url = re.sub(r'w_\d+', 'w_1200', image_url)
                     image_url = re.sub(r'h_\d+', 'h_1200', image_url)
                 
+                logger.info(f"   Size: {full_item.size or 'N/A'}")
+                logger.info(f"   Photo: {'ORIGINAL' if '/orig/' in (image_url or '') else 'thumbnail'}")
+                
                 # Add to database
                 item_id = self.db.add_item(
-                    mercari_id=item.id,
+                    mercari_id=full_item.id,
                     search_id=search_id,
-                    title=item.title,
-                    price=item.price,
-                    currency=item.currency,
-                    brand=item.brand,
-                    condition=item.condition,
-                    size=item.size,
-                    shipping_cost=item.shipping_cost,
-                    stock_quantity=item.stock_quantity,
-                    item_url=item.url,
+                    title=full_item.title,
+                    price=full_item.price,
+                    currency=full_item.currency,
+                    brand=full_item.brand,
+                    condition=full_item.condition,
+                    size=full_item.size,
+                    shipping_cost=full_item.shipping_cost,
+                    stock_quantity=full_item.stock_quantity,
+                    item_url=full_item.url,
                     image_url=image_url,
-                    seller_name=item.seller_name,
-                    seller_rating=item.seller_rating,
-                    location=item.location,
-                    description=item.description,
-                    category=item.category
+                    seller_name=full_item.seller_name,
+                    seller_rating=full_item.seller_rating,
+                    location=full_item.location,
+                    description=full_item.description,
+                    category=full_item.category
                 )
 
                 # If item was added (new), add to list
@@ -319,6 +334,8 @@ class MercariSearcher:
                 logger.error(f"Failed to process item {item.id}: {e}")
                 # Log to database for tracking
                 self.db.log_error(f"Failed to process item {item.id}: {str(e)}", 'item_processing')
+                import traceback
+                logger.error(traceback.format_exc())
                 continue
 
         if new_items:
