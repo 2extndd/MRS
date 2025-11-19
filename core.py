@@ -217,6 +217,18 @@ class MercariSearcher:
             # Use GLOBAL config setting (from Web UI config page)
             if limit is None:
                 limit = config.MAX_ITEMS_PER_SEARCH
+            
+            # SPECIAL CASE: First scan after DB clear
+            # If this search has 0 items in database, load more items to populate
+            items_count_query = "SELECT COUNT(*) as count FROM items WHERE search_id = %s"
+            result = self.db.execute_query(items_count_query, (search_id,), fetch=True)
+            items_in_db = result[0]['count'] if result else 0
+            
+            if items_in_db == 0:
+                # First scan - load more items to populate database
+                original_limit = limit
+                limit = min(50, config.MAX_ITEMS_PER_SEARCH * 10)  # Up to 50 items on first scan
+                logger.info(f"[FIRST SCAN] This search has 0 items in DB, increasing limit: {original_limit} → {limit}")
 
             logger.info(f"Searching: {search_url[:100]}... (limit: {limit})")
 
