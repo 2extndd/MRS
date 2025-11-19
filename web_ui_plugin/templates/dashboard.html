@@ -98,6 +98,24 @@ let isLoading = false;
 let hasMore = true;
 const itemsPerPage = 30;
 
+// Clean timestamp function (remove microseconds)
+function cleanTimestamp(ts) {
+    if (!ts || typeof ts !== 'string') return ts;
+    // Remove microseconds (e.g., "2025-11-19 22:43:32.585535" -> "2025-11-19 22:43:32")
+    if (ts.includes('.')) {
+        const parts = ts.split('.');
+        if (parts.length === 2) {
+            // Check if there's timezone info after microseconds
+            if (parts[1].includes(' ')) {
+                const tzPart = parts[1].split(' ').slice(1).join(' ');
+                return tzPart ? `${parts[0]} ${tzPart}` : parts[0];
+            }
+            return parts[0];
+        }
+    }
+    return ts;
+}
+
 // Load recent items
 function loadRecentItems(append = false) {
     if (isLoading || (!hasMore && append)) return;

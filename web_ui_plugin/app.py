@@ -27,6 +27,51 @@ db = get_db()
 shared_state = get_shared_state()
 
 
+# Jinja2 custom filter for cleaning timestamps
+@app.template_filter('clean_timestamp')
+def clean_timestamp_filter(ts):
+    """Jinja2 filter to remove microseconds from timestamps"""
+    return clean_timestamp(str(ts)) if ts else ''
+
+
+def get_safe_config():
+    """Get config with fallback for USD_CONVERSION_RATE"""
+    safe_config = type('SafeConfig', (object,), {
+        'USD_CONVERSION_RATE': config.USD_CONVERSION_RATE or 0.0067
+    })()
+
+    # Copy all other config attributes
+    for attr in dir(config):
+        if not attr.startswith('_') and attr != 'USD_CONVERSION_RATE':
+            try:
+                setattr(safe_config, attr, getattr(config, attr))
+            except:
+                pass
+
+    return safe_config
+
+
+def clean_timestamp(ts_str):
+    """Remove microseconds from timestamp string"""
+    if not isinstance(ts_str, str):
+        return ts_str
+
+    # Remove microseconds (e.g., "2025-11-19 22:43:32.585535" -> "2025-11-19 22:43:32")
+    if '.' in ts_str:
+        # Split at dot and keep only the part before it
+        parts = ts_str.split('.')
+        if len(parts) == 2:
+            # Check if there's a timezone after microseconds
+            if ' ' in parts[1]:
+                # e.g., ".585535 GMT+3" -> " GMT+3"
+                tz_part = parts[1].split(' ', 1)[1] if ' ' in parts[1] else ''
+                return f"{parts[0]} {tz_part}".strip() if tz_part else parts[0]
+            else:
+                return parts[0]
+
+    return ts_str
+
+
 @app.route('/')
 def index():
     """Dashboard"""
@@ -54,7 +99,7 @@ def index():
                              stats=stats,
                              state_stats=state_stats,
                              total_api_requests=db.get_api_counter(),
-                             config=config)
+                             config=get_safe_config())
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
         import traceback
@@ -68,7 +113,7 @@ def queries():
     """Search queries management"""
     try:
         searches = db.get_all_searches()
-        return render_template('queries.html', searches=searches, config=config)
+        return render_template('queries.html', searches=searches, config=get_safe_config())
     except Exception as e:
         logger.error(f"Queries page error: {e}")
         import traceback
@@ -83,7 +128,7 @@ def items():
     try:
         limit = request.args.get('limit', 100, type=int)
         all_items = db.get_all_items(limit=limit)
-        return render_template('items.html', items=all_items, config=config)
+        return render_template('items.html', items=all_items, config=get_safe_config())
     except Exception as e:
         logger.error(f"Items page error: {e}")
         import traceback
@@ -167,14 +212,14 @@ def logs():
                         ts = MOSCOW_TZ.localize(ts)
                     else:
                         ts = ts.astimezone(MOSCOW_TZ)
-                    # Format as "YYYY-MM-DD HH:MM:SS GMT+3"
+                    # Format as "YYYY-MM-DD HH:MM:SS GMT+3" (no microseconds)
                     log_copy['timestamp'] = ts.strftime('%Y-%m-%d %H:%M:%S GMT+3')
                 elif isinstance(ts, str):
-                    # Already formatted
-                    log_copy['timestamp'] = ts
+                    # Already formatted, but clean microseconds
+                    log_copy['timestamp'] = clean_timestamp(ts)
             formatted_logs.append(log_copy)
 
-        return render_template('logs.html', logs=formatted_logs, config=config)
+        return render_template('logs.html', logs=formatted_logs, config=get_safe_config())
     except Exception as e:
         logger.error(f"Logs page error: {e}")
         return f"Error: {e}", 500

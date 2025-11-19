@@ -69,7 +69,7 @@
                     <!-- Found timestamp -->
                     {% if item.found_at %}
                     <small class="text-muted mt-auto" style="font-size: 11px;">
-                        {{ item.found_at }}
+                        {{ item.found_at|clean_timestamp }}
                     </small>
                     {% endif %}
                 </div>
@@ -101,6 +101,24 @@ let isLoading = false;
 let hasMore = true;
 const itemsPerPage = 30;
 const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
+
+// Clean timestamp function (remove microseconds)
+function cleanTimestamp(ts) {
+    if (!ts || typeof ts !== 'string') return ts;
+    // Remove microseconds (e.g., "2025-11-19 22:43:32.585535" -> "2025-11-19 22:43:32")
+    if (ts.includes('.')) {
+        const parts = ts.split('.');
+        if (parts.length === 2) {
+            // Check if there's timezone info after microseconds
+            if (parts[1].includes(' ')) {
+                const tzPart = parts[1].split(' ').slice(1).join(' ');
+                return tzPart ? `${parts[0]} ${tzPart}` : parts[0];
+            }
+            return parts[0];
+        }
+    }
+    return ts;
+}
 
 // Load more items
 function loadMoreItems() {
@@ -154,7 +172,7 @@ function loadMoreItems() {
                                     <span class="text-muted" style="font-size: 13px;">¥${item.price}${item.size ? ' · ' + item.size : ''}</span>
                                 </div>
                                 ${item.search_keyword ? `<div class="mb-2"><span class="badge bg-primary" style="font-size: 11px;">${item.search_keyword}</span></div>` : ''}
-                                ${item.found_at ? `<small class="text-muted mt-auto" style="font-size: 11px;">${item.found_at}</small>` : ''}
+                                ${item.found_at ? `<small class="text-muted mt-auto" style="font-size: 11px;">${cleanTimestamp(item.found_at)}</small>` : ''}
                             </div>
                         </div>
                     </div>
