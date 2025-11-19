@@ -343,10 +343,17 @@ def api_delete_query(query_id):
 
 @app.route('/api/items')
 def api_get_items():
-    """Get items API"""
+    """Get items API - WITHOUT heavy image_data for fast loading"""
     try:
         limit = request.args.get('limit', 50, type=int)
         all_items = db.get_all_items(limit=limit)
+        
+        # OPTIMIZATION: Remove heavy image_data from response
+        # Frontend will use image_url instead
+        for item in all_items:
+            if 'image_data' in item:
+                del item['image_data']  # Remove 100-500KB base64 data
+        
         return jsonify({'success': True, 'items': all_items})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -354,13 +361,19 @@ def api_get_items():
 
 @app.route('/api/recent-items')
 def api_get_recent_items():
-    """Get recent items for dashboard"""
+    """Get recent items for dashboard - WITHOUT heavy image_data"""
     try:
         from datetime import datetime
         import pytz
 
         # Just get latest 30 items - NO filtering, like items page
         items = db.get_all_items(limit=30)
+        
+        # OPTIMIZATION: Remove heavy image_data from response
+        # This makes API response 10-50x smaller!
+        for item in items:
+            if 'image_data' in item:
+                del item['image_data']  # Remove 100-500KB base64 data
         
         # Moscow timezone (GMT+3)
         MOSCOW_TZ = pytz.timezone('Europe/Moscow')
