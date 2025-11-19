@@ -114,7 +114,15 @@ class TelegramWorker:
 
         # Price in JPY and USD
         price_jpy = item.get('price', 0)
-        price_usd = round(price_jpy * config.USD_CONVERSION_RATE, 2)
+        
+        # Check if USD conversion rate is set
+        usd_rate = config.USD_CONVERSION_RATE
+        if usd_rate == 0 or usd_rate is None:
+            logger.warning(f"USD_CONVERSION_RATE is {usd_rate}, using default 0.0067")
+            usd_rate = 0.0067
+        
+        price_usd = round(price_jpy * usd_rate, 2)
+        logger.debug(f"Price conversion: ¥{price_jpy} × {usd_rate} = ${price_usd}")
 
         # Build message - MINIMAL FORMAT
         lines = [
