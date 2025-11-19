@@ -91,10 +91,10 @@
                 <strong>Status:</strong> <span id="proxy-status">{{ 'Active' if config.PROXY_ENABLED else 'Inactive' }}</span>
             </div>
             <div class="col-md-4">
-                <strong>Total Proxies:</strong> <span id="proxy-total">{{ config.PROXY_LIST|length }}</span>
+                <strong>Total Proxies:</strong> <span id="proxy-total">{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST.split('\n')|select|list|length }}{% else %}{{ config.PROXY_LIST|length }}{% endif %}</span>
             </div>
             <div class="col-md-4">
-                <strong>Current Proxy:</strong> <code class="small" id="proxy-current">{{ config.PROXY_LIST[0] if config.PROXY_LIST else 'None' }}</code>
+                <strong>Current Proxy:</strong> <code class="small" id="proxy-current">{% if config.PROXY_LIST %}{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST.split('\n')[0] }}{% else %}{{ config.PROXY_LIST[0] }}{% endif %}{% else %}None{% endif %}</code>
             </div>
         </div>
 
@@ -111,7 +111,7 @@
             <div class="mb-3">
                 <label class="form-label">Proxy List (one per line)</label>
                 <textarea class="form-control" name="proxy_list" rows="5"
-                          placeholder="http://user:pass@host:port&#10;socks5://host:port">{{ config.PROXY_LIST|join('\n') if config.PROXY_LIST else '' }}</textarea>
+                          placeholder="http://user:pass@host:port&#10;socks5://host:port">{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST }}{% elif config.PROXY_LIST %}{{ config.PROXY_LIST|join('\n') }}{% endif %}</textarea>
                 <small class="text-muted">Format: protocol://user:pass@host:port</small>
             </div>
             <div class="d-flex gap-2">
