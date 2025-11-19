@@ -57,6 +57,9 @@ def index():
                              config=config)
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        db.log_error(f"Dashboard error: {str(e)}", 'web_ui')
         return f"Error: {e}", 500
 
 
@@ -68,6 +71,9 @@ def queries():
         return render_template('queries.html', searches=searches, config=config)
     except Exception as e:
         logger.error(f"Queries page error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        db.log_error(f"Queries page error: {str(e)}", 'web_ui')
         return f"Error: {e}", 500
 
 
@@ -80,6 +86,9 @@ def items():
         return render_template('items.html', items=all_items, config=config)
     except Exception as e:
         logger.error(f"Items page error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        db.log_error(f"Items page error: {str(e)}", 'web_ui')
         return f"Error: {e}", 500
 
 

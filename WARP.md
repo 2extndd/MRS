@@ -502,6 +502,20 @@ railway logs --service worker | head -20
 
 ## 🔄 Recent Changes Log
 
+### 2025-01-XX (Session 4): Photo quality fix, pagination, error logging
+- **HIGH-RES photos:** Force w_1200 in core.py AND simple_telegram_worker.py (both web UI and Telegram)
+- **Items page:** Removed "Sent" status badge, price section bigger and more visible
+- **Pagination:** 60 items per page with smart pagination controls
+- **Error logging:** All errors now logged to database via db.log_error()
+- **Test cleanup:** Removed test_mercari_api.py, test_mercari_search.py, test_fixes.py
+- **Web UI errors:** Added traceback logging for all web routes
+
+### Key fixes:
+- Photos NOW truly high-res: re.sub(r'w_\d+', 'w_1200', image_url) in 3 places
+- Items page loads fast with client-side pagination (JS)
+- All exceptions logged to error_tracking table for Railway status monitoring
+- Price display: bigger font (18px), separate lines, light background for visibility
+
 ### 2025-01-XX (Session 3): Complete TODO implementation
 - **Config saving:** Implemented Telegram, Proxy, and Railway config endpoints
 - **Railway status:** Real error tracking from database with categorization

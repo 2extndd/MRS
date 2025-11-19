@@ -57,11 +57,19 @@ class TelegramWorker:
             # Create inline keyboard
             keyboard = self._create_item_keyboard(item)
 
+            # Ensure HIGH RESOLUTION photo for Telegram
+            image_url = item.get('image_url')
+            if image_url:
+                import re
+                # Force high resolution (w_1200) for Telegram
+                image_url = re.sub(r'w_\d+', 'w_1200', image_url)
+                image_url = re.sub(r'h_\d+', 'h_1200', image_url)
+
             # Send with photo if available
-            if item.get('image_url'):
+            if image_url:
                 success = self._send_with_photo(
                     message=message,
-                    photo_url=item['image_url'],
+                    photo_url=image_url,
                     keyboard=keyboard,
                     thread_id=thread_id
                 )
@@ -87,6 +95,8 @@ class TelegramWorker:
 
         except Exception as e:
             logger.error(f"Failed to send notification: {e}")
+            # Log error to database
+            self.db.log_error(f"Failed to send Telegram notification: {str(e)}", 'telegram')
             return False
 
     def _format_item_message(self, item: Dict[str, Any]) -> str:
@@ -193,9 +203,15 @@ class TelegramWorker:
                     continue
 
                 logger.warning(f"Failed to send photo (attempt {attempt + 1}/{self.max_retries}): {response.status_code} - {response.text[:200]}")
+                # Log to database on final attempt
+                if attempt == self.max_retries - 1:
+                    self.db.log_error(f"Failed to send photo after {self.max_retries} attempts: {response.status_code}", 'telegram_photo')
 
             except Exception as e:
                 logger.warning(f"Failed to send photo (attempt {attempt + 1}/{self.max_retries}): {e}")
+                # Log to database on final attempt
+                if attempt == self.max_retries - 1:
+                    self.db.log_error(f"Failed to send photo: {str(e)}", 'telegram_photo')
 
             if attempt < self.max_retries - 1:
                 time.sleep(self.retry_delay)

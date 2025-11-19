@@ -171,6 +171,7 @@ class MercariSearcher:
             except Exception as e:
                 logger.error(f"Error processing search {search['id']}: {e}")
                 self.db.add_log_entry('ERROR', f"Error processing search: {str(e)}", 'search', f"ID: {search['id']}")
+                self.db.log_error(f"Error processing search {search['id']}: {str(e)}", 'search_cycle')
                 results['failed_searches'] += 1
                 self.total_errors += 1
                 self.shared_state.add_error(str(e))
@@ -244,6 +245,9 @@ class MercariSearcher:
         except Exception as e:
             logger.error(f"Search query failed: {e}")
             self.total_errors += 1
+            
+            # Log to database for tracking
+            self.db.log_error(f"Search query failed: {str(e)}", 'search')
 
             # Try changing proxy on error
             if self.use_proxy and proxy_rotator and '403' in str(e):
@@ -276,8 +280,13 @@ class MercariSearcher:
                 # Convert to dict
                 item_dict = item.to_dict()
 
-                # Use image from search (now high-res thanks to URL manipulation)
+                # Ensure HIGH RESOLUTION image - force w_1200
                 image_url = item.image_url
+                if image_url:
+                    import re
+                    # Replace any width parameter with w_1200 for high-res
+                    image_url = re.sub(r'w_\d+', 'w_1200', image_url)
+                    image_url = re.sub(r'h_\d+', 'h_1200', image_url)
                 
                 # Add to database
                 item_id = self.db.add_item(
@@ -308,6 +317,8 @@ class MercariSearcher:
 
             except Exception as e:
                 logger.error(f"Failed to process item {item.id}: {e}")
+                # Log to database for tracking
+                self.db.log_error(f"Failed to process item {item.id}: {str(e)}", 'item_processing')
                 continue
 
         if new_items:
