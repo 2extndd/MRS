@@ -475,13 +475,26 @@ class DatabaseManager:
             print(f"[DB] Item {mercari_id} already exists")
             return None
 
-        query = """
-            INSERT INTO items
-            (mercari_id, search_id, title, price, currency, brand, condition,
-             size, shipping_cost, stock_quantity, item_url, image_url, image_data,
-             seller_name, seller_rating, location, description, category, found_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
+        # PostgreSQL: use RETURNING id
+        if self.db_type == 'postgresql':
+            query = """
+                INSERT INTO items
+                (mercari_id, search_id, title, price, currency, brand, condition,
+                 size, shipping_cost, stock_quantity, item_url, image_url, image_data,
+                 seller_name, seller_rating, location, description, category, found_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """
+        else:
+            # SQLite: no RETURNING
+            query = """
+                INSERT INTO items
+                (mercari_id, search_id, title, price, currency, brand, condition,
+                 size, shipping_cost, stock_quantity, item_url, image_url, image_data,
+                 seller_name, seller_rating, location, description, category, found_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        
         params = (
             mercari_id,
             search_id,
@@ -504,19 +517,19 @@ class DatabaseManager:
             get_moscow_time()
         )
 
-        cursor = self.execute_query(query, params)
-
         # Get inserted item ID
         if self.db_type == 'postgresql':
-            item_id = cursor.lastrowid if hasattr(cursor, 'lastrowid') else None
+            result = self.execute_query(query, params, fetch=True)
+            item_id = result[0]['id'] if result else None
         else:
+            cursor = self.execute_query(query, params)
             item_id = cursor.lastrowid
 
         # Add initial price to price_history
         if item_id and kwargs.get('price'):
             self.add_price_history(item_id, kwargs.get('price'))
 
-        print(f"[DB] Item added: {kwargs.get('title', 'No title')}")
+        print(f"[DB] Item added: {kwargs.get('title', 'No title')} (ID: {item_id})")
         return item_id
 
     def get_unsent_items(self, limit=100):
