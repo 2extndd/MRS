@@ -50,7 +50,7 @@
                     <!-- Price with Size - BIGGER & MORE VISIBLE -->
                     <div class="mb-2 p-2 bg-light rounded">
                         <span class="fw-bold text-dark" style="font-size: 18px; display: block;">
-                            ${{ (item.price * config.USD_CONVERSION_RATE)|round(2) }}
+                            ${{ (item.price * (config.USD_CONVERSION_RATE or 0.0067))|round(2) }}
                         </span>
                         <span class="text-muted" style="font-size: 13px;">
                             ¥{{ item.price }}{% if item.size %} · {{ item.size }}{% endif %}
@@ -100,7 +100,7 @@ let currentOffset = {{ items|length if items else 0 }};
 let isLoading = false;
 let hasMore = true;
 const itemsPerPage = 30;
-const usdRate = {{ config.USD_CONVERSION_RATE }};
+const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
 
 // Load more items
 function loadMoreItems() {

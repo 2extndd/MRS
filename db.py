@@ -243,6 +243,21 @@ class DatabaseManager:
         self.conn.commit()
         print("[DB] Tables created successfully")
 
+        # Initialize USD conversion rate if not set
+        self._ensure_default_config()
+
+    def _ensure_default_config(self):
+        """Ensure default configuration values are set"""
+        try:
+            # Check if USD_CONVERSION_RATE is set
+            usd_rate = self.load_config('config_usd_conversion_rate')
+            if usd_rate is None or usd_rate == 0:
+                # Set default value
+                self.save_config('config_usd_conversion_rate', 0.0067)
+                print("[DB] ✅ Initialized config_usd_conversion_rate = 0.0067")
+        except Exception as e:
+            print(f"[DB] Warning: Could not initialize default config: {e}")
+
     def execute_query(self, query, params=None, fetch=False):
         """Execute SQL query with proper parameter binding"""
         try:
