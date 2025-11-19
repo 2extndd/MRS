@@ -530,21 +530,31 @@ railway logs --service worker | head -20
 - Размер может отсутствовать если не указан в description
 - WARP.md defaults устарели - реальные значения берутся из Web UI config page
 
-### 2025-01-XX (Session 5.3): CRITICAL FIXES - Item ID bug + Config reload spam
-- **КРИТИЧНЕЙШИЙ БАГ:** Items НЕ добавлялись в БД из-за неправильного атрибута ID!
-- **mercapi uses id_:** Объекты имеют атрибут `id_`, НЕ `id`
-- **core.py использовал item.id:** Всегда был None/пустой → БД отклоняла
-- **Результат:** "Found 6 items (0 new)" - все items игнорировались
-- **Фикс:** getattr(item, 'id_', None) с fallback на id
-- **Config reload spam:** Сравнение теперь только config_ ключей (не api_request_count)
-- **Логирование:** '✅ NEW item added' vs '⏭️ Item already exists'
+### 2025-01-XX (Session 5.3): CRITICAL FIXES - TWO bugs preventing items from being added!
+- **БАГ #1: Item ID attribute** - Items НЕ добавлялись из-за item.id (должно быть item.id_)
+- **БАГ #2: Items object iteration** - Итерация Items объекта напрямую (нужно items_result.items)
+- **Результат:** "Found 6 items (0 new)" - for loop никогда не выполнялся!
+- **Config reload spam:** Исправлено - сравнение только config_ ключей
 
-### Технические детали:
-- mercapi library: item.id_ (underscore!)
-- pyMercariAPI Item class: self.id (no underscore)
-- core.py must use: getattr(item, 'id_', None) for mercapi objects
-- Config reload: filter keys with k.startswith('config_') before comparison
-- api_request_count changes every request → excluded from comparison
+### Детали Bug #1 (Item ID):
+- mercapi library: объекты имеют атрибут `id_` (с underscore)
+- core.py использовал: `item.id` (без underscore) → всегда None
+- База данных отклоняла items (mercari_id пустой)
+- Фикс: `getattr(item, 'id_', None)` с fallback на `id`
+
+### Детали Bug #2 (Items object):
+- api.search() возвращает: `Items` объект (не список!)
+- Items объект имеет атрибут: `.items` (список item'ов)
+- core.py итерировал: `for item in items` → Items объект напрямую
+- Результат: for loop пропускался, `_process_new_items()` получал пустой список
+- Фикс: `items = items_result.items` (извлечь список из объекта)
+
+### Почему "Found 6 items (0 new)":
+1. api.search() вернул Items объект с 6 items
+2. len(Items) = 6 → лог показал "Found 6 items"
+3. Но for loop не выполнился (итерация объекта, не списка)
+4. _process_new_items получил пустой/неправильный список
+5. Результат: 0 новых items добавлено
 
 ### 2025-01-XX (Session 5.2): Hot reload debug + API counter fix
 - **Hot reload logging:** Детальные логи показывают все ключи из БД и изменения
