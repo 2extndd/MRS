@@ -126,7 +126,7 @@ class ProxyManager:
 
     def _test_proxy(self, proxy: str, timeout: int = 10) -> bool:
         """
-        Test single proxy
+        Test single proxy against Mercari CDN (where images are hosted)
 
         Args:
             proxy: Proxy URL
@@ -141,12 +141,26 @@ class ProxyManager:
                 'https': proxy
             }
 
-            # Test against Mercari.jp
+            # Test against Mercari CDN (static.mercdn.net) - this is where images come from
+            # Use same headers as actual image download to ensure validation matches reality
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://jp.mercari.com/',
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Language': 'ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+
+            # Test with a known small image from Mercari CDN
+            test_url = 'https://static.mercdn.net/c!/w=240/thumb/photos/m18043642062_1.jpg'
+
             response = requests.get(
-                config.MERCARI_BASE_URL,
+                test_url,
                 proxies=proxies,
                 timeout=timeout,
-                headers={'User-Agent': 'Mozilla/5.0'}
+                headers=headers,
+                stream=True
             )
 
             return response.status_code == 200
