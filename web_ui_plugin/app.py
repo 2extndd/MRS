@@ -218,9 +218,17 @@ def api_stats():
 
 @app.route('/api/queries', methods=['GET'])
 def api_get_queries():
-    """Get all queries"""
+    """Get all queries with actual item counts"""
     try:
         searches = db.get_all_searches()
+        
+        # Add real item count for each search
+        for search in searches:
+            # Count items for this search_id
+            count_query = "SELECT COUNT(*) as count FROM items WHERE search_id = %s"
+            result = db.execute_query(count_query, (search['id'],), fetch=True)
+            search['items_count'] = result[0]['count'] if result else 0
+        
         return jsonify({'success': True, 'queries': searches})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
