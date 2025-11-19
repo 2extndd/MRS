@@ -191,6 +191,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (totalPages > 1) {
         showPage(1);
     }
+    
+    // Auto-refresh items every 5 seconds
+    setInterval(function() {
+        // Save current scroll position
+        const scrollPos = window.scrollY;
+        
+        // Reload items data
+        fetch('/api/items?limit=50')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    allItems = data.items;
+                    renderItems(allItems);
+                    
+                    // Restore scroll position
+                    window.scrollTo(0, scrollPos);
+                }
+            })
+            .catch(err => console.error('Auto-refresh failed:', err));
+    }, 5000);
 });
 </script>
 {% endblock %}

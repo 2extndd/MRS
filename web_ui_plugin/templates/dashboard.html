@@ -228,13 +228,10 @@ function refreshStats() {
 // Initial load
 loadRecentItems();
 
-// Auto-refresh every 30 seconds
+// Auto-refresh every 5 seconds (fast updates!)
 setInterval(() => {
     loadRecentItems();
     refreshStats();
-}, 30000);
-
-// Refresh stats every 5 seconds
-setInterval(refreshStats, 5000);
+}, 5000);
 </script>
 {% endblock %}

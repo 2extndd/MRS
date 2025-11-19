@@ -57,7 +57,7 @@
 {% endif %}
 
 <script>
-// Auto-refresh logs every 15 seconds
+// Auto-refresh logs every 5 seconds (without full page reload!)
 setInterval(function() {
     // Don't refresh if user is actively selecting text or focusing on elements
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
@@ -69,10 +69,41 @@ setInterval(function() {
         return;
     }
 
-    // Reload page preserving current filter
-    window.location.reload();
-}, 15000); // 15 seconds
+    // Save current scroll position
+    const scrollPos = window.scrollY;
+    
+    // Get current filter
+    const level = new URLSearchParams(window.location.search).get('level') || '';
+    
+    // Reload logs via AJAX
+    fetch(`/api/logs?level=${level}&limit=200`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                // Update logs table
+                const tbody = document.querySelector('.table tbody');
+                if (tbody) {
+                    tbody.innerHTML = data.logs.map(log => {
+                        const levelClass = log.level === 'ERROR' ? 'danger' : 
+                                         log.level === 'WARNING' ? 'warning' : 
+                                         log.level === 'INFO' ? 'info' : 'secondary';
+                        return `
+                            <tr>
+                                <td>${log.timestamp}</td>
+                                <td><span class="badge bg-${levelClass}">${log.level}</span></td>
+                                <td>${log.message}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    
+                    // Restore scroll position
+                    window.scrollTo(0, scrollPos);
+                }
+            }
+        })
+        .catch(err => console.error('Auto-refresh failed:', err));
+}, 5000); // 5 seconds
 
-console.log('Logs auto-refresh enabled (every 15 seconds)');
+console.log('Logs auto-refresh enabled (every 5 seconds, no page reload)');
 </script>
 {% endblock %}
