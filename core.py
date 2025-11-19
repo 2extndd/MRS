@@ -295,27 +295,63 @@ class MercariSearcher:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
-                # Try to get FULL item details (SIZE, ORIGINAL PHOTOS)
-                # If it fails, use search data (lower quality but item still added)
-                full_item = item  # Default to search data
-                try:
-                    logger.info(f"📦 Getting full details for item: {item_id}")
-                    full_item_result = self.api.get_item(item_id)
-                    
-                    # Increment API counter for get_item() call
-                    self.total_api_requests += 1
-                    self.shared_state.increment('total_api_requests')
-                    self.db.increment_api_counter()
-                    
-                    if full_item_result:
-                        full_item = full_item_result
-                        logger.info(f"✅ Got full details for {item_id}")
+                # STRATEGY: Try to get high-res photos WITHOUT slow get_item() calls
+                # 1. Use search data as base (fast)
+                # 2. Upgrade photo URL to high-res via manipulation
+                # 3. Only call get_item() if URL manipulation fails
+                full_item = item
+                needs_get_item = False
+                
+                # Try to get high-res photo URL from search data
+                search_photo = getattr(item, 'image_url', None) or getattr(item, 'image', None)
+                if search_photo:
+                    import re
+                    # Try URL manipulation to get /orig/ or /large/
+                    if 'mercari-shops-static.com' in search_photo:
+                        # Mercari Shops: small → large
+                        search_photo = re.sub(r'/-/small/', '/-/large/', search_photo)
+                        logger.info(f"   📸 Mercari Shops: upgraded to /large/")
+                    elif 'mercdn.net' in search_photo:
+                        # Regular Mercari: upgrade to /orig/
+                        if '/thumb/' in search_photo or 'w_' in search_photo:
+                            search_photo = re.sub(r'/thumb/', '/item/detail/orig/', search_photo)
+                            search_photo = re.sub(r'/c/w=\d+/', '/item/detail/orig/', search_photo)
+                            search_photo = re.sub(r'w_\d+', 'w_1200', search_photo)
+                            search_photo = re.sub(r'h_\d+', 'h_1200', search_photo)
+                            logger.info(f"   📸 URL upgraded to high-res")
+                        elif '/orig/' in search_photo:
+                            logger.info(f"   📸 Already /orig/ quality")
+                        else:
+                            needs_get_item = True  # Unknown format, need get_item
                     else:
-                        logger.warning(f"⚠️ get_item returned None for {item_id}, using search data")
+                        needs_get_item = True  # Unknown domain
+                    
+                    # Update item's image_url
+                    if hasattr(item, 'image_url'):
+                        item.image_url = search_photo
+                else:
+                    needs_get_item = True  # No photo in search, need get_item
+                
+                # Only call get_item() if URL manipulation didn't work
+                if needs_get_item:
+                    try:
+                        logger.info(f"📦 Calling get_item() for full details: {item_id}")
+                        full_item_result = self.api.get_item(item_id)
                         
-                except Exception as get_item_error:
-                    logger.warning(f"⚠️ get_item failed for {item_id}: {get_item_error}, using search data")
-                    # full_item already = item (search data)
+                        # Increment API counter
+                        self.total_api_requests += 1
+                        self.shared_state.increment('total_api_requests')
+                        self.db.increment_api_counter()
+                        
+                        if full_item_result:
+                            full_item = full_item_result
+                            logger.info(f"✅ Got full details via get_item()")
+                        else:
+                            logger.warning(f"⚠️ get_item returned None, using upgraded search data")
+                    except Exception as e:
+                        logger.warning(f"⚠️ get_item failed: {e}, using upgraded search data")
+                else:
+                    logger.info(f"✅ Using upgraded search data (no get_item needed)")
                 
                 # Get mercari_id from full_item (mercapi uses id_, our Item uses id)
                 mercari_id = getattr(full_item, 'id_', None) or getattr(full_item, 'id', None)
