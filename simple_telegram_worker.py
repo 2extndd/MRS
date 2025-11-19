@@ -316,17 +316,20 @@ class TelegramWorker:
             logger.error(f"Failed to send system message: {e}")
             return False
 
-    def process_pending_notifications(self) -> Dict[str, int]:
+    def process_pending_notifications(self, max_items: int = 10) -> Dict[str, int]:
         """
-        Process all pending notifications from database
+        Process pending notifications from database - LIMITED to avoid blocking
+
+        Args:
+            max_items: Maximum items to process per cycle (default 10)
 
         Returns:
             Dictionary with processing statistics
         """
         logger.info("Processing pending notifications...")
 
-        # Get unsent items
-        unsent_items = self.db.get_unsent_items()
+        # Get unsent items - LIMITED
+        unsent_items = self.db.get_unsent_items(limit=max_items)
 
         stats = {
             'total': len(unsent_items),
@@ -338,7 +341,7 @@ class TelegramWorker:
             logger.info("No pending notifications")
             return stats
 
-        logger.info(f"Found {len(unsent_items)} pending notifications")
+        logger.info(f"Processing {len(unsent_items)} pending notifications (max {max_items} per cycle)")
 
         for item in unsent_items:
             success = self.send_item_notification(item)
