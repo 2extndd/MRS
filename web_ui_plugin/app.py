@@ -882,3 +882,53 @@ def api_clear_all_items():
         logger.error(f"❌ Error clearing items: {e}")
         db.add_log_entry('ERROR', f'Failed to clear items: {str(e)}', 'api')
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/proxy-image')
+def proxy_image():
+    """
+    Image proxy to bypass Cloudflare hotlink protection
+    Returns the image with proper headers so browser can display it
+    """
+    try:
+        import requests
+        from flask import Response
+
+        # Get target image URL
+        image_url = request.args.get('url')
+        if not image_url:
+            return "No URL provided", 400
+
+        # Fetch image with proper headers (pretend to be a browser from Mercari)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://jp.mercari.com/',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'image',
+            'Sec-Fetch-Mode': 'no-cors',
+            'Sec-Fetch-Site': 'cross-site'
+        }
+
+        # Make request with timeout
+        response = requests.get(image_url, headers=headers, timeout=10, stream=True)
+
+        if response.status_code == 200:
+            # Return image with correct content type
+            return Response(
+                response.content,
+                mimetype=response.headers.get('Content-Type', 'image/jpeg'),
+                headers={
+                    'Cache-Control': 'public, max-age=86400',  # Cache for 24h
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
+        else:
+            logger.warning(f"Failed to fetch image: {response.status_code}")
+            return f"Failed to fetch image: {response.status_code}", response.status_code
+
+    except Exception as e:
+        logger.error(f"Error proxying image: {e}")
+        return f"Error: {str(e)}", 500

@@ -105,19 +105,19 @@ function loadRecentItems() {
             // Render items (same style as items page)
             let html = '';
             data.items.forEach(item => {
-                // High-res image URL
-                let imageUrl = item.image_url || '';
-                
+                // High-res image URL via proxy to bypass Cloudflare
+                let imageUrl = item.image_url ? `/proxy-image?url=${encodeURIComponent(item.image_url)}` : '';
+
                 // Calculate USD price
                 const usdPrice = (item.price * {{ config.USD_CONVERSION_RATE }}).toFixed(2);
-                
+
                 html += `
                     <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-4">
                         <div class="card h-100">
                             <a href="${item.item_url}" target="_blank" class="text-decoration-none">
                                 <div style="aspect-ratio: 4/5; overflow: hidden;">
-                                    ${imageUrl ? 
-                                        `<img src="${imageUrl}" class="d-block w-100 h-100" style="object-fit: cover;">` :
+                                    ${imageUrl ?
+                                        `<img src="${imageUrl}" class="d-block w-100 h-100" style="object-fit: cover;" loading="lazy">` :
                                         `<div class="bg-light d-flex align-items-center justify-content-center h-100">
                                             <i class="bi bi-image" style="font-size: 3rem; color: #ccc;"></i>
                                         </div>`
