@@ -509,7 +509,7 @@ railway logs --service worker | head -20
 
 ## 🔄 Recent Changes Log
 
-### 2025-01-XX (Session 5): FULL item details, size extraction, original photos
+### 2025-01-XX (Session 5): FULL item details, size extraction, original photos [UPDATED]
 - **КРИТИЧНО:** Теперь получаем ПОЛНУЮ инфу о каждом товаре через get_item()
 - **Размер:** Извлекается из description (regex patterns для японских размеров)
 - **ОРИГИНАЛЬНЫЕ ФОТО:** mercapi возвращает /orig/ URLs (full resolution)
@@ -529,6 +529,13 @@ railway logs --service worker | head -20
 - Получение полной инфы = +1 API запрос на каждый товар (медленнее, но полные данные)
 - Размер может отсутствовать если не указан в description
 - WARP.md defaults устарели - реальные значения берутся из Web UI config page
+
+### 2025-01-XX (Session 5.1): Size regex fix + navbar fix
+- **Size regex:** Исправлен паттерн - XS|XXL|XXXL|XL|L|M|S (правильный порядок)
+- **フリーサイズ:** Теперь распознаётся как 'FREE'
+- **Navbar:** "powered by extndd" - правильный line-height и display: block
+- **Exclude words:** IS, AS, US, IN, ON, OR, SO, TO (не размеры)
+- **Priority:** サイズ/size labels → measurements (80cm) → standalone letters
 
 ### 2025-01-XX (Session 4): Photo quality, pagination, error logging, UI branding
 - **CRITICAL FIX:** config.html missing {% endblock %} - caused 500 error on entire site
