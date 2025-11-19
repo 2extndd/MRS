@@ -125,7 +125,7 @@ class MercariSearcher:
 
         # Define worker function for thread pool
         def process_single_search(search):
-            """Process a single search in a thread - each thread has its own DB connection"""
+            """Process a single search in a thread - each thread has its own API instance"""
             try:
                 # Get query name for better logging
                 query_name = search.get('name', search.get('keyword', f"Query ID {search['id']}"))
@@ -139,8 +139,12 @@ class MercariSearcher:
                 # Each thread uses the shared DB instance (psycopg2 handles connections thread-safe)
                 self.db.add_log_entry('INFO', f"🔍 Scanning query: {query_name}", 'scanner', f"ID: {search['id']}")
 
-                # Perform search
-                items_result = self.search_query(search)
+                # CRITICAL: Create separate API instance for this thread
+                # Cannot share async objects between threads!
+                thread_api = self._init_api()
+                
+                # Perform search with thread-local API
+                items_result = self.search_query(search, api_instance=thread_api)
 
                 # Update search scan time
                 self.db.update_search_scan_time(search['id'])
@@ -240,13 +244,14 @@ class MercariSearcher:
 
         return results
 
-    def search_query(self, search: Dict[str, Any], limit: Optional[int] = None) -> Dict[str, Any]:
+    def search_query(self, search: Dict[str, Any], limit: Optional[int] = None, api_instance=None) -> Dict[str, Any]:
         """
         Search single query
 
         Args:
             search: Search dictionary from database
             limit: Max items to fetch (None = use GLOBAL config from Web UI)
+            api_instance: Optional API instance (for thread-safe parallel execution)
 
         Returns:
             Dictionary with search results
@@ -273,8 +278,11 @@ class MercariSearcher:
 
             logger.info(f"Searching: {search_url[:100]}... (limit: {limit})")
 
+            # Use thread-local API instance if provided, otherwise use self.api
+            api = api_instance if api_instance else self.api
+            
             # Perform search
-            items_result = self.api.search(search_url, limit=limit)
+            items_result = api.search(search_url, limit=limit)
 
             # Increment API request counter (in both memory and database for cross-process visibility)
             self.total_api_requests += 1
