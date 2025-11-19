@@ -172,9 +172,50 @@ class Config:
                     cls.REQUEST_DELAY_MAX = float(new_config['config_request_delay']) + 2.0
                     logger.info(f"[CONFIG] REQUEST_DELAY: {cls.REQUEST_DELAY_MIN}-{cls.REQUEST_DELAY_MAX}s")
 
+                # Proxy settings (hot reload with proxy_manager reinit)
+                proxy_config_changed = False
+
                 if 'config_proxy_enabled' in new_config:
+                    old_enabled = cls.PROXY_ENABLED
                     cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
-                    logger.info(f"[CONFIG] PROXY_ENABLED: {cls.PROXY_ENABLED}")
+                    logger.info(f"[CONFIG] PROXY_ENABLED: {old_enabled} → {cls.PROXY_ENABLED}")
+                    if old_enabled != cls.PROXY_ENABLED:
+                        proxy_config_changed = True
+
+                if 'config_proxy_list' in new_config:
+                    old_count = len(cls.PROXY_LIST)
+                    proxy_str = str(new_config['config_proxy_list'])
+                    # Parse proxies from newline-separated string
+                    cls.PROXY_LIST = [p.strip() for p in proxy_str.replace('\n', ',').split(",") if p.strip()]
+                    new_count = len(cls.PROXY_LIST)
+                    logger.info(f"[CONFIG] PROXY_LIST: {old_count} → {new_count} proxies")
+                    if old_count != new_count:
+                        proxy_config_changed = True
+
+                # Reinitialize proxy_manager if proxy config changed
+                if proxy_config_changed:
+                    logger.warning(f"[CONFIG] ⚠️  Proxy configuration changed! Reinitializing proxy system...")
+                    try:
+                        # Import here to avoid circular dependency
+                        import proxies
+
+                        if cls.PROXY_ENABLED and cls.PROXY_LIST:
+                            logger.info(f"[CONFIG] 🔄 Initializing proxy system with {len(cls.PROXY_LIST)} proxies...")
+                            proxies.proxy_manager = proxies.ProxyManager(cls.PROXY_LIST)
+
+                            if proxies.proxy_manager.working_proxies:
+                                proxies.proxy_rotator = proxies.ProxyRotator(proxies.proxy_manager)
+                                stats = proxies.proxy_manager.get_proxy_stats()
+                                logger.info(f"[CONFIG] ✅ Proxy system initialized: {stats['working']} working, {stats['failed']} failed")
+                            else:
+                                logger.warning(f"[CONFIG] ⚠️  No working proxies found after validation")
+                                proxies.proxy_rotator = None
+                        else:
+                            logger.info(f"[CONFIG] Proxy system disabled")
+                            proxies.proxy_manager = None
+                            proxies.proxy_rotator = None
+                    except Exception as e:
+                        logger.error(f"[CONFIG] ❌ Failed to reinitialize proxy system: {e}")
 
                 # Telegram settings (hot reload)
                 if 'config_telegram_bot_token' in new_config:
