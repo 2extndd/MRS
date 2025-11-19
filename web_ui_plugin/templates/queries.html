@@ -104,19 +104,11 @@
                                placeholder="e.g., 123456">
                         <small class="text-muted">Telegram topic/thread ID for notifications</small>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Items Per Query</label>
-                            <input type="number" class="form-control" name="scan_limit"
-                                   value="6" min="1" max="120">
-                            <small class="text-muted">How many items to fetch</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Scan Interval (seconds)</label>
-                            <input type="number" class="form-control" name="scan_interval"
-                                   value="60" min="30" max="3600">
-                            <small class="text-muted">Delay between scans</small>
-                        </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Items Per Query</strong> and <strong>Scan Interval</strong> are configured globally in 
+                        <a href="/config" class="alert-link">Config page</a>
                     </div>
                 </form>
             </div>
@@ -152,19 +144,11 @@
                         <label class="form-label">Thread ID (optional)</label>
                         <input type="text" class="form-control" id="edit_thread_id">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Items Per Query</label>
-                            <input type="number" class="form-control" id="edit_scan_limit"
-                                   value="6" min="1" max="120">
-                            <small class="text-muted">How many items to fetch</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Scan Interval (seconds)</label>
-                            <input type="number" class="form-control" id="edit_scan_interval"
-                                   value="60" min="30" max="3600">
-                            <small class="text-muted">Delay between scans</small>
-                        </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Items Per Query</strong> and <strong>Scan Interval</strong> are configured globally in 
+                        <a href="/config" class="alert-link">Config page</a>
                     </div>
                 </form>
             </div>
