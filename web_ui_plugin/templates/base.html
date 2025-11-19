@@ -12,9 +12,24 @@
             if (savedTheme === 'dark') {
                 document.documentElement.style.backgroundColor = '#0d1117';
                 document.documentElement.style.color = '#f0f6fc';
+                document.documentElement.setAttribute('data-theme', 'dark');
             }
         })();
     </script>
+
+    <!-- Critical inline CSS to prevent flash -->
+    <style>
+        [data-theme="dark"] body {
+            background-color: #0d1117 !important;
+            color: #f0f6fc !important;
+        }
+        [data-theme="dark"] .navbar {
+            background-color: #161b22 !important;
+        }
+        [data-theme="dark"] .container-fluid {
+            background-color: #0d1117 !important;
+        }
+    </style>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">

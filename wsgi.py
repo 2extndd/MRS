@@ -39,14 +39,16 @@ try:
             logger.info("Starting background scheduler thread...")
             logger.info("=" * 60)
 
-            from mercari_notifications import MercariApp
+            from mercari_notifications import MercariNotificationApp
 
             # Create app instance and run scheduler
-            mercari_app = MercariApp()
+            mercari_app = MercariNotificationApp()
             mercari_app.run_scheduler()
 
         except Exception as e:
             logger.error(f"Background scheduler error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     # Start scheduler in daemon thread (dies when main process exits)
     scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
