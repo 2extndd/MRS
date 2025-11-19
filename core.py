@@ -143,15 +143,17 @@ class MercariSearcher:
                     results['total_items_found'] += items_result['items_found']
                     results['new_items'] += items_result['new_items']
 
-                    logger.info(f"[SCAN] ✅ Search completed: {items_result['items_found']} total items, {items_result['new_items']} NEW items")
+                    logger.info(f"[SCAN] ✅ Search completed: {items_result['items_found']} total items from API, {items_result['new_items']} NEW items added to DB")
 
                     # Log names of new items found
-                    if items_result.get('items_data'):
-                        logger.info(f"[SCAN] 📦 New items found:")
+                    if items_result.get('items_data') and len(items_result['items_data']) > 0:
+                        logger.info(f"[SCAN] 🆕 NEW ITEMS ADDED ({len(items_result['items_data'])}):")
                         for idx, item in enumerate(items_result['items_data'][:10], 1):  # Log first 10
-                            logger.info(f"[SCAN]    {idx}. {item.get('title', 'Unknown')} - ¥{item.get('price', 0)}")
+                            logger.info(f"[SCAN]    {idx}. {item.get('title', 'Unknown')[:60]} - ¥{item.get('price', 0):,}")
                         if len(items_result['items_data']) > 10:
                             logger.info(f"[SCAN]    ... and {len(items_result['items_data']) - 10} more")
+                    elif items_result['new_items'] == 0:
+                        logger.info(f"[SCAN] ℹ️  No new items (all {items_result['items_found']} items already in database)")
 
                     self.db.add_log_entry('INFO',
                         f"✅ Found {items_result['items_found']} items ({items_result['new_items']} new) in {query_name}",
@@ -286,6 +288,8 @@ class MercariSearcher:
             List of new items data
         """
         new_items = []
+        
+        logger.info(f"[PROCESS] 📦 Processing {len(items)} items from API response...")
 
         for item in items:
             try:
@@ -421,9 +425,9 @@ class MercariSearcher:
                     item_dict['db_id'] = db_item_id
                     new_items.append(item_dict)
                     self.total_items_found += 1
-                    logger.info(f"✅ NEW item added to DB: {full_item.title[:50]}")
+                    logger.info(f"[PROCESS] ✅ NEW item added to DB (ID: {db_item_id}): {full_item.title[:50]}")
                 else:
-                    logger.info(f"⏭️ Item already exists: {mercari_id}")
+                    logger.debug(f"[PROCESS] ⏭️  Item already exists in DB: {mercari_id}")
 
             except Exception as e:
                 item_id_str = item_id if 'item_id' in locals() else 'unknown'
@@ -435,7 +439,9 @@ class MercariSearcher:
                 continue
 
         if new_items:
-            logger.info(f"Saved {len(new_items)} new items to database")
+            logger.info(f"[PROCESS] ✅ Successfully saved {len(new_items)} NEW items to database")
+        else:
+            logger.info(f"[PROCESS] ℹ️  No new items to save (all items already in database)")
 
         return new_items
 

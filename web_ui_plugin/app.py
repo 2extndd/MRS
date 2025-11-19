@@ -1031,3 +1031,48 @@ def image_proxy():
     except Exception as e:
         logger.error(f"Image proxy error: {e}")
         return f"Error: {str(e)}", 500
+
+
+@app.route('/api/proxy/stats')
+def api_proxy_stats():
+    """Get proxy system statistics and status"""
+    try:
+        from proxies import proxy_manager, proxy_rotator
+        
+        if not proxy_manager:
+            return jsonify({
+                'success': False,
+                'error': 'Proxy system disabled',
+                'enabled': False
+            })
+        
+        # Get proxy manager stats
+        stats = proxy_manager.get_proxy_stats()
+        
+        # Get current proxy from rotator
+        current_proxy = None
+        if proxy_rotator and proxy_rotator.current_proxy:
+            current_proxy = proxy_rotator.current_proxy
+            # Mask credentials for security
+            if '@' in current_proxy:
+                parts = current_proxy.split('@')
+                if len(parts) == 2:
+                    # Show only last part (ip:port)
+                    current_proxy = f"***@{parts[1]}"
+        
+        return jsonify({
+            'success': True,
+            'enabled': True,
+            'stats': {
+                'total_proxies': stats['total'],
+                'working_proxies': stats['working'],
+                'failed_proxies': stats['failed'],
+                'last_validation': stats['last_validation'],
+                'current_proxy': current_proxy,
+                'rotation_count': proxy_rotator.request_count if proxy_rotator else 0,
+                'rotation_interval': proxy_rotator.rotation_count if proxy_rotator else 0
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting proxy stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

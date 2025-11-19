@@ -11,13 +11,15 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-def download_and_encode_image(image_url: str, timeout: int = 10) -> Optional[str]:
+def download_and_encode_image(image_url: str, timeout: int = 10, use_proxy: bool = True) -> Optional[str]:
     """
     Download image from URL and encode to base64
+    Uses proxy rotation to bypass Railway IP blocking by Cloudflare
 
     Args:
         image_url: URL of the image to download
         timeout: Request timeout in seconds
+        use_proxy: Whether to use proxy (True by default)
 
     Returns:
         Base64-encoded image string or None if failed
@@ -26,6 +28,9 @@ def download_and_encode_image(image_url: str, timeout: int = 10) -> Optional[str
         return None
 
     try:
+        # Import proxy_rotator here to avoid circular imports
+        from proxies import proxy_rotator
+        
         # Headers to bypass Cloudflare (pretend to be browser from Mercari)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -36,12 +41,28 @@ def download_and_encode_image(image_url: str, timeout: int = 10) -> Optional[str
             'Pragma': 'no-cache'
         }
 
-        # Download image
+        # Get proxy if available and enabled
+        proxies = None
+        current_proxy = None
+        if use_proxy and proxy_rotator:
+            proxy_dict = proxy_rotator.get_proxy()
+            if proxy_dict:
+                proxies = proxy_dict
+                current_proxy = proxy_dict.get('http', 'unknown')
+                logger.info(f"📡 Using proxy for image download: {current_proxy[:50]}...")
+        
+        # Download image with proxy
         logger.debug(f"Downloading image: {image_url[:80]}...")
-        response = requests.get(image_url, headers=headers, timeout=timeout, stream=True)
+        response = requests.get(image_url, headers=headers, proxies=proxies, timeout=timeout, stream=True)
 
         if response.status_code != 200:
-            logger.warning(f"Failed to download image: HTTP {response.status_code}")
+            logger.warning(f"Failed to download image: HTTP {response.status_code} (proxy: {current_proxy[:50] if current_proxy else 'direct'})")
+            
+            # If 403 and using proxy, mark proxy as failed
+            if response.status_code == 403 and proxies and proxy_rotator:
+                logger.warning(f"⚠️  Proxy blocked (403), marking as failed: {current_proxy[:50]}...")
+                proxy_rotator.mark_current_failed()
+            
             return None
 
         # Check content type
@@ -70,7 +91,21 @@ def download_and_encode_image(image_url: str, timeout: int = 10) -> Optional[str
         return data_uri
 
     except requests.Timeout:
-        logger.warning(f"Timeout downloading image from {image_url[:50]}...")
+        logger.warning(f"Timeout downloading image from {image_url[:50]}... (proxy: {current_proxy[:50] if current_proxy else 'direct'})")
+        
+        # Mark proxy as failed on timeout
+        if proxies and proxy_rotator:
+            logger.warning(f"⚠️  Proxy timeout, marking as failed: {current_proxy[:50]}...")
+            proxy_rotator.mark_current_failed()
+        
+        return None
+    except requests.exceptions.ProxyError:
+        logger.warning(f"Proxy connection error: {current_proxy[:50] if current_proxy else 'unknown'}")
+        
+        # Mark proxy as failed
+        if proxies and proxy_rotator:
+            proxy_rotator.mark_current_failed()
+        
         return None
     except requests.RequestException as e:
         logger.warning(f"Request error downloading image: {e}")

@@ -13,6 +13,46 @@ from configuration_values import config
 logger = logging.getLogger(__name__)
 
 
+def parse_proxy_string(proxy_str: str) -> Optional[str]:
+    """
+    Parse proxy from multiple formats and convert to requests-compatible format
+    
+    Supported formats:
+    - ip:port:user:pass → http://user:pass@ip:port
+    - http://user:pass@ip:port → http://user:pass@ip:port (pass through)
+    - ip:port → http://ip:port
+    
+    Args:
+        proxy_str: Proxy string in various formats
+        
+    Returns:
+        Proxy URL in format http://user:pass@ip:port or None if invalid
+    """
+    if not proxy_str or not isinstance(proxy_str, str):
+        return None
+    
+    proxy_str = proxy_str.strip()
+    
+    # Already in correct format (starts with http:// or https://)
+    if proxy_str.startswith('http://') or proxy_str.startswith('https://'):
+        return proxy_str
+    
+    # Parse ip:port:user:pass or ip:port format
+    parts = proxy_str.split(':')
+    
+    if len(parts) == 4:
+        # Format: ip:port:user:pass
+        ip, port, user, password = parts
+        return f"http://{user}:{password}@{ip}:{port}"
+    elif len(parts) == 2:
+        # Format: ip:port (no auth)
+        ip, port = parts
+        return f"http://{ip}:{port}"
+    else:
+        logger.warning(f"Invalid proxy format: {proxy_str} (expected ip:port:user:pass or ip:port or http://...)")
+        return None
+
+
 class ProxyManager:
     """Manages proxy validation and rotation"""
 
@@ -21,19 +61,29 @@ class ProxyManager:
         Initialize proxy manager
 
         Args:
-            proxies: List of proxy URLs
+            proxies: List of proxy URLs in various formats
         """
-        self.all_proxies = proxies
+        # Parse all proxy strings to standard format
+        self.all_proxies = []
+        invalid_count = 0
+        
+        for proxy_str in proxies:
+            parsed = parse_proxy_string(proxy_str)
+            if parsed:
+                self.all_proxies.append(parsed)
+            else:
+                invalid_count += 1
+        
         self.working_proxies = []
         self.failed_proxies = []
         self.last_validation_time = 0
         self.validation_interval = 3600  # 1 hour
 
-        if proxies:
-            logger.info(f"ProxyManager initialized with {len(proxies)} proxies")
+        if self.all_proxies:
+            logger.info(f"ProxyManager initialized with {len(self.all_proxies)} proxies (parsed from {len(proxies)} entries, {invalid_count} invalid)")
             self.validate_proxies()
         else:
-            logger.info("ProxyManager initialized with no proxies")
+            logger.warning(f"ProxyManager initialized with no valid proxies (tried to parse {len(proxies)} entries, all invalid)")
 
     def validate_proxies(self, max_workers: int = 10):
         """
