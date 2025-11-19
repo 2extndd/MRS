@@ -484,11 +484,29 @@ def api_save_telegram_config():
     """Save Telegram configuration"""
     try:
         data = request.get_json()
-        # TODO: Implement config saving
-        logger.info(f"Telegram config update requested: {data}")
-        return jsonify({'success': True, 'message': 'Telegram settings saved'})
+        logger.info(f"[CONFIG] /api/config/telegram called with data: {data}")
+
+        # Save each config value to database
+        saved_count = 0
+        for key, value in data.items():
+            logger.info(f"[CONFIG] Saving config_{key} = {value}")
+            if db.save_config(f"config_{key}", value):
+                saved_count += 1
+                logger.info(f"[CONFIG] ✅ Saved config_{key}")
+            else:
+                logger.error(f"[CONFIG] ❌ Failed to save config_{key}")
+
+        logger.info(f"[CONFIG] Total saved: {saved_count}/{len(data)}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Saved {saved_count} Telegram settings',
+            'note': 'Settings will be applied automatically within 10 seconds'
+        })
     except Exception as e:
-        logger.error(f"Error saving telegram config: {e}")
+        logger.error(f"[CONFIG] ❌ Error saving telegram config: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -497,11 +515,29 @@ def api_save_proxy_config():
     """Save proxy configuration"""
     try:
         data = request.get_json()
-        # TODO: Implement config saving
-        logger.info(f"Proxy config update requested: {data}")
-        return jsonify({'success': True, 'message': 'Proxy settings saved'})
+        logger.info(f"[CONFIG] /api/config/proxy called with data: {data}")
+
+        # Save each config value to database
+        saved_count = 0
+        for key, value in data.items():
+            logger.info(f"[CONFIG] Saving config_{key} = {value}")
+            if db.save_config(f"config_{key}", value):
+                saved_count += 1
+                logger.info(f"[CONFIG] ✅ Saved config_{key}")
+            else:
+                logger.error(f"[CONFIG] ❌ Failed to save config_{key}")
+
+        logger.info(f"[CONFIG] Total saved: {saved_count}/{len(data)}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Saved {saved_count} proxy settings',
+            'note': 'Settings will be applied automatically within 10 seconds'
+        })
     except Exception as e:
-        logger.error(f"Error saving proxy config: {e}")
+        logger.error(f"[CONFIG] ❌ Error saving proxy config: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -510,11 +546,29 @@ def api_save_railway_config():
     """Save Railway configuration"""
     try:
         data = request.get_json()
-        # TODO: Implement config saving
-        logger.info(f"Railway config update requested: {data}")
-        return jsonify({'success': True, 'message': 'Railway settings saved'})
+        logger.info(f"[CONFIG] /api/config/railway called with data: {data}")
+
+        # Save each config value to database
+        saved_count = 0
+        for key, value in data.items():
+            logger.info(f"[CONFIG] Saving config_{key} = {value}")
+            if db.save_config(f"config_{key}", value):
+                saved_count += 1
+                logger.info(f"[CONFIG] ✅ Saved config_{key}")
+            else:
+                logger.error(f"[CONFIG] ❌ Failed to save config_{key}")
+
+        logger.info(f"[CONFIG] Total saved: {saved_count}/{len(data)}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Saved {saved_count} Railway settings',
+            'note': 'Railway token is sensitive and stored securely'
+        })
     except Exception as e:
-        logger.error(f"Error saving railway config: {e}")
+        logger.error(f"[CONFIG] ❌ Error saving railway config: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -522,19 +576,59 @@ def api_save_railway_config():
 def api_railway_status():
     """Get Railway auto-redeploy status"""
     try:
-        # TODO: Implement actual error tracking
+        # Get error statistics from database
+        recent_errors = db.get_recent_errors(limit=50)
+        
+        # Count errors by type
+        error_counts = {'403': 0, '401': 0, '429': 0, 'other': 0}
+        total_errors = 0
+        first_error = 'None'
+        last_error = 'None'
+        
+        for error in recent_errors:
+            total_errors += 1
+            error_msg = error.get('error_message', '')
+            
+            # Categorize errors
+            if '403' in error_msg:
+                error_counts['403'] += 1
+            elif '401' in error_msg:
+                error_counts['401'] += 1
+            elif '429' in error_msg:
+                error_counts['429'] += 1
+            else:
+                error_counts['other'] += 1
+            
+            # Track first and last error times
+            if first_error == 'None':
+                first_error = str(error.get('occurred_at', 'Unknown'))
+            last_error = str(error.get('occurred_at', 'Unknown'))
+        
+        # Get last redeploy info from config
+        last_redeploy = db.load_config('last_railway_redeploy', 'Never')
+        
+        # Determine status
+        max_errors = config.MAX_ERRORS_BEFORE_REDEPLOY
+        status = 'active'
+        if total_errors >= max_errors:
+            status = 'critical'
+        elif total_errors >= max_errors // 2:
+            status = 'warning'
+        
         return jsonify({
             'success': True,
             'status': {
-                'status': 'active',
-                'errors': {'403': 0, '401': 0, '429': 0},
-                'total_errors': 0,
-                'first_error': 'None',
-                'last_error': 'None',
-                'last_redeploy': 'Never'
+                'status': status,
+                'errors': error_counts,
+                'total_errors': total_errors,
+                'max_errors': max_errors,
+                'first_error': first_error,
+                'last_error': last_error,
+                'last_redeploy': last_redeploy
             }
         })
     except Exception as e:
+        logger.error(f"Error getting railway status: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -542,10 +636,81 @@ def api_railway_status():
 def api_railway_redeploy():
     """Trigger Railway redeploy"""
     try:
-        # TODO: Implement Railway API integration
-        logger.warning("⚠️ Railway redeploy requested (not implemented yet)")
-        return jsonify({'success': False, 'error': 'Redeploy not implemented yet'}), 501
+        import requests
+        from datetime import datetime
+        
+        railway_token = config.RAILWAY_TOKEN
+        railway_project_id = config.RAILWAY_PROJECT_ID
+        railway_service_id = config.RAILWAY_SERVICE_ID
+        
+        if not railway_token:
+            logger.error("❌ RAILWAY_TOKEN not configured")
+            return jsonify({'success': False, 'error': 'Railway token not configured'}), 400
+        
+        if not railway_project_id or not railway_service_id:
+            logger.error("❌ Railway project/service IDs not configured")
+            return jsonify({'success': False, 'error': 'Railway project/service IDs not configured'}), 400
+        
+        logger.info("🔄 Triggering Railway redeploy...")
+        
+        # Railway GraphQL API endpoint
+        url = "https://backboard.railway.app/graphql/v2"
+        
+        # GraphQL mutation to trigger redeploy
+        query = """
+        mutation serviceInstanceRedeploy($serviceId: String!) {
+            serviceInstanceRedeploy(serviceId: $serviceId)
+        }
+        """
+        
+        headers = {
+            "Authorization": f"Bearer {railway_token}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "query": query,
+            "variables": {
+                "serviceId": railway_service_id
+            }
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # Check for GraphQL errors
+            if 'errors' in result:
+                error_msg = result['errors'][0].get('message', 'Unknown error')
+                logger.error(f"❌ Railway API error: {error_msg}")
+                return jsonify({'success': False, 'error': f'Railway API error: {error_msg}'}), 500
+            
+            # Save redeploy timestamp
+            db.save_config('last_railway_redeploy', datetime.now().isoformat())
+            
+            logger.info("✅ Railway redeploy triggered successfully")
+            db.add_log_entry('INFO', 'Railway redeploy triggered from web UI', 'railway')
+            
+            return jsonify({
+                'success': True,
+                'message': 'Railway redeploy triggered successfully',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            logger.error(f"❌ Railway API returned status {response.status_code}: {response.text}")
+            return jsonify({
+                'success': False,
+                'error': f'Railway API error: HTTP {response.status_code}'
+            }), 500
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Railway API request timed out")
+        return jsonify({'success': False, 'error': 'Request timed out'}), 500
     except Exception as e:
+        logger.error(f"❌ Error triggering redeploy: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -553,10 +718,108 @@ def api_railway_redeploy():
 def api_test_proxies():
     """Test proxy connections"""
     try:
-        # TODO: Implement proxy testing
-        logger.info("Proxy test requested")
-        return jsonify({'success': True, 'total': 0, 'working': 0})
+        import requests
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import time
+        
+        logger.info("🔍 Testing proxy connections...")
+        
+        # Get proxy list from config
+        proxy_list_str = config.PROXY_LIST
+        if isinstance(proxy_list_str, str):
+            proxy_list = [p.strip() for p in proxy_list_str.split(',') if p.strip()]
+        elif isinstance(proxy_list_str, list):
+            proxy_list = [p.strip() for p in proxy_list_str if p.strip()]
+        else:
+            proxy_list = []
+        
+        if not proxy_list:
+            logger.warning("⚠️ No proxies configured to test")
+            return jsonify({
+                'success': True,
+                'total': 0,
+                'working': 0,
+                'results': [],
+                'message': 'No proxies configured'
+            })
+        
+        # Test URL (fast endpoint)
+        test_url = "https://jp.mercari.com"
+        timeout = 5
+        
+        def test_proxy(proxy):
+            """Test a single proxy"""
+            result = {
+                'proxy': proxy,
+                'working': False,
+                'response_time': None,
+                'error': None
+            }
+            
+            try:
+                start_time = time.time()
+                proxies = {
+                    'http': proxy,
+                    'https': proxy
+                }
+                
+                response = requests.get(test_url, proxies=proxies, timeout=timeout)
+                end_time = time.time()
+                
+                if response.status_code == 200:
+                    result['working'] = True
+                    result['response_time'] = round((end_time - start_time) * 1000, 2)  # ms
+                else:
+                    result['error'] = f"HTTP {response.status_code}"
+                    
+            except requests.exceptions.Timeout:
+                result['error'] = "Timeout"
+            except requests.exceptions.ProxyError:
+                result['error'] = "Proxy connection failed"
+            except requests.exceptions.ConnectionError:
+                result['error'] = "Connection error"
+            except Exception as e:
+                result['error'] = str(e)
+            
+            return result
+        
+        # Test proxies in parallel
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(test_proxy, proxy): proxy for proxy in proxy_list}
+            
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append(result)
+                    
+                    if result['working']:
+                        logger.info(f"✅ Proxy OK: {result['proxy']} ({result['response_time']}ms)")
+                    else:
+                        logger.warning(f"❌ Proxy FAILED: {result['proxy']} - {result['error']}")
+                        
+                except Exception as e:
+                    logger.error(f"Error testing proxy: {e}")
+        
+        # Calculate statistics
+        working_count = sum(1 for r in results if r['working'])
+        total_count = len(results)
+        
+        logger.info(f"📊 Proxy test completed: {working_count}/{total_count} working")
+        db.add_log_entry('INFO', f'Proxy test: {working_count}/{total_count} working', 'proxy')
+        
+        return jsonify({
+            'success': True,
+            'total': total_count,
+            'working': working_count,
+            'results': results,
+            'message': f'{working_count} of {total_count} proxies are working'
+        })
+        
     except Exception as e:
+        logger.error(f"❌ Error testing proxies: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
