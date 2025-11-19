@@ -138,10 +138,17 @@ class Config:
             # Compare only config values, not metadata like updated_at
             # Filter to only config_ keys
             config_keys = [k for k in new_config.keys() if k.startswith('config_')]
-            old_values = {k: cls._config_cache.get(k) for k in config_keys} if cls._config_cache else {}
-            new_values = {k: new_config.get(k) for k in config_keys}
             
-            if new_values != old_values:
+            # Check if config actually changed
+            config_changed = False
+            if cls._config_cache is None:
+                config_changed = True  # First load
+            else:
+                old_values = {k: cls._config_cache.get(k) for k in config_keys}
+                new_values = {k: new_config.get(k) for k in config_keys}
+                config_changed = (new_values != old_values)
+            
+            if config_changed:
                 logger.info(f"[CONFIG] Configuration changed, hot reloading... Keys in DB: {config_keys}")
 
                 # Update runtime settings from database
