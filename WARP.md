@@ -429,10 +429,17 @@ return jsonify({'success': True, 'message': 'Started'})
 
 ## 🎓 Lessons Learned
 
-### 1. Railway ≠ Heroku
-- Worker doesn't auto-deploy from GitHub
-- Must use `railway up` every time
-- RAILWAY_SERVICE_NAME is critical
+### 1. Railway Worker Deploy ⚠️ КРИТИЧНО!
+- **Web service:** ✅ Автоматически деплоится при push в GitHub
+- **Worker service:** ❌ НЕ деплоится автоматически!
+- **ОБЯЗАТЕЛЬНО после каждого коммита:**
+  ```bash
+  git push origin main
+  railway up --service web      # Обычно не нужен (автодеплой)
+  railway up --service worker   # ОБЯЗАТЕЛЬНО! Без этого worker на старом коде!
+  ```
+- Railway кеширует старые билды worker'а
+- RAILWAY_SERVICE_NAME должен быть установлен для обоих сервисов
 
 ### 2. Async + Flask = Careful
 - Use threads for async work
@@ -577,6 +584,17 @@ This helps future agents avoid repeating mistakes!
 
 ---
 
-**Last Updated:** 2025-11-19  
+**Last Updated:** 2025-01-XX  
 **Status:** Production, all major issues resolved  
 **Always keep this file current!**
+
+---
+
+## 📝 ЗАПОМНЕННЫЕ ИНСТРУКЦИИ
+
+### После слов "запомни" сохранять в WARP.md:
+
+1. **НЕ сохранять кучу лишней документации** - только критический контекст
+2. **Railway два сервиса:** web (автодеплой ✅) + worker (нужен `railway up` ❌)
+3. **После коммита worker НЕ обновляется** - обязательно `railway up --service worker`
+4. **Контекст последней работы** - всегда добавлять в "Recent Changes Log"
