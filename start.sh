@@ -2,10 +2,12 @@
 # Railway start script - determines which process to start based on SERVICE_NAME or RAILWAY_SERVICE_NAME
 
 SERVICE="${RAILWAY_SERVICE_NAME:-${SERVICE_NAME:-web}}"
+# Convert to lowercase for comparison
+SERVICE_LOWER=$(echo "$SERVICE" | tr '[:upper:]' '[:lower:]')
 
-echo "Starting Railway service: $SERVICE"
+echo "Starting Railway service: $SERVICE (checking as: $SERVICE_LOWER)"
 
-if [ "$SERVICE" = "worker" ]; then
+if [ "$SERVICE_LOWER" = "worker" ]; then
     echo "Starting worker process..."
     exec python mercari_notifications.py worker
 else
