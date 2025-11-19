@@ -692,14 +692,14 @@ This helps future agents avoid repeating mistakes!
 - **Testing needed:** Verify deployment with `railway logs` + check items in DB
 - **Issue:** Railway CLI logs hang/timeout - may need Railway Dashboard check
 
-### Latest Actions (Session 5.3 FINAL):
+### Latest Actions (Session 5.4 - Cloudflare Image Fix):
 - **Worker recreated:** New service MRS (1d82b0ac-1281-4b31-9a5d-cb3148ff77d0)
-- **Variables set:** DATABASE_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, RAILWAY_SERVICE_NAME
-- **GitHub Actions removed:** .github/workflows/ deleted (blocked auto-deploy)
-- **Latest commit:** c79ff52 (fix: Enforce items limit)
-- **Status:** ✅ WORKING! Items adding to DB with full details
-- **Fixed bugs:** 3 critical bugs (item.id_, Items iteration, items limit)
-- **Results:** Items add to DB with Size, orig photos, full data
+- **Variables set:** DATABASE_URL, TELEGRAM_BOT_TOKEN(?), TELEGRAM_CHAT_ID(?), RAILWAY_SERVICE_NAME
+- **Latest commit:** 3ddfe3d (fix: w_800 images + fallback placeholder)
+- **Status:** ⚠️ PARTIAL - Items add to DB, but Telegram NOT sending
+- **Working:** Worker scans + adds 103 items to DB ✅
+- **NOT working:** Telegram notifications (103 unsent items) ❌
+- **Cause:** TELEGRAM_BOT_TOKEN possibly not set on Railway worker
 
 ### Working Features:
 - ✅ Items добавляются в БД

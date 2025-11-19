@@ -156,8 +156,11 @@ class Config:
 
                 if 'config_max_items_per_search' in new_config:
                     old_val = cls.MAX_ITEMS_PER_SEARCH
-                    cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items_per_search'])
-                    logger.info(f"[CONFIG] MAX_ITEMS_PER_SEARCH: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
+                    new_val = int(new_config['config_max_items_per_search'])
+                    cls.MAX_ITEMS_PER_SEARCH = new_val
+                    logger.info(f"[CONFIG] ✅ MAX_ITEMS_PER_SEARCH: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
+                    if old_val != new_val:
+                        logger.warning(f"[CONFIG] ⚠️  CRITICAL: Items per search changed from {old_val} to {new_val}!")
                 elif 'config_max_items' in new_config:
                     old_val = cls.MAX_ITEMS_PER_SEARCH
                     cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items'])
@@ -172,14 +175,24 @@ class Config:
                     cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
                     logger.info(f"[CONFIG] PROXY_ENABLED: {cls.PROXY_ENABLED}")
 
-                # Telegram settings
-                if 'config_telegram_chat_id' in new_config:
-                    cls.TELEGRAM_CHAT_ID = str(new_config['config_telegram_chat_id'])
-                    logger.info(f"[CONFIG] TELEGRAM_CHAT_ID: {cls.TELEGRAM_CHAT_ID}")
-
+                # Telegram settings (hot reload)
                 if 'config_telegram_bot_token' in new_config:
-                    cls.TELEGRAM_BOT_TOKEN = str(new_config['config_telegram_bot_token'])
-                    logger.info(f"[CONFIG] TELEGRAM_BOT_TOKEN: updated")
+                    old_val = cls.TELEGRAM_BOT_TOKEN
+                    new_val = str(new_config['config_telegram_bot_token'])
+                    if new_val and new_val != 'None':
+                        cls.TELEGRAM_BOT_TOKEN = new_val
+                        logger.info(f"[CONFIG] ✅ TELEGRAM_BOT_TOKEN updated (length: {len(new_val)})")
+                        if not old_val:
+                            logger.warning(f"[CONFIG] ⚠️  Bot token was NOT set before, now configured!")
+
+                if 'config_telegram_chat_id' in new_config:
+                    old_val = cls.TELEGRAM_CHAT_ID
+                    new_val = str(new_config['config_telegram_chat_id'])
+                    if new_val and new_val != 'None':
+                        cls.TELEGRAM_CHAT_ID = new_val
+                        logger.info(f"[CONFIG] ✅ TELEGRAM_CHAT_ID: {cls.TELEGRAM_CHAT_ID}")
+                        if not old_val:
+                            logger.warning(f"[CONFIG] ⚠️  Chat ID was NOT set before, now configured!")
 
                 # USD conversion rate
                 if 'config_usd_conversion_rate' in new_config:
