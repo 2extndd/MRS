@@ -46,7 +46,8 @@ class Config:
 
     # Proxy Settings
     PROXY_ENABLED = os.getenv("PROXY_ENABLED", "false").lower() == "true"
-    PROXY_LIST = os.getenv("PROXY_LIST", "").split(",") if os.getenv("PROXY_LIST") else []
+    # Support both newline and comma-separated proxies
+    PROXY_LIST = [p.strip() for p in os.getenv("PROXY_LIST", "").replace('\n', ',').split(",") if p.strip()] if os.getenv("PROXY_LIST") else []
 
     # Railway Auto-Redeploy
     RAILWAY_TOKEN = os.getenv("RAILWAY_TOKEN")

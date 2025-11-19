@@ -736,7 +736,8 @@ def api_test_proxies():
         # Get proxy list from config
         proxy_list_str = config.PROXY_LIST
         if isinstance(proxy_list_str, str):
-            proxy_list = [p.strip() for p in proxy_list_str.split(',') if p.strip()]
+            # Support both newline and comma-separated proxies
+            proxy_list = [p.strip() for p in proxy_list_str.replace('\n', ',').split(',') if p.strip()]
         elif isinstance(proxy_list_str, list):
             proxy_list = [p.strip() for p in proxy_list_str if p.strip()]
         else:
