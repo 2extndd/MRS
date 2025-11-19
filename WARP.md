@@ -679,3 +679,15 @@ This helps future agents avoid repeating mistakes!
 - **Простой Redeploy НЕ работает:** нет выбора нового коммита в WebUI
 - **Решение:** Удалить worker service и создать заново с GitHub source
 - **Альтернатива:** Пустой коммит + trigger deploy from branch в Settings
+
+### Railway Project Link:
+- **Project ID:** f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
+- **Link command:** `railway link -p f17da572-14c9-47b5-a9f1-1b6d5b6dea2d`
+- **Deploy command:** `railway up --detach` (после link к worker service)
+
+### Session 5.3 Final Status:
+- **Code:** 2 critical bugs fixed + Mercari Shops support ✅
+- **GitHub:** All commits pushed (latest: e9bffb6) ✅
+- **Railway deployment:** Executed `railway up` for worker ✅
+- **Testing needed:** Verify deployment with `railway logs` + check items in DB
+- **Issue:** Railway CLI logs hang/timeout - may need Railway Dashboard check
