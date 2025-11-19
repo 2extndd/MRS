@@ -405,15 +405,18 @@ def send_notifications(items: List[Dict[str, Any]]) -> Dict[str, int]:
     return stats
 
 
-def process_pending_notifications() -> Dict[str, int]:
+def process_pending_notifications(max_items: int = 10) -> Dict[str, int]:
     """
     Process pending notifications from database
+
+    Args:
+        max_items: Maximum items to process per cycle (default 10)
 
     Returns:
         Dictionary with statistics
     """
     worker = TelegramWorker()
-    return worker.process_pending_notifications()
+    return worker.process_pending_notifications(max_items=max_items)
 
 
 def send_system_message(message: str) -> bool:
