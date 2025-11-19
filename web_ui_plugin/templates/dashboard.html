@@ -92,9 +92,25 @@
 </div>
 
 <script>
+// Infinite scroll state
+let currentPage = 1;
+let isLoading = false;
+let hasMore = true;
+const itemsPerPage = 30;
+
 // Load recent items
-function loadRecentItems() {
-    fetch('/api/recent-items')
+function loadRecentItems(append = false) {
+    if (isLoading || (!hasMore && append)) return;
+
+    isLoading = true;
+    const page = append ? currentPage : 1;
+
+    if (!append) {
+        currentPage = 1;
+        hasMore = true;
+    }
+
+    fetch(`/api/recent-items?limit=${itemsPerPage}&offset=${(page - 1) * itemsPerPage}`)
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
@@ -105,12 +121,21 @@ function loadRecentItems() {
             }
             
             const container = document.getElementById('recent-items-container');
-            
+
             if (!data.items || data.items.length === 0) {
-                container.innerHTML = '<div class="col-12 text-center py-3"><p class="text-muted">No items found yet</p></div>';
+                if (!append) {
+                    container.innerHTML = '<div class="col-12 text-center py-3"><p class="text-muted">No items found yet</p></div>';
+                }
+                hasMore = false;
+                isLoading = false;
                 return;
             }
-            
+
+            // Check if there are more items
+            if (data.items.length < itemsPerPage) {
+                hasMore = false;
+            }
+
             // Render items (same style as items page)
             let html = '';
             data.items.forEach(item => {
@@ -151,14 +176,39 @@ function loadRecentItems() {
                     </div>
                 `;
             });
-            
-            container.innerHTML = html;
+
+            if (append) {
+                container.insertAdjacentHTML('beforeend', html);
+                currentPage++;
+            } else {
+                container.innerHTML = html;
+            }
+
+            isLoading = false;
         })
         .catch(error => {
             console.error('Error loading recent items:', error);
-            document.getElementById('recent-items-container').innerHTML = 
-                '<div class="col-12 text-center py-3"><p class="text-danger">Error loading items</p></div>';
+            if (!append) {
+                document.getElementById('recent-items-container').innerHTML =
+                    '<div class="col-12 text-center py-3"><p class="text-danger">Error loading items</p></div>';
+            }
+            isLoading = false;
         });
+}
+
+// Infinite scroll detector
+function setupInfiniteScroll() {
+    window.addEventListener('scroll', () => {
+        if (isLoading || !hasMore) return;
+
+        const scrollPosition = window.innerHeight + window.scrollY;
+        const pageHeight = document.documentElement.scrollHeight;
+
+        // Load more when user is 300px from bottom
+        if (scrollPosition >= pageHeight - 300) {
+            loadRecentItems(true);
+        }
+    });
 }
 
 // Force scan all queries
@@ -227,11 +277,14 @@ function refreshStats() {
 
 // Initial load
 loadRecentItems();
+setupInfiniteScroll();
 
-// Auto-refresh every 5 seconds (fast updates!)
+// Auto-refresh every 30 seconds (only first page, don't reset scroll)
 setInterval(() => {
-    loadRecentItems();
+    if (currentPage === 1) {
+        loadRecentItems(false);
+    }
     refreshStats();
-}, 5000);
+}, 30000);
 </script>
 {% endblock %}
