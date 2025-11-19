@@ -298,14 +298,21 @@ def api_update_query(query_id):
         if not validation.get('valid'):
             return jsonify({'success': False, 'error': validation.get('error', 'Invalid URL')}), 400
 
-        # Update query
-        db.update_search(
-            query_id,
-            search_url=search_url,
-            name=data.get('name'),
-            thread_id=data.get('thread_id'),
-            keyword=data.get('keyword') or validation.get('keyword')
-        )
+        # Update query with scan settings
+        update_data = {
+            'search_url': search_url,
+            'name': data.get('name'),
+            'thread_id': data.get('thread_id'),
+            'keyword': data.get('keyword') or validation.get('keyword')
+        }
+        
+        # Add scan_limit and scan_interval if provided
+        if 'scan_limit' in data:
+            update_data['scan_limit'] = data['scan_limit']
+        if 'scan_interval' in data:
+            update_data['scan_interval'] = data['scan_interval']
+        
+        db.update_search(query_id, **update_data)
 
         return jsonify({'success': True, 'message': 'Query updated successfully'})
 
@@ -336,10 +343,18 @@ def api_delete_query(query_id):
 
 @app.route('/api/items')
 def api_get_items():
-    """Get items API"""
+    """Get items API with compressed images for fast loading"""
     try:
+        from image_compressor import compress_image_data
+        
         limit = request.args.get('limit', 50, type=int)
         all_items = db.get_all_items(limit=limit)
+        
+        # Compress images for faster web loading
+        for item in all_items:
+            if item.get('image_data'):
+                item['image_thumbnail'] = compress_image_data(item['image_data'], max_width=400, quality=75)
+        
         return jsonify({'success': True, 'items': all_items})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -347,13 +362,19 @@ def api_get_items():
 
 @app.route('/api/recent-items')
 def api_get_recent_items():
-    """Get recent items - SUPER FAST like items page"""
+    """Get recent items with compressed images for dashboard"""
     try:
         from datetime import datetime
         import pytz
+        from image_compressor import compress_image_data
 
         # Just get latest 30 items - NO filtering, like items page
         items = db.get_all_items(limit=30)
+        
+        # Compress images for faster loading
+        for item in items:
+            if item.get('image_data'):
+                item['image_thumbnail'] = compress_image_data(item['image_data'], max_width=300, quality=70)
         
         # Moscow timezone (GMT+3)
         MOSCOW_TZ = pytz.timezone('Europe/Moscow')

@@ -205,7 +205,7 @@ class MercariSearcher:
 
         Args:
             search: Search dictionary from database
-            limit: Max items to fetch (None = use config)
+            limit: Max items to fetch (None = use search setting or config)
 
         Returns:
             Dictionary with search results
@@ -214,10 +214,12 @@ class MercariSearcher:
             search_url = search['search_url']
             search_id = search['id']
 
+            # Use search-specific limit if not provided
             if limit is None:
-                limit = config.MAX_ITEMS_PER_SEARCH
+                # Try to get from search config first, then fallback to global config
+                limit = search.get('scan_limit') or config.MAX_ITEMS_PER_SEARCH
 
-            logger.info(f"Searching: {search_url[:100]}...")
+            logger.info(f"Searching: {search_url[:100]}... (limit: {limit})")
 
             # Perform search
             items_result = self.api.search(search_url, limit=limit)
@@ -344,7 +346,7 @@ class MercariSearcher:
                     if image_data:
                         logger.info(f"[PROCESS] ✅ HIGH-RES image saved ({len(image_data)/1024:.1f}KB base64)")
                     else:
-                        logger.warning(f"[PROCESS] ⚠️ Failed to download image, URL only")
+                        logger.warning(f"[PROCESS] ⚠️ Failed to download image, will add item without image data")
 
                 # Log item info
                 logger.info(f"[PROCESS] 📋 Item info:")

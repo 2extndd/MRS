@@ -9,3 +9,4 @@ lxml>=4.9.3
 fake-useragent>=1.4.0
 pytz>=2023.3
 mercapi>=0.4.2
+Pillow>=10.0.0

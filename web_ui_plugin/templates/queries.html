@@ -104,6 +104,20 @@
                                placeholder="e.g., 123456">
                         <small class="text-muted">Telegram topic/thread ID for notifications</small>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Items Per Query</label>
+                            <input type="number" class="form-control" name="scan_limit"
+                                   value="6" min="1" max="120">
+                            <small class="text-muted">How many items to fetch</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Scan Interval (seconds)</label>
+                            <input type="number" class="form-control" name="scan_interval"
+                                   value="60" min="30" max="3600">
+                            <small class="text-muted">Delay between scans</small>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -137,6 +151,20 @@
                     <div class="mb-3">
                         <label class="form-label">Thread ID (optional)</label>
                         <input type="text" class="form-control" id="edit_thread_id">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Items Per Query</label>
+                            <input type="number" class="form-control" id="edit_scan_limit"
+                                   value="6" min="1" max="120">
+                            <small class="text-muted">How many items to fetch</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Scan Interval (seconds)</label>
+                            <input type="number" class="form-control" id="edit_scan_interval"
+                                   value="60" min="30" max="3600">
+                            <small class="text-muted">Delay between scans</small>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -182,6 +210,8 @@ function editQuery(id) {
             document.getElementById('edit_search_url').value = data.query.search_url;
             document.getElementById('edit_name').value = data.query.name || '';
             document.getElementById('edit_thread_id').value = data.query.thread_id || '';
+            document.getElementById('edit_scan_limit').value = data.query.scan_limit || 6;
+            document.getElementById('edit_scan_interval').value = data.query.scan_interval || 60;
 
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('editQueryModal'));
@@ -200,7 +230,9 @@ function updateQuery() {
     const data = {
         search_url: document.getElementById('edit_search_url').value,
         name: document.getElementById('edit_name').value,
-        thread_id: document.getElementById('edit_thread_id').value
+        thread_id: document.getElementById('edit_thread_id').value,
+        scan_limit: parseInt(document.getElementById('edit_scan_limit').value),
+        scan_interval: parseInt(document.getElementById('edit_scan_interval').value)
     };
 
     fetch(`/api/queries/${id}`, {

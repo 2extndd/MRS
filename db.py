@@ -86,6 +86,7 @@ class DatabaseManager:
                 item_status TEXT,
                 sort_order TEXT DEFAULT 'created_desc',
                 scan_interval INTEGER DEFAULT 300,
+                scan_limit INTEGER DEFAULT 50,
                 is_active BOOLEAN DEFAULT TRUE,
                 notify_on_price_drop BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -111,6 +112,13 @@ class DatabaseManager:
                 """)
             except:
                 pass
+            
+            try:
+                self.execute_query("""
+                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS scan_limit INTEGER DEFAULT 50
+                """)
+            except:
+                pass
         else:
             # SQLite - check if columns exist first
             try:
@@ -125,6 +133,10 @@ class DatabaseManager:
                 if 'thread_id' not in columns:
                     print("[DB] Adding 'thread_id' column to searches table")
                     self.execute_query("ALTER TABLE searches ADD COLUMN thread_id TEXT")
+                
+                if 'scan_limit' not in columns:
+                    print("[DB] Adding 'scan_limit' column to searches table")
+                    self.execute_query("ALTER TABLE searches ADD COLUMN scan_limit INTEGER DEFAULT 50")
             except Exception as e:
                 print(f"[DB] Migration warning: {e}")
 
@@ -276,8 +288,8 @@ class DatabaseManager:
                 INSERT INTO searches
                 (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
                  condition, size, color, shipping_payer, item_status, sort_order,
-                 scan_interval, notify_on_price_drop)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 scan_interval, scan_limit, notify_on_price_drop)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """
         else:
@@ -285,8 +297,8 @@ class DatabaseManager:
                 INSERT INTO searches
                 (search_url, name, thread_id, keyword, min_price, max_price, category_id, brand,
                  condition, size, color, shipping_payer, item_status, sort_order,
-                 scan_interval, notify_on_price_drop)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 scan_interval, scan_limit, notify_on_price_drop)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
 
         params = (
@@ -305,6 +317,7 @@ class DatabaseManager:
             kwargs.get('item_status'),
             kwargs.get('sort_order', 'created_desc'),
             kwargs.get('scan_interval', 300),
+            kwargs.get('scan_limit', 50),
             kwargs.get('notify_on_price_drop', False)
         )
 
@@ -427,6 +440,14 @@ class DatabaseManager:
         if 'keyword' in kwargs:
             updates.append("keyword = %s")
             params.append(kwargs['keyword'])
+        
+        if 'scan_limit' in kwargs:
+            updates.append("scan_limit = %s")
+            params.append(kwargs['scan_limit'])
+        
+        if 'scan_interval' in kwargs:
+            updates.append("scan_interval = %s")
+            params.append(kwargs['scan_interval'])
 
         if not updates:
             return
