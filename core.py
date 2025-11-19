@@ -382,7 +382,18 @@ class MercariSearcher:
 
                 logger.info(f"   Size: {full_item.size or 'N/A'}")
                 logger.info(f"   Photo: {('w_800' if 'w_800' in (image_url or '') else 'thumbnail')}")
-                
+
+                # Download and encode image for database storage (bypass Cloudflare)
+                image_data = None
+                if image_url:
+                    from image_utils import download_and_encode_image
+                    logger.info(f"📥 Downloading image: {image_url[:80]}...")
+                    image_data = download_and_encode_image(image_url)
+                    if image_data:
+                        logger.info(f"✅ Image saved ({len(image_data)/1024:.1f}KB base64)")
+                    else:
+                        logger.warning(f"⚠️ Failed to download image, URL fallback only")
+
                 # Add to database
                 db_item_id = self.db.add_item(
                     mercari_id=mercari_id,
@@ -401,7 +412,8 @@ class MercariSearcher:
                     seller_rating=full_item.seller_rating,
                     location=full_item.location,
                     description=full_item.description,
-                    category=full_item.category
+                    category=full_item.category,
+                    image_data=image_data
                 )
 
                 # If item was added (new), add to list

@@ -435,9 +435,9 @@ class DatabaseManager:
         query = """
             INSERT INTO items
             (mercari_id, search_id, title, price, currency, brand, condition,
-             size, shipping_cost, stock_quantity, item_url, image_url,
+             size, shipping_cost, stock_quantity, item_url, image_url, image_data,
              seller_name, seller_rating, location, description, category, found_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         params = (
             mercari_id,
@@ -452,6 +452,7 @@ class DatabaseManager:
             kwargs.get('stock_quantity', 1),
             kwargs.get('item_url'),
             kwargs.get('image_url'),
+            kwargs.get('image_data'),  # Base64-encoded image
             kwargs.get('seller_name'),
             kwargs.get('seller_rating'),
             kwargs.get('location'),

@@ -939,3 +939,61 @@ def proxy_image():
     except Exception as e:
         logger.error(f"Error proxying image: {e}")
         return f"Error: {str(e)}", 500
+
+
+@app.route('/api/image/<int:item_id>')
+def get_item_image(item_id):
+    """
+    Serve image from database (base64-encoded)
+    This endpoint returns images stored in the database to bypass Cloudflare
+    """
+    try:
+        from flask import Response
+
+        # Query item from database
+        query = "SELECT image_data, image_url FROM items WHERE id = %s"
+        result = db.query(query, (item_id,))
+
+        if not result or len(result) == 0:
+            logger.warning(f"Item {item_id} not found")
+            return "Item not found", 404
+
+        item = result[0]
+        image_data = item.get('image_data')
+        image_url = item.get('image_url')
+
+        # If we have base64 image data, return it
+        if image_data:
+            # image_data is already a data URI: data:image/jpeg;base64,{data}
+            # Extract just the base64 part
+            if image_data.startswith('data:'):
+                # Parse data URI: data:image/jpeg;base64,{base64data}
+                parts = image_data.split(',', 1)
+                if len(parts) == 2:
+                    content_type = parts[0].split(';')[0].replace('data:', '')
+                    base64_data = parts[1]
+
+                    # Decode base64 to bytes
+                    import base64
+                    image_bytes = base64.b64decode(base64_data)
+
+                    return Response(
+                        image_bytes,
+                        mimetype=content_type,
+                        headers={
+                            'Cache-Control': 'public, max-age=2592000',  # Cache for 30 days
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    )
+
+        # Fallback: if no image_data, redirect to original URL
+        if image_url:
+            from flask import redirect
+            return redirect(image_url)
+
+        # No image at all
+        return "No image available", 404
+
+    except Exception as e:
+        logger.error(f"Error serving image for item {item_id}: {e}")
+        return f"Error: {str(e)}", 500

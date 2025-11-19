@@ -105,8 +105,8 @@ function loadRecentItems() {
             // Render items (same style as items page)
             let html = '';
             data.items.forEach(item => {
-                // Image URL (direct, with fallback on error)
-                let imageUrl = item.image_url || '';
+                // Use /api/image endpoint to serve images from database
+                let imageUrl = item.id ? `/api/image/${item.id}` : '';
 
                 // Calculate USD price
                 const usdPrice = (item.price * {{ config.USD_CONVERSION_RATE }}).toFixed(2);

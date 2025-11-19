@@ -21,9 +21,9 @@
             <div class="card h-100">
                 <!-- Clickable Image with 4:5 aspect ratio - OPENS MERCARI -->
                 <a href="{{ item.item_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none position-relative d-block">
-                    {% if item.image_url %}
+                    {% if item.id %}
                         <div style="aspect-ratio: 4/5; overflow: hidden; position: relative; background: #f8f9fa;">
-                            <img src="{{ item.image_url }}"
+                            <img src="/api/image/{{ item.id }}"
                                  class="d-block w-100 h-100"
                                  alt="{{ item.title }}"
                                  style="object-fit: cover; object-position: center;"
