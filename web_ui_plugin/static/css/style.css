@@ -21,22 +21,22 @@
 }
 
 [data-theme="dark"] {
-    /* Dark Theme */
-    --bg-primary: #1a1d23;
-    --bg-secondary: #23272e;
-    --bg-card: #2c3039;
-    --bg-header: #23272e;
-    --text-primary: #e9ecef;
-    --text-secondary: #adb5bd;
-    --text-muted: #6c757d;
-    --border-color: #3d434d;
-    --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-    --table-hover: rgba(255, 255, 255, 0.05);
-    --log-hover: rgba(255, 255, 255, 0.05);
-    --input-bg: #2c3039;
-    --input-border: #3d434d;
-    --card-header-bg: #23272e;
+    /* Dark Theme - High Contrast */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #21262d;
+    --bg-header: #161b22;
+    --text-primary: #f0f6fc;
+    --text-secondary: #c9d1d9;
+    --text-muted: #8b949e;
+    --border-color: #30363d;
+    --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.6);
+    --table-hover: rgba(255, 255, 255, 0.08);
+    --log-hover: rgba(255, 255, 255, 0.08);
+    --input-bg: #161b22;
+    --input-border: #30363d;
+    --card-header-bg: #161b22;
 }
 
 /* General Styles */
@@ -309,6 +309,57 @@ body {
     font-size: 0.875rem;
     font-weight: 500;
     color: #6c757d;
+}
+
+/* Dark theme price fixes */
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .item-price {
+    color: #f0f6fc !important;
+}
+
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .item-image-container {
+    background-color: var(--bg-card) !important;
+}
+
+/* Larger navbar on desktop */
+@media (min-width: 992px) {
+    .navbar {
+        padding: 1rem 0 !important;
+    }
+
+    .brand-title {
+        font-size: 1.5rem !important;
+    }
+
+    .brand-subtitle {
+        font-size: 0.8rem !important;
+    }
+
+    .navbar-nav .nav-link {
+        font-size: 1.05rem;
+        padding: 0.6rem 1rem;
+    }
+}
+
+/* Queries table dark theme */
+[data-theme="dark"] .queries-table tbody tr {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .queries-table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+[data-theme="dark"] .query-code {
+    background-color: var(--bg-primary);
+    color: #58a6ff;
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* Location Display */

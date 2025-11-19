@@ -10,8 +10,8 @@
 </button>
 
 <div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead>
+    <table class="table table-striped table-hover queries-table">
+        <thead class="table-light">
             <tr>
                 <th>#</th>
                 <th>Query</th>
@@ -31,7 +31,7 @@
                     </a>
                 </td>
                 <td>
-                    <code class="small">{{ search.thread_id or '-' }}</code>
+                    <code class="small query-code">{{ search.thread_id or '-' }}</code>
                 </td>
                 <td>
                     {% if search.last_scanned_at %}
