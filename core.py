@@ -312,13 +312,19 @@ class MercariSearcher:
                         search_photo = re.sub(r'/-/small/', '/-/large/', search_photo)
                         logger.info(f"   📸 Mercari Shops: upgraded to /large/")
                     elif 'mercdn.net' in search_photo:
-                        # Regular Mercari: upgrade to /orig/
-                        if '/thumb/' in search_photo or 'w_' in search_photo:
-                            search_photo = re.sub(r'/thumb/', '/item/detail/orig/', search_photo)
-                            search_photo = re.sub(r'/c/w=\d+/', '/item/detail/orig/', search_photo)
-                            search_photo = re.sub(r'w_\d+', 'w_1200', search_photo)
-                            search_photo = re.sub(r'h_\d+', 'h_1200', search_photo)
-                            logger.info(f"   📸 URL upgraded to high-res")
+                        # Regular Mercari: upgrade to /orig/ (ORIGINAL quality, no resize)
+                        if '/thumb/' in search_photo or 'w_' in search_photo or '/c/' in search_photo:
+                            # Remove all size params and use /orig/
+                            search_photo = re.sub(r'/thumb/[^/]+/', '/item/detail/orig/photos/', search_photo)
+                            search_photo = re.sub(r'/c/w=\d+/[^/]+/', '/item/detail/orig/photos/', search_photo)
+                            search_photo = re.sub(r'\?w=\d+.*$', '', search_photo)  # Remove query params
+                            search_photo = re.sub(r'w_\d+', 'orig', search_photo)  # Replace w_240 with orig
+                            # Ensure proper path structure
+                            if '/item/detail/orig/photos/' not in search_photo:
+                                # Fallback: just replace path segments
+                                search_photo = search_photo.replace('/thumb/', '/item/detail/orig/photos/')
+                                search_photo = search_photo.replace('/c/', '/item/detail/orig/photos/')
+                            logger.info(f"   📸 URL upgraded to /orig/ (original quality)")
                         elif '/orig/' in search_photo:
                             logger.info(f"   📸 Already /orig/ quality")
                         else:
