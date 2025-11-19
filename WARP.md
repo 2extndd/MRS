@@ -530,6 +530,13 @@ railway logs --service worker | head -20
 - Размер может отсутствовать если не указан в description
 - WARP.md defaults устарели - реальные значения берутся из Web UI config page
 
+### 2025-01-XX (Session 5.2): Hot reload debug + API counter fix
+- **Hot reload logging:** Детальные логи показывают все ключи из БД и изменения
+- **API counter:** Теперь считает get_item() вызовы (было: ~40, стало: ~250)
+- **USD rate:** Добавлен hot reload для config_usd_conversion_rate
+- **Debugging:** Логи показывают old_val → new_val для всех параметров
+- **Правильный подсчёт:** 1 search() + N get_item() = 1+N API requests
+
 ### 2025-01-XX (Session 5.1): Size regex fix + navbar fix
 - **Size regex:** Исправлен паттерн - XS|XXL|XXXL|XL|L|M|S (правильный порядок)
 - **フリーサイズ:** Теперь распознаётся как 'FREE'
