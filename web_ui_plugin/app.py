@@ -343,18 +343,10 @@ def api_delete_query(query_id):
 
 @app.route('/api/items')
 def api_get_items():
-    """Get items API with compressed images for fast loading"""
+    """Get items API"""
     try:
-        from image_compressor import compress_image_data
-        
         limit = request.args.get('limit', 50, type=int)
         all_items = db.get_all_items(limit=limit)
-        
-        # Compress images for faster web loading
-        for item in all_items:
-            if item.get('image_data'):
-                item['image_thumbnail'] = compress_image_data(item['image_data'], max_width=400, quality=75)
-        
         return jsonify({'success': True, 'items': all_items})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -362,19 +354,13 @@ def api_get_items():
 
 @app.route('/api/recent-items')
 def api_get_recent_items():
-    """Get recent items with compressed images for dashboard"""
+    """Get recent items for dashboard"""
     try:
         from datetime import datetime
         import pytz
-        from image_compressor import compress_image_data
 
         # Just get latest 30 items - NO filtering, like items page
         items = db.get_all_items(limit=30)
-        
-        # Compress images for faster loading
-        for item in items:
-            if item.get('image_data'):
-                item['image_thumbnail'] = compress_image_data(item['image_data'], max_width=300, quality=70)
         
         # Moscow timezone (GMT+3)
         MOSCOW_TZ = pytz.timezone('Europe/Moscow')

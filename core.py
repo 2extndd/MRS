@@ -205,7 +205,7 @@ class MercariSearcher:
 
         Args:
             search: Search dictionary from database
-            limit: Max items to fetch (None = use search setting or config)
+            limit: Max items to fetch (None = use GLOBAL config from Web UI)
 
         Returns:
             Dictionary with search results
@@ -214,10 +214,9 @@ class MercariSearcher:
             search_url = search['search_url']
             search_id = search['id']
 
-            # Use search-specific limit if not provided
+            # Use GLOBAL config setting (from Web UI config page)
             if limit is None:
-                # Try to get from search config first, then fallback to global config
-                limit = search.get('scan_limit') or config.MAX_ITEMS_PER_SEARCH
+                limit = config.MAX_ITEMS_PER_SEARCH
 
             logger.info(f"Searching: {search_url[:100]}... (limit: {limit})")
 
