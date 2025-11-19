@@ -5,6 +5,25 @@
 {% block content %}
 <h1 class="mb-4">Configuration</h1>
 
+<!-- Theme Settings (Mobile-optimized) -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-palette"></i> Theme Settings</h5>
+    </div>
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+                <strong class="d-block mb-1">Appearance</strong>
+                <small class="text-muted">Choose your preferred color theme. Your choice is saved automatically.</small>
+            </div>
+            <button class="theme-toggle-btn" onclick="toggleTheme()" id="themeToggleBtn">
+                <i class="bi bi-moon-fill"></i>
+                <span class="theme-text d-none d-sm-inline">Dark Mode</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- System Settings -->
 <div class="card mb-4">
     <div class="card-header">
@@ -363,5 +382,22 @@ function forceRedeploy() {
 // Auto-refresh Railway status every 30 seconds
 setInterval(refreshRailwayStatus, 30000);
 refreshRailwayStatus();
+
+// Initialize theme toggle button state
+function initThemeToggle() {
+    const currentTheme = window.getCurrentTheme();
+    const icon = document.querySelector('.theme-toggle-btn i');
+    const text = document.querySelector('.theme-toggle-btn .theme-text');
+
+    if (icon) {
+        icon.className = currentTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+    }
+    if (text) {
+        text.textContent = currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+    }
+}
+
+// Initialize on page load
+initThemeToggle();
 </script>
 {% endblock %}
