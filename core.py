@@ -282,6 +282,11 @@ class MercariSearcher:
                 logger.info(f"📦 Getting full details for item: {item.id}")
                 full_item = self.api.get_item(item.id)
                 
+                # Increment API counter for get_item() call
+                self.total_api_requests += 1
+                self.shared_state.increment('total_api_requests')
+                self.db.increment_api_counter()
+                
                 if not full_item:
                     logger.warning(f"⚠️ Could not get full details for {item.id}, using search data")
                     full_item = item

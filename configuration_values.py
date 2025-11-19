@@ -135,37 +135,54 @@ class Config:
             new_config = db.get_all_config()
 
             if new_config != cls._config_cache:
-                logger.info("[CONFIG] Configuration changed, hot reloading...")
+                logger.info(f"[CONFIG] Configuration changed, hot reloading... Keys in DB: {list(new_config.keys())}")
 
                 # Update runtime settings from database
                 # Check both old and new key names for compatibility
                 if 'config_search_interval' in new_config:
+                    old_val = cls.SEARCH_INTERVAL
                     cls.SEARCH_INTERVAL = int(new_config['config_search_interval'])
+                    logger.info(f"[CONFIG] SEARCH_INTERVAL: {old_val} → {cls.SEARCH_INTERVAL}")
                 elif 'config_scan_interval' in new_config:
+                    old_val = cls.SEARCH_INTERVAL
                     cls.SEARCH_INTERVAL = int(new_config['config_scan_interval'])
+                    logger.info(f"[CONFIG] SEARCH_INTERVAL (old key): {old_val} → {cls.SEARCH_INTERVAL}")
 
                 if 'config_max_items_per_search' in new_config:
+                    old_val = cls.MAX_ITEMS_PER_SEARCH
                     cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items_per_search'])
+                    logger.info(f"[CONFIG] MAX_ITEMS_PER_SEARCH: {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
                 elif 'config_max_items' in new_config:
+                    old_val = cls.MAX_ITEMS_PER_SEARCH
                     cls.MAX_ITEMS_PER_SEARCH = int(new_config['config_max_items'])
+                    logger.info(f"[CONFIG] MAX_ITEMS_PER_SEARCH (old key): {old_val} → {cls.MAX_ITEMS_PER_SEARCH}")
 
                 if 'config_request_delay' in new_config:
                     cls.REQUEST_DELAY_MIN = float(new_config['config_request_delay'])
                     cls.REQUEST_DELAY_MAX = float(new_config['config_request_delay']) + 2.0
+                    logger.info(f"[CONFIG] REQUEST_DELAY: {cls.REQUEST_DELAY_MIN}-{cls.REQUEST_DELAY_MAX}s")
 
                 if 'config_proxy_enabled' in new_config:
                     cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
+                    logger.info(f"[CONFIG] PROXY_ENABLED: {cls.PROXY_ENABLED}")
 
                 # Telegram settings
                 if 'config_telegram_chat_id' in new_config:
                     cls.TELEGRAM_CHAT_ID = str(new_config['config_telegram_chat_id'])
-                    logger.info(f"[CONFIG] Updated Telegram Chat ID: {cls.TELEGRAM_CHAT_ID}")
+                    logger.info(f"[CONFIG] TELEGRAM_CHAT_ID: {cls.TELEGRAM_CHAT_ID}")
 
                 if 'config_telegram_bot_token' in new_config:
                     cls.TELEGRAM_BOT_TOKEN = str(new_config['config_telegram_bot_token'])
+                    logger.info(f"[CONFIG] TELEGRAM_BOT_TOKEN: updated")
+
+                # USD conversion rate
+                if 'config_usd_conversion_rate' in new_config:
+                    old_val = cls.USD_CONVERSION_RATE
+                    cls.USD_CONVERSION_RATE = float(new_config['config_usd_conversion_rate'])
+                    logger.info(f"[CONFIG] USD_CONVERSION_RATE: {old_val} → {cls.USD_CONVERSION_RATE}")
 
                 cls._config_cache = new_config
-                logger.info(f"[CONFIG] ✅ Hot reload complete! scan_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}, telegram_chat_id={cls.TELEGRAM_CHAT_ID}")
+                logger.info(f"[CONFIG] ✅ Hot reload complete! search_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}")
                 return True
 
         except Exception as e:
