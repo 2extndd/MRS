@@ -668,6 +668,14 @@ This helps future agents avoid repeating mistakes!
 
 1. **НЕ сохранять кучу лишней документации** - только критический контекст
 2. **Railway работает ТОЛЬКО с PostgreSQL** - нет SQLite на production
-3. **Railway два сервиса:** web (автодеплой ✅) + worker (нужен `railway up` ❌)
-4. **После коммита worker НЕ обновляется** - обязательно `railway up --service worker`
-5. **Контекст последней работы** - всегда добавлять в "Recent Changes Log"
+3. **Railway два сервиса:** web (автодеплой ✅) + worker (нужен manual redeploy ❌)
+4. **ПРОСТОЙ РЕДЕПЛОЙ через WebUI НЕ ПОМОГАЕТ** - Railway кеширует старый коммит
+5. **Railway worker застревает на старом коммите** - нужно удалить и создать заново
+6. **После коммита worker НЕ обновляется автоматически** - требует force redeploy
+7. **Контекст последней работы** - всегда добавлять в "Recent Changes Log"
+
+### Railway Worker Redeploy Issue:
+- **Проблема:** Worker застревает на коммите от `railway up` (3fc6bfed)
+- **Простой Redeploy НЕ работает:** нет выбора нового коммита в WebUI
+- **Решение:** Удалить worker service и создать заново с GitHub source
+- **Альтернатива:** Пустой коммит + trigger deploy from branch в Settings
