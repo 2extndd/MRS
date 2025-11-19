@@ -3,37 +3,79 @@
 {% block title %}Logs - MercariSearcher{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">System Logs</h1>
+<h1 class="mb-3 d-none d-md-block">System Logs</h1>
 
-<!-- Filter Controls -->
+<!-- Mobile-optimized Filter Controls (horizontal buttons) -->
 <div class="mb-3">
-    <div class="btn-group" role="group">
-        <a href="/logs" class="btn btn-sm btn-outline-secondary {{ 'active' if not request.args.get('level') else '' }}">All</a>
-        <a href="/logs?level=INFO" class="btn btn-sm btn-outline-info {{ 'active' if request.args.get('level') == 'INFO' else '' }}">INFO</a>
-        <a href="/logs?level=WARNING" class="btn btn-sm btn-outline-warning {{ 'active' if request.args.get('level') == 'WARNING' else '' }}">WARNING</a>
-        <a href="/logs?level=ERROR" class="btn btn-sm btn-outline-danger {{ 'active' if request.args.get('level') == 'ERROR' else '' }}">ERROR</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/logs" class="btn btn-sm {{ 'btn-secondary' if not request.args.get('level') else 'btn-outline-secondary' }} flex-fill" style="font-size: 0.75rem;">
+            All
+        </a>
+        <a href="/logs?level=INFO" class="btn btn-sm {{ 'btn-info text-white' if request.args.get('level') == 'INFO' else 'btn-outline-info' }} flex-fill" style="font-size: 0.75rem;">
+            INFO
+        </a>
+        <a href="/logs?level=WARNING" class="btn btn-sm {{ 'btn-warning' if request.args.get('level') == 'WARNING' else 'btn-outline-warning' }} flex-fill" style="font-size: 0.75rem;">
+            WARNING
+        </a>
+        <a href="/logs?level=ERROR" class="btn btn-sm {{ 'btn-danger' if request.args.get('level') == 'ERROR' else 'btn-outline-danger' }} flex-fill" style="font-size: 0.75rem;">
+            ERROR
+        </a>
     </div>
 </div>
 
 <style>
-    /* Compact log rows */
-    .table-compact tbody tr {
-        line-height: 1.2;
+    /* Mobile-responsive log table */
+    @media (max-width: 768px) {
+        .log-table td {
+            display: block;
+            width: 100% !important;
+            border: none !important;
+            padding: 0.3rem 0.5rem !important;
+        }
+        .log-table tr {
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            margin-bottom: 0.75rem;
+            display: block;
+            background: white;
+        }
+        .log-table thead {
+            display: none;
+        }
+        .log-table .timestamp {
+            font-size: 0.7rem;
+            color: #6c757d;
+        }
+        .log-table .level-badge {
+            margin: 0.3rem 0;
+        }
+        .log-table .message {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
     }
-    .table-compact tbody td {
-        padding: 0.25rem 0.5rem !important;
-        vertical-align: middle;
-    }
-    .table-compact thead th {
-        padding: 0.4rem 0.5rem !important;
+
+    /* Desktop table */
+    @media (min-width: 769px) {
+        .log-table tbody tr {
+            line-height: 1.2;
+        }
+        .log-table tbody td {
+            padding: 0.4rem 0.6rem !important;
+            vertical-align: middle;
+        }
+        .log-table thead th {
+            padding: 0.5rem 0.6rem !important;
+        }
     }
 </style>
 
 <div class="table-responsive">
-    <table class="table table-sm table-hover table-compact">
+    <table class="table table-sm table-hover log-table">
         <thead class="table-light">
             <tr>
-                <th style="width: 220px;">Timestamp</th>
+                <th style="width: 200px;">Timestamp</th>
                 <th style="width: 100px;">Level</th>
                 <th>Message</th>
             </tr>
@@ -42,13 +84,15 @@
             {% if logs %}
                 {% for log in logs %}
                 <tr>
-                    <td><small class="text-muted">{{ log.timestamp }}</small></td>
-                    <td>
+                    <td class="timestamp">
+                        <small class="text-muted">{{ log.timestamp }}</small>
+                    </td>
+                    <td class="level-badge">
                         <span class="badge bg-{{ 'danger' if log.level == 'ERROR' else ('warning' if log.level == 'WARNING' else 'info') }}">
                             {{ log.level }}
                         </span>
                     </td>
-                    <td>{{ log.message }}</td>
+                    <td class="message">{{ log.message }}</td>
                 </tr>
                 {% endfor %}
             {% else %}
@@ -98,14 +142,14 @@ setInterval(function() {
                 const tbody = document.querySelector('.table tbody');
                 if (tbody) {
                     tbody.innerHTML = data.logs.map(log => {
-                        const levelClass = log.level === 'ERROR' ? 'danger' : 
-                                         log.level === 'WARNING' ? 'warning' : 
+                        const levelClass = log.level === 'ERROR' ? 'danger' :
+                                         log.level === 'WARNING' ? 'warning' :
                                          log.level === 'INFO' ? 'info' : 'secondary';
                         return `
                             <tr>
-                                <td>${log.timestamp}</td>
-                                <td><span class="badge bg-${levelClass}">${log.level}</span></td>
-                                <td>${log.message}</td>
+                                <td class="timestamp"><small class="text-muted">${log.timestamp}</small></td>
+                                <td class="level-badge"><span class="badge bg-${levelClass}">${log.level}</span></td>
+                                <td class="message">${log.message}</td>
                             </tr>
                         `;
                     }).join('');
