@@ -96,19 +96,37 @@ class DatabaseManager:
         """)
 
         # Migrate existing searches table if it doesn't have name/thread_id
-        try:
-            self.execute_query("""
-                ALTER TABLE searches ADD COLUMN IF NOT EXISTS name TEXT
-            """)
-        except:
-            pass
+        # PostgreSQL supports IF NOT EXISTS, SQLite does not
+        if self.db_type == 'postgresql':
+            try:
+                self.execute_query("""
+                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS name TEXT
+                """)
+            except:
+                pass
 
-        try:
-            self.execute_query("""
-                ALTER TABLE searches ADD COLUMN IF NOT EXISTS thread_id TEXT
-            """)
-        except:
-            pass
+            try:
+                self.execute_query("""
+                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS thread_id TEXT
+                """)
+            except:
+                pass
+        else:
+            # SQLite - check if columns exist first
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("PRAGMA table_info(searches)")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                if 'name' not in columns:
+                    print("[DB] Adding 'name' column to searches table")
+                    self.execute_query("ALTER TABLE searches ADD COLUMN name TEXT")
+                
+                if 'thread_id' not in columns:
+                    print("[DB] Adding 'thread_id' column to searches table")
+                    self.execute_query("ALTER TABLE searches ADD COLUMN thread_id TEXT")
+            except Exception as e:
+                print(f"[DB] Migration warning: {e}")
 
         # Items table with Mercari-specific fields
         self.execute_query("""
@@ -418,8 +436,8 @@ class DatabaseManager:
             INSERT INTO items
             (mercari_id, search_id, title, price, currency, brand, condition,
              size, shipping_cost, stock_quantity, item_url, image_url,
-             seller_name, seller_rating, location, description, category)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             seller_name, seller_rating, location, description, category, found_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         params = (
             mercari_id,
@@ -438,7 +456,8 @@ class DatabaseManager:
             kwargs.get('seller_rating'),
             kwargs.get('location'),
             kwargs.get('description'),
-            kwargs.get('category')
+            kwargs.get('category'),
+            get_moscow_time()
         )
 
         cursor = self.execute_query(query, params)

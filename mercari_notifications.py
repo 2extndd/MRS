@@ -100,11 +100,14 @@ class MercariNotificationApp:
             # Perform searches
             results = self.searcher.search_all_queries()
 
-            # Process notifications for new items
-            if results['new_items'] > 0:
-                logger.info(f"Processing {results['new_items']} new items for notifications...")
-                notification_stats = process_pending_notifications()
+            # ALWAYS check for pending notifications (even if new_items=0 in this cycle)
+            logger.info("Checking for pending notifications...")
+            notification_stats = process_pending_notifications()
+            
+            if notification_stats['total'] > 0:
                 logger.info(f"Notifications: {notification_stats['sent']}/{notification_stats['total']} sent")
+            else:
+                logger.info("No pending notifications")
 
             # Update metrics
             metrics_storage.set_last_search_time()
@@ -177,9 +180,13 @@ class MercariNotificationApp:
             try:
                 # HOT RELOAD CONFIG EVERY ITERATION
                 if config.reload_if_needed():
+                    logger.info("[CONFIG] ✅ Configuration reloaded from database")
+                    self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
+                    
                     # If search interval changed, recreate schedule
                     if config.SEARCH_INTERVAL != last_interval:
                         logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
+                        self.db.add_log_entry('INFO', f"Search interval changed: {last_interval}s → {config.SEARCH_INTERVAL}s", 'config')
                         self._setup_schedule()
                         last_interval = config.SEARCH_INTERVAL
 

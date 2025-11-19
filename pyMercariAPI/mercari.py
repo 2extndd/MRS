@@ -103,16 +103,8 @@ class Mercari:
                 result = await m.search('test')
                 return result is not None
 
-            # Proper event loop handling
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    raise RuntimeError("Event loop is closed")
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            return loop.run_until_complete(_test())
+            # Use asyncio.run() for clean event loop handling
+            return asyncio.run(_test())
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
@@ -178,9 +170,15 @@ class Mercari:
                         'description': ''
                     }
 
-                    # Get thumbnail
+                    # Get best available image (photos > thumbnails)
+                    photos = getattr(item, 'photos', [])
                     thumbnails = getattr(item, 'thumbnails', [])
-                    if thumbnails:
+                    
+                    if photos:
+                        # Use full-size photo if available
+                        item_dict['image_url'] = photos[0]
+                    elif thumbnails:
+                        # Fallback to thumbnail
                         item_dict['image_url'] = thumbnails[0]
 
                     items_data.append(item_dict)
@@ -188,19 +186,8 @@ class Mercari:
 
                 return items_data
 
-            # Execute async search with proper event loop handling
-            # Try to get existing event loop, if not available or closed, create new one
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    raise RuntimeError("Event loop is closed")
-            except RuntimeError:
-                # No event loop or closed - create new one for this thread
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            # Run the async function
-            items_data = loop.run_until_complete(_perform_search())
+            # Execute async search with asyncio.run() for clean event loop handling
+            items_data = asyncio.run(_perform_search())
 
             # Convert to Items object
             items = Items(items_data)
@@ -269,21 +256,12 @@ class Mercari:
 
             logger.info(f"Getting item details: {item_id}")
 
-            # Run async in sync context with proper event loop handling
+            # Run async in sync context with asyncio.run()
             async def _get_item():
                 m = self._get_mercapi()
                 return await m.item(item_id)
 
-            # Proper event loop handling
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    raise RuntimeError("Event loop is closed")
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            full_item = loop.run_until_complete(_get_item())
+            full_item = asyncio.run(_get_item())
 
             if not full_item:
                 return None

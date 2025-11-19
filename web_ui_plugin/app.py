@@ -53,6 +53,7 @@ def index():
         return render_template('dashboard.html',
                              stats=stats,
                              state_stats=state_stats,
+                             total_api_requests=db.get_api_counter(),
                              config=config)
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
