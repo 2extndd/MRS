@@ -300,8 +300,10 @@ class MercariSearcher:
                 self.db.increment_api_counter()
                 
                 if not full_item:
-                    logger.warning(f"⚠️ Could not get full details for {item_id}, using search data")
+                    logger.warning(f"⚠️ Could not get full details for {item_id} (maybe Mercari Shops), using search data")
                     full_item = item
+                else:
+                    logger.info(f"✅ Got full details for {item_id}")
                 
                 # Get mercari_id from full_item (mercapi uses id_, our Item uses id)
                 mercari_id = getattr(full_item, 'id_', None) or getattr(full_item, 'id', None)
@@ -315,13 +317,20 @@ class MercariSearcher:
                 # Image URL is already ORIGINAL from get_item() (mercapi photos field)
                 image_url = full_item.image_url
                 
-                # Ensure it's original quality
-                if image_url and '/orig/' not in image_url:
+                # Ensure it's original/high quality
+                if image_url:
                     import re
-                    # Force original if somehow not already
-                    image_url = re.sub(r'/thumb/', '/orig/', image_url)
-                    image_url = re.sub(r'w_\d+', 'w_1200', image_url)
-                    image_url = re.sub(r'h_\d+', 'h_1200', image_url)
+                    
+                    # For Mercari Shops items: replace /small/ with /large/ (best available)
+                    if 'mercari-shops-static.com' in image_url:
+                        image_url = re.sub(r'/-/small/', '/-/large/', image_url)
+                        logger.info(f"   Mercari Shops: using /large/ quality")
+                    
+                    # For regular Mercari items: ensure /orig/
+                    elif '/orig/' not in image_url:
+                        image_url = re.sub(r'/thumb/', '/orig/', image_url)
+                        image_url = re.sub(r'w_\d+', 'w_1200', image_url)
+                        image_url = re.sub(r'h_\d+', 'h_1200', image_url)
                 
                 logger.info(f"   Size: {full_item.size or 'N/A'}")
                 logger.info(f"   Photo: {'ORIGINAL' if '/orig/' in (image_url or '') else 'thumbnail'}")
