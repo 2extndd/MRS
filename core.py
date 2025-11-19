@@ -320,23 +320,11 @@ class MercariSearcher:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
-                # Get full item details for size, photos, description
-                logger.info(f"[PROCESS] 📦 Getting full details for item: {item_id}")
-                
-                try:
-                    full_item = self.api.get_item(item_id)
-                    
-                    # Increment API counter
-                    self.total_api_requests += 1
-                    self.shared_state.increment('total_api_requests')
-                    self.db.increment_api_counter()
-                    
-                    if not full_item:
-                        logger.warning(f"⚠️ get_item returned None, using search data")
-                        full_item = item
-                except Exception as e:
-                    logger.warning(f"⚠️ get_item failed: {e}, using search data")
-                    full_item = item
+                # OPTIMIZATION: Skip get_item() call - we already have enough data from search
+                # get_item() adds 1-2 seconds per item and we don't need all details
+                # Using search data directly is much faster
+                full_item = item
+                logger.debug(f"[PROCESS] Using search data for item: {item_id} (faster)")
                 
                 # Get mercari_id from Item object
                 mercari_id = full_item.id
