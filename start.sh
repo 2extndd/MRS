@@ -9,7 +9,7 @@ echo "Starting Railway service: $SERVICE (checking as: $SERVICE_LOWER)"
 
 if [ "$SERVICE_LOWER" = "worker" ]; then
     echo "Starting worker process..."
-    exec python mercari_notifications.py worker
+    exec python3 mercari_notifications.py worker
 else
     echo "Starting web process..."
     exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info wsgi:application
