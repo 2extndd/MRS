@@ -997,3 +997,37 @@ def get_item_image(item_id):
     except Exception as e:
         logger.error(f"Error serving image for item {item_id}: {e}")
         return f"Error: {str(e)}", 500
+
+@app.route('/api/image-proxy')
+def image_proxy():
+    """Proxy images from Mercari to bypass Cloudflare 403"""
+    try:
+        image_url = request.args.get('url')
+        if not image_url:
+            return "No URL provided", 400
+        
+        # Request image with proper headers to bypass Cloudflare
+        import requests
+        from flask import Response
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://jp.mercari.com/',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        }
+        
+        response = requests.get(image_url, headers=headers, timeout=10, stream=True)
+        
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type=response.headers.get('Content-Type', 'image/jpeg'),
+                headers={'Cache-Control': 'public, max-age=86400'}
+            )
+        else:
+            logger.error(f"Image proxy failed: {response.status_code} for {image_url}")
+            return f"Failed: {response.status_code}", response.status_code
+            
+    except Exception as e:
+        logger.error(f"Image proxy error: {e}")
+        return f"Error: {str(e)}", 500
