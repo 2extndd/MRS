@@ -245,6 +245,12 @@ class MercariSearcher:
             # Process new items
             new_items_data = self._process_new_items(items, search_id)
 
+            # Count new items
+            new_items_count = len(new_items_data) if new_items_data else 0
+            
+            # IMPORTANT: Log immediately after counting
+            logger.info(f"[SEARCH] 📊 RESULT: API returned {items_found} items, added {new_items_count} NEW items to database")
+
             # Update search stats
             if new_items_data:
                 self.db.update_search_stats(search_id, len(new_items_data))
@@ -252,7 +258,7 @@ class MercariSearcher:
             return {
                 'success': True,
                 'items_found': items_found,
-                'new_items': len(new_items_data),
+                'new_items': new_items_count,
                 'items_data': new_items_data
             }
 
