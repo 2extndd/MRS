@@ -701,9 +701,10 @@ This helps future agents avoid repeating mistakes!
 - **NOT working:** Telegram notifications (103 unsent items) ❌
 - **Cause:** TELEGRAM_BOT_TOKEN possibly not set on Railway worker
 
-### Session 5.5 - Database Image Storage Solution (COMPLETED ✅):
+### Session 5.5 - Database Image Storage Solution (PARTIALLY COMPLETED ⚠️):
 **Problem:** ALL Cloudflare attempts failed (proxy, w_800, /orig/) - Railway IPs blocked
-**Solution:** Save photos in database as base64 during scanning
+**Solution Attempted:** Save photos in database as base64 during scanning
+**Status:** ❌ CLOUDFLARE BLOCKS RAILWAY IPs FOR ALL MERCARI DOMAINS
 
 **✅ Implementation COMPLETED:**
 
@@ -787,12 +788,234 @@ This helps future agents avoid repeating mistakes!
 - Fallback: if no image_data, redirects to original URL
 - Existing 103 items: will show 403 until re-scanned or deleted
 
+**🚨 CRITICAL DISCOVERY - Session 5.5 Final Status:**
+
+**What Works:**
+- ✅ Code implementation complete (image_utils.py, core.py, endpoints)
+- ✅ Database migration executed (image_data column exists)
+- ✅ Worker process fixed (python3 instead of python in start.sh)
+- ✅ SERVICE_NAME=worker environment variable set
+- ✅ Telegram notifications working
+- ✅ Worker scanning and adding items to DB
+
+**What DOESN'T Work:**
+- ❌ **CLOUDFLARE BLOCKS ALL RAILWAY IPs FOR MERCARI DOMAINS**
+- ❌ `static.mercdn.net` returns HTTP 403 from Railway
+- ❌ `mercari-shops-static.com` returns HTTP 403 from Railway (sometimes works, unreliable)
+- ❌ No amount of headers/user-agents bypasses this
+- ❌ Database storage solution CANNOT work without downloading images first
+
+**Tested:**
+```bash
+railway run -s Worker python3 -c "from image_utils import download_and_encode_image; print(download_and_encode_image('https://static.mercdn.net/.../'))"
+# Result: ❌ Failed - HTTP 403
+```
+
+**Why it fails:**
+1. Railway IPs are in Cloudflare's block list
+2. Cloudflare detects datacenter IPs vs residential IPs
+3. Headers/referrers don't help for datacenter IPs
+4. This is permanent, not a temporary rate limit
+
+**Critical Fixes Made (Session 5.5):**
+1. **start.sh python→python3** (commit 3b181a7)
+   - Railway doesn't have `python` command, only `python3`
+   - This was causing Worker to fail silently!
+   - Fixed: `exec python3 mercari_notifications.py worker`
+
+2. **db.query()→db.execute_query()** (commit 26e15ca)
+   - /api/image endpoint was broken
+   - Fixed: `db.execute_query(query, params, fetch=True)`
+
+3. **SERVICE_NAME environment variable**
+   - Added manually on Railway Dashboard: `SERVICE_NAME=worker`
+   - Without this, start.sh defaults to web process
+
 **Key Lessons:**
-- Cloudflare blocks ALL Railway IPs - no proxy/header workaround works
-- Database storage is reliable solution (no external dependencies)
-- Images downloaded DURING scanning (not lazy load) for guaranteed availability
-- Railway services: "Worker" (not "worker"), "Postgres-T-E-" for DB
-- `railway up -s ServiceName` works, but Railway Dashboard more reliable for verification
+- Cloudflare blocks ALL Railway datacenter IPs permanently
+- Database storage solution requires DOWNLOADING images first
+- Cannot download if Cloudflare blocks the source
+- Need alternative approach (external proxy, Cloudflare Worker, or no images)
+- Railway: use `python3` not `python`
+- Railway: `railway up` works but may need multiple deploys to take effect
+- Railway logs command hangs/fails - use Dashboard or error_tracking table
+- start.sh case-sensitivity fixed with `tr '[:upper:]' '[:lower:]'`
+
+---
+
+## 🔄 NEXT STEPS: 4 Solutions for Image Problem
+
+### Solution 1: External Proxy Service (RECOMMENDED) ⭐
+
+**Pros:**
+- Residential IPs bypass Cloudflare
+- Reliable and stable
+- Easy to implement (just change requests URL)
+
+**Cons:**
+- Costs money ($10-50/month)
+- Added latency (~1-3 seconds per image)
+
+**Services:**
+- **ScraperAPI** (scraperapi.com) - $49/month, 100k requests
+- **Bright Data** (brightdata.com) - Pay as you go
+- **Proxy6** (proxy6.net) - Cheap Russian proxies
+- **WebShare** (webshare.io) - $10/month residential
+
+**Implementation:**
+```python
+# In image_utils.py
+PROXY = os.getenv('PROXY_URL')  # http://user:pass@proxy.com:8080
+
+response = requests.get(
+    image_url,
+    headers=headers,
+    proxies={'http': PROXY, 'https': PROXY},
+    timeout=timeout
+)
+```
+
+**Estimate:** 6 items/scan × 60sec interval = 360 items/hour = 8640 items/day = ~260k/month
+Cost: $30-50/month for reliable service
+
+---
+
+### Solution 2: Cloudflare Worker Proxy (MEDIUM) ⚡
+
+**Pros:**
+- Free tier: 100k requests/day
+- Fast (Cloudflare edge network)
+- No Railway IP involved
+
+**Cons:**
+- Requires separate Cloudflare account setup
+- May still get blocked (Cloudflare→Cloudflare detection)
+- More complex setup
+
+**Implementation:**
+1. Create Cloudflare Worker:
+```javascript
+// worker.js
+export default {
+  async fetch(request) {
+    const url = new URL(request.url).searchParams.get('url');
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0...',
+        'Referer': 'https://jp.mercari.com/'
+      }
+    });
+    return new Response(response.body, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': response.headers.get('Content-Type')
+      }
+    });
+  }
+}
+```
+
+2. Deploy to Cloudflare Workers
+3. Update image_utils.py:
+```python
+CLOUDFLARE_WORKER = "https://your-worker.workers.dev"
+proxy_url = f"{CLOUDFLARE_WORKER}?url={image_url}"
+response = requests.get(proxy_url, timeout=timeout)
+```
+
+**Cost:** Free (100k/day limit)
+**Success Rate:** 60-80% (may still get blocked)
+
+---
+
+### Solution 3: Accept No Images (SIMPLEST) 📝
+
+**Pros:**
+- Zero additional cost
+- No complexity
+- Bot still works for notifications
+
+**Cons:**
+- No images in Web UI
+- Users must click through to Mercari to see items
+
+**Implementation:**
+```python
+# In core.py - REMOVE lines 386-395 (image download code)
+# In templates - show placeholder or Mercari link button
+
+# templates/items.html
+<div class="placeholder">
+    <a href="{{ item.item_url }}" target="_blank">
+        <i class="bi bi-box"></i>
+        <span>View on Mercari</span>
+    </a>
+</div>
+```
+
+**Telegram:**
+- Send text-only messages (already works)
+- Or send Mercari URL as "photo" (Telegram will try to preview)
+
+**Cost:** $0
+
+---
+
+### Solution 4: Hybrid Approach (BEST VALUE) 💡
+
+**Pros:**
+- Cheap rotating proxies for occasional use
+- Fallback to no-image if proxy fails
+- Best of both worlds
+
+**Cons:**
+- More complex logic
+- Some images may fail
+
+**Implementation:**
+```python
+# image_utils.py
+def download_and_encode_image(image_url: str, use_proxy: bool = True) -> Optional[str]:
+    proxies = None
+
+    # Try cheap proxy first (if available)
+    if use_proxy and PROXY_URL:
+        proxies = {'http': PROXY_URL, 'https': PROXY_URL}
+
+    try:
+        response = requests.get(image_url, headers=headers, proxies=proxies, timeout=10)
+
+        if response.status_code == 403 and not proxies:
+            # Cloudflare blocked, don't retry
+            logger.warning(f"Cloudflare blocked, no proxy available")
+            return None
+
+        # ... rest of code
+    except:
+        return None
+```
+
+**Setup:**
+- Use free/cheap proxies for testing
+- Monitor success rate
+- Upgrade to paid if success rate >70%
+
+**Cost:** $0-10/month
+
+---
+
+## 📊 Comparison Table:
+
+| Solution | Cost/Month | Success Rate | Complexity | Speed |
+|----------|-----------|--------------|------------|-------|
+| External Proxy | $30-50 | 95-99% | Low | Medium |
+| Cloudflare Worker | $0 | 60-80% | Medium | Fast |
+| No Images | $0 | N/A | Very Low | N/A |
+| Hybrid | $0-10 | 70-90% | High | Medium |
+
+**Recommendation:** Start with **Solution 3 (No Images)** if budget is $0, then add **Solution 1 (External Proxy)** when ready to invest.
+
+---
 
 ### Working Features:
 - ✅ Items добавляются в БД
