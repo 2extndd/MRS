@@ -1034,3 +1034,371 @@ def download_and_encode_image(image_url: str, use_proxy: bool = True) -> Optiona
 Railway Dashboard → MRS service → Deployments → Check commit hash:
 - Should be: 01c9442 or newer
 - If still old (3fc6bfed, d7917c9): Manual redeploy needed via Dashboard
+
+---
+
+## 🚨 CRITICAL ISSUE #6: Proxy Hot Reload Не Работал!
+
+**DATE:** 2025-11-19 (Session 5.7-5.8)
+**SEVERITY:** CRITICAL - Photos not downloading, proxy system disabled
+
+### THE PROBLEM:
+
+**Симптомы:**
+- Web UI config shows: `config_proxy_enabled = true`, `115 proxies`
+- Worker logs show: `Proxy system disabled`
+- Images failing: `HTTP 403 (proxy: direct)` ← NO PROXY!
+- User: "ФОТОГРАФИЙ НЕТ!"
+
+**Root Cause:**
+Hot reload в [configuration_values.py](configuration_values.py#L175-177) обновлял ТОЛЬКО `PROXY_ENABLED`:
+
+```python
+# СТАРЫЙ КОД (НЕПОЛНЫЙ):
+if 'config_proxy_enabled' in new_config:
+    cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
+    logger.info(f"[CONFIG] PROXY_ENABLED: {cls.PROXY_ENABLED}")
+# НО! PROXY_LIST НЕ ОБНОВЛЯЛСЯ!
+# И proxy_manager НЕ реинициализировался!
+```
+
+**Что НЕ работало:**
+1. ❌ `PROXY_LIST` НЕ загружался из БД (`config_proxy_list`)
+2. ❌ `proxy_manager` НЕ реинициализировался
+3. ❌ `proxy_rotator` оставался `None`
+4. ❌ Модуль `proxies.py` загружался 1 раз при старте с `PROXY_ENABLED=false`
+
+### THE FIX:
+
+**Commit:** `1356296` (2025-11-19)
+**File:** [configuration_values.py:175-218](configuration_values.py#L175-L218)
+
+```python
+# НОВЫЙ КОД (ПОЛНЫЙ):
+proxy_config_changed = False
+
+if 'config_proxy_enabled' in new_config:
+    old_enabled = cls.PROXY_ENABLED
+    cls.PROXY_ENABLED = str(new_config['config_proxy_enabled']).lower() == 'true'
+    logger.info(f"[CONFIG] PROXY_ENABLED: {old_enabled} → {cls.PROXY_ENABLED}")
+    if old_enabled != cls.PROXY_ENABLED:
+        proxy_config_changed = True
+
+if 'config_proxy_list' in new_config:
+    old_count = len(cls.PROXY_LIST)
+    proxy_str = str(new_config['config_proxy_list'])
+    cls.PROXY_LIST = [p.strip() for p in proxy_str.replace('\n', ',').split(",") if p.strip()]
+    new_count = len(cls.PROXY_LIST)
+    logger.info(f"[CONFIG] PROXY_LIST: {old_count} → {new_count} proxies")
+    if old_count != new_count:
+        proxy_config_changed = True
+
+# REINITIALIZE proxy_manager if config changed!
+if proxy_config_changed:
+    logger.warning(f"[CONFIG] ⚠️  Proxy configuration changed! Reinitializing...")
+    import proxies
+
+    if cls.PROXY_ENABLED and cls.PROXY_LIST:
+        logger.info(f"[CONFIG] 🔄 Initializing proxy system with {len(cls.PROXY_LIST)} proxies...")
+        proxies.proxy_manager = proxies.ProxyManager(cls.PROXY_LIST)
+
+        if proxies.proxy_manager.working_proxies:
+            proxies.proxy_rotator = proxies.ProxyRotator(proxies.proxy_manager)
+            stats = proxies.proxy_manager.get_proxy_stats()
+            logger.info(f"[CONFIG] ✅ Proxy system initialized: {stats['working']} working, {stats['failed']} failed")
+        else:
+            logger.warning(f"[CONFIG] ⚠️  No working proxies found")
+    else:
+        logger.info(f"[CONFIG] Proxy system disabled")
+        proxies.proxy_manager = None
+        proxies.proxy_rotator = None
+```
+
+### EXPECTED BEHAVIOR:
+
+After deployment, hot reload (every 10 seconds) will log:
+
+```
+[CONFIG] Configuration changed, hot reloading...
+[CONFIG] PROXY_ENABLED: False → True
+[CONFIG] PROXY_LIST: 0 → 115 proxies
+[CONFIG] ⚠️  Proxy configuration changed! Reinitializing proxy system...
+[CONFIG] 🔄 Initializing proxy system with 115 proxies...
+[ProxyManager] Validating 115 proxies...
+[ProxyManager] Validation complete: 110 working, 5 failed
+[CONFIG] ✅ Proxy system initialized: 110 working, 5 failed
+```
+
+Then image downloads:
+```
+📥 Downloading image: https://static.mercdn.net/...
+📡 Using proxy for image download: http://user:pass@82.21.62.51:7815...
+✅ Image downloaded: 123.4KB base64
+```
+
+### KEY LESSONS:
+
+1. **Hot reload НЕ применяется к module-level code!**
+   - `proxies.py:283-293` runs ONCE at import
+   - Updating `config.PROXY_ENABLED` в runtime НЕ влияет на уже импортированный модуль
+   - Need to REINITIALIZE `proxy_manager` explicitly
+
+2. **PROXY_LIST must be reloaded from database!**
+   - Database stores: `config_proxy_list` (newline-separated string)
+   - Code must parse: `proxy_str.replace('\n', ',').split(",")`
+   - Old code NEVER loaded this from DB!
+
+3. **Global state must be modified directly:**
+   ```python
+   import proxies  # Import module object
+   proxies.proxy_manager = ProxyManager(...)  # Modify global var
+   proxies.proxy_rotator = ProxyRotator(...)
+   ```
+
+### HOW TO VERIFY:
+
+**Check logs (Web UI or Railway):**
+```
+railway logs -s Worker | grep -E "CONFIG|Proxy|proxy"
+```
+
+Should see proxy initialization after config change.
+
+**Check database:**
+```sql
+SELECT COUNT(*) as with_images FROM items WHERE image_data IS NOT NULL AND found_at > NOW() - INTERVAL '10 minutes';
+```
+
+Should be > 0 for new items.
+
+**Test image download:**
+```python
+railway run -s Worker -- python3 test_image_download.py
+```
+
+Should show: `✅ SUCCESS! Image downloaded`
+
+---
+
+## 🚨 CRITICAL ISSUE #7: Logs NOT Informative
+
+**DATE:** 2025-11-19 (Session 5.8)
+**SEVERITY:** HIGH - Can't debug without proper logs
+
+### THE PROBLEM:
+
+**User complaint:** "логи не информативные, нет статуса запуска бота и начала сканирования, запуска и инициализации прокси"
+
+**What's Missing in Web UI /logs:**
+- ❌ Worker startup logs
+- ❌ Proxy initialization logs
+- ❌ Image download logs
+- ❌ HTTP error logs (403, timeout)
+- ❌ Proxy rotation/failure logs
+
+**What's Shown (only):**
+- ✅ Search cycle started
+- ✅ Configuration reloaded
+- ✅ Found X items (0 new)
+
+### ROOT CAUSE:
+
+Logs записываются в БД ТОЛЬКО через `db.add_log_entry()` вручную:
+
+```python
+# ✅ ПОПАДАЕТ в Web UI (БД):
+self.db.add_log_entry('INFO', 'Starting search cycle', 'core')
+
+# ❌ НЕ попадает в Web UI (только stdout):
+logger.info(f"📥 Downloading image...")
+logger.info(f"[CONFIG] ✅ Proxy system initialized")
+logger.warning(f"Failed to download image: HTTP 403")
+```
+
+**Why:**
+- `logger` writes to stdout/file
+- Web UI reads from `system_logs` table in DB
+- Only `db.add_log_entry()` writes to table
+
+**Files with invisible logs:**
+- [core.py:394-399](core.py#L394-L399) - image download
+- [configuration_values.py:181-218](configuration_values.py#L181-L218) - proxy config
+- [image_utils.py:52,59,90](image_utils.py#L52,L59,L90) - download errors
+- [proxies.py:125,195](proxies.py#L125,L195) - proxy validation
+
+### THE FIX (TODO):
+
+Add `db.add_log_entry()` calls to critical events:
+
+```python
+# In configuration_values.py:209
+if proxies.proxy_manager.working_proxies:
+    stats = proxies.proxy_manager.get_proxy_stats()
+    logger.info(f"[CONFIG] ✅ Proxy system initialized: {stats['working']} working")
+
+    # ADD THIS:
+    from db import get_db
+    db = get_db()
+    db.add_log_entry('INFO',
+        f"Proxy system initialized: {stats['working']} working, {stats['failed']} failed",
+        'proxy')
+
+# In core.py:397
+if image_data:
+    logger.info(f"✅ Image saved ({len(image_data)/1024:.1f}KB base64)")
+
+    # ADD THIS:
+    self.db.add_log_entry('INFO',
+        f"Image downloaded: {len(image_data)/1024:.1f}KB base64",
+        'image')
+else:
+    logger.warning(f"⚠️  Failed to download image, URL fallback only")
+
+    # ADD THIS:
+    self.db.add_log_entry('WARNING',
+        'Image download failed (HTTP 403 or proxy error)',
+        'image')
+```
+
+**Priority events to log:**
+1. Proxy system initialization (startup + hot reload)
+2. Image download success/failure
+3. HTTP errors (403, 429, timeout)
+4. Proxy rotation/failure
+5. Worker startup complete
+
+### WORKAROUND (Current):
+
+Check Railway logs directly:
+```bash
+railway logs -s Worker | grep -E "Proxy|image|download|403"
+```
+
+Or monitor error_tracking table:
+```sql
+SELECT * FROM error_tracking WHERE timestamp > NOW() - INTERVAL '1 hour' ORDER BY timestamp DESC;
+```
+
+---
+
+## 🚨 CRITICAL ISSUE #8: "0 new items" When Items Found
+
+**DATE:** 2025-11-19 (Session 5.8)
+**SEVERITY:** MEDIUM - Misleading logs
+
+### THE PROBLEM:
+
+**User complaint:** "Даже если бот находит вещи, он пишет 0 new items хотя это не так"
+
+**Logs show:**
+```
+[search] ✅ Found 6 items (0 new)
+[search] ✅ Found 50 items (0 new)
+```
+
+**Possible causes:**
+1. All items already in database (duplicates) ✅ EXPECTED
+2. Logic bug in `db.add_item()` - always returns "exists"
+3. Search scanning same items repeatedly
+4. Mercari ID extraction failing (item.id_ vs item.id)
+
+### HOW TO DIAGNOSE:
+
+**Check database:**
+```sql
+-- Count total items
+SELECT COUNT(*) FROM items;
+
+-- Count items from last hour
+SELECT COUNT(*) FROM items WHERE found_at > NOW() - INTERVAL '1 hour';
+
+-- Check for duplicates
+SELECT mercari_id, COUNT(*) as count
+FROM items
+GROUP BY mercari_id
+HAVING COUNT(*) > 1
+ORDER BY count DESC
+LIMIT 10;
+```
+
+**Check mercari_id values:**
+```sql
+SELECT id, mercari_id, title FROM items ORDER BY id DESC LIMIT 10;
+```
+
+Should NOT be NULL or empty.
+
+**If mercari_id is NULL:**
+- Bug in `item.id_` extraction (see Session 5.3 fix)
+- Check [core.py:342](core.py#L342): `mercari_id = getattr(item, 'id_', item.id)`
+
+### EXPECTED BEHAVIOR:
+
+- **First scan:** "Found 50 items (50 new)"
+- **Second scan (same items):** "Found 50 items (0 new)" ← CORRECT!
+- **Third scan (3 new items):** "Found 50 items (3 new)"
+
+If ALWAYS "0 new" even after deleting DB → BUG!
+
+---
+
+## 📝 Session 5.7-5.8 Summary (2025-11-19)
+
+### Problems Found & Fixed:
+
+1. ✅ **Proxy Hot Reload** - Fixed (commit 1356296)
+   - Now loads PROXY_LIST from DB
+   - Reinitializes proxy_manager on config change
+   - Expected: photos download via proxy after ~10 sec
+
+2. ✅ **Proxy Display in Web UI** - Fixed (commit 094d3dd)
+   - Handles string vs list correctly
+   - No more gibberish display
+
+3. ⏳ **Logs Not Informative** - Identified, TODO
+   - Need to add db.add_log_entry() for critical events
+   - Proxy init, image download, errors
+
+4. ⏳ **"0 new items" Issue** - Needs investigation
+   - Check mercari_id extraction
+   - Check duplicate detection logic
+
+### Files Modified:
+
+- [configuration_values.py](configuration_values.py#L175-218) - Proxy hot reload
+- [web_ui_plugin/templates/config.html](web_ui_plugin/templates/config.html) - Proxy display
+- [test_image_download.py](test_image_download.py) - NEW test script
+- [verify_proxy_config.py](verify_proxy_config.py) - NEW diagnostic tool
+- [SESSION_5.7_PROXY_RESTART.md](SESSION_5.7_PROXY_RESTART.md) - Documentation
+- [SESSION_5.8_FINAL_DIAGNOSIS.md](SESSION_5.8_FINAL_DIAGNOSIS.md) - Full diagnosis
+
+### Git Commits:
+
+```
+1356296 - fix: Proxy hot reload with proxy_manager reinit
+65ec032 - trigger: Force worker restart via redeploy
+094d3dd - fix: Proxy display in Web UI
+881031e - docs: System architecture + cleanup
+```
+
+### Deployment Status:
+
+- **Latest commit:** 1356296
+- **Deployed to:** Railway Worker service
+- **Expected:** Proxies initialize via hot reload (~10 sec)
+- **Verify:** Check logs for proxy init messages
+
+### Next Agent TODO:
+
+1. Wait 2-3 minutes for deployment
+2. Check Worker logs for proxy initialization
+3. Check database for new items with images
+4. Add db.add_log_entry() for critical events (proxy, image, errors)
+5. Investigate "0 new items" issue if still occurring
+6. Test with real Mercari items (m18043642062, m44454223480)
+
+---
+
+**Last Updated:** 2025-11-19 (Session 5.8)
+**Critical Fixes:** Proxy hot reload, proxy display
+**Remaining:** Logs improvement, "0 new items" investigation
