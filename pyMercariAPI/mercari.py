@@ -170,6 +170,10 @@ class Mercari:
             async def _perform_search():
                 m = self._get_mercapi()
                 results = await m.search(query=keyword)
+                
+                # Log what mercapi returned
+                total_from_api = len(results.items) if hasattr(results, 'items') else 0
+                logger.info(f"mercapi returned {total_from_api} items, will limit to {limit}")
 
                 # Convert mercapi results to our Items format
                 items_data = []
