@@ -530,6 +530,22 @@ railway logs --service worker | head -20
 - Размер может отсутствовать если не указан в description
 - WARP.md defaults устарели - реальные значения берутся из Web UI config page
 
+### 2025-01-XX (Session 5.3): CRITICAL FIXES - Item ID bug + Config reload spam
+- **КРИТИЧНЕЙШИЙ БАГ:** Items НЕ добавлялись в БД из-за неправильного атрибута ID!
+- **mercapi uses id_:** Объекты имеют атрибут `id_`, НЕ `id`
+- **core.py использовал item.id:** Всегда был None/пустой → БД отклоняла
+- **Результат:** "Found 6 items (0 new)" - все items игнорировались
+- **Фикс:** getattr(item, 'id_', None) с fallback на id
+- **Config reload spam:** Сравнение теперь только config_ ключей (не api_request_count)
+- **Логирование:** '✅ NEW item added' vs '⏭️ Item already exists'
+
+### Технические детали:
+- mercapi library: item.id_ (underscore!)
+- pyMercariAPI Item class: self.id (no underscore)
+- core.py must use: getattr(item, 'id_', None) for mercapi objects
+- Config reload: filter keys with k.startswith('config_') before comparison
+- api_request_count changes every request → excluded from comparison
+
 ### 2025-01-XX (Session 5.2): Hot reload debug + API counter fix
 - **Hot reload logging:** Детальные логи показывают все ключи из БД и изменения
 - **API counter:** Теперь считает get_item() вызовы (было: ~40, стало: ~250)
