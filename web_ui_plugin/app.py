@@ -338,63 +338,56 @@ def api_get_items():
 
 @app.route('/api/recent-items')
 def api_get_recent_items():
-    """Get recent items (last 24 hours) for dashboard auto-refresh"""
+    """Get recent items (last 24 hours) for dashboard auto-refresh - OPTIMIZED"""
     try:
-        import json
         from datetime import datetime, timedelta
         import pytz
 
         # Moscow timezone (GMT+3)
         MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-        # Get items from last 24 hours
-        recent_items = []
-        all_items = db.get_all_items(limit=100)
-
-        # Use Moscow timezone for cutoff
+        # Calculate cutoff time (24 hours ago)
         cutoff_time = datetime.now(MOSCOW_TZ) - timedelta(hours=24)
 
-        for item in all_items:
-            try:
-                # Parse found_at timestamp
-                item_time = None
-                
-                if item.get('found_at'):
-                    if isinstance(item['found_at'], str):
-                        # Try parsing RFC 2822 format
-                        from email.utils import parsedate_to_datetime
-                        try:
-                            item_time = parsedate_to_datetime(item['found_at'])
-                        except:
-                            # Try ISO format
-                            try:
-                                item_time = datetime.fromisoformat(item['found_at'].replace('Z', '+00:00'))
-                            except:
-                                # Try simple datetime parse
-                                try:
-                                    item_time = datetime.strptime(item['found_at'], '%Y-%m-%d %H:%M:%S.%f')
-                                except:
-                                    pass
-                    elif isinstance(item['found_at'], datetime):
-                        item_time = item['found_at']
-                
-                # If we got a time, check if it's recent
-                if item_time:
-                    # Make timezone-aware if needed
-                    if item_time.tzinfo is None:
-                        item_time = MOSCOW_TZ.localize(item_time)
-                    
-                    # Compare with cutoff
-                    if item_time >= cutoff_time:
-                        # Use existing image_url from DB
-                        recent_items.append(item)
+        # Get items directly from DB with SQL filter (MUCH FASTER!)
+        if db.db_type == 'postgresql':
+            query = """
+                SELECT i.*, s.keyword as search_keyword
+                FROM items i
+                LEFT JOIN searches s ON i.search_id = s.id
+                WHERE i.found_at >= %s
+                ORDER BY i.found_at DESC
+                LIMIT 30
+            """
+            recent_items = db.execute_query(query, (cutoff_time,), fetch=True)
+        else:
+            # SQLite fallback - get recent and filter
+            all_items = db.get_all_items(limit=100)
+            recent_items = []
+            
+            for item in all_items:
+                try:
+                    if item.get('found_at'):
+                        item_time = None
                         
-            except Exception as e:
-                logger.warning(f"Error parsing item timestamp: {e}")
-                continue
-
-        # Limit to 30 most recent
-        recent_items = recent_items[:30]
+                        if isinstance(item['found_at'], str):
+                            try:
+                                item_time = datetime.fromisoformat(item['found_at'])
+                            except:
+                                pass
+                        elif isinstance(item['found_at'], datetime):
+                            item_time = item['found_at']
+                        
+                        if item_time:
+                            if item_time.tzinfo is None:
+                                item_time = MOSCOW_TZ.localize(item_time)
+                            
+                            if item_time >= cutoff_time:
+                                recent_items.append(item)
+                                if len(recent_items) >= 30:
+                                    break
+                except:
+                    continue
 
         return jsonify({
             'success': True,
@@ -604,4 +597,56 @@ def api_test_proxies():
         logger.info("Proxy test requested")
         return jsonify({'success': True, 'total': 0, 'working': 0})
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/clear-all-items', methods=['POST'])
+def api_clear_all_items():
+    """Clear all items from database and trigger new scan"""
+    try:
+        logger.info("🗑️  Clear all items triggered via API")
+        db.add_log_entry('WARNING', 'Clear all items triggered from web UI', 'api')
+        
+        # Get count before deletion
+        stats = db.get_statistics()
+        items_count = stats.get('total_items', 0)
+        
+        # Delete all items
+        if db.db_type == 'postgresql':
+            db.execute_query("DELETE FROM items")
+        else:
+            db.execute_query("DELETE FROM items")
+        
+        logger.info(f"✅ Deleted {items_count} items from database")
+        db.add_log_entry('INFO', f'Deleted {items_count} items from database', 'api')
+        
+        # Trigger new scan in background
+        import threading
+        
+        def run_scan():
+            try:
+                from core import MercariSearcher
+                searcher = MercariSearcher()
+                results = searcher.search_all_queries()
+                
+                logger.info(f"✅ Scan after clear completed: {results}")
+                db.add_log_entry('INFO',
+                    f"Scan after clear completed: {results.get('new_items', 0)} items found",
+                    'api',
+                    f"Total: {results.get('total_items_found', 0)}")
+            except Exception as e:
+                logger.error(f"❌ Error in scan after clear: {e}")
+                db.add_log_entry('ERROR', f'Scan after clear failed: {str(e)}', 'api')
+        
+        scan_thread = threading.Thread(target=run_scan, daemon=True)
+        scan_thread.start()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Deleted {items_count} items. New scan started in background!',
+            'deleted_count': items_count
+        })
+    except Exception as e:
+        logger.error(f"❌ Error clearing items: {e}")
+        db.add_log_entry('ERROR', f'Failed to clear items: {str(e)}', 'api')
         return jsonify({'success': False, 'error': str(e)}), 500

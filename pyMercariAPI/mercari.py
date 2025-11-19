@@ -40,6 +40,9 @@ class Mercari:
         # Rate limiting settings
         self.min_delay = 1.5
         self.max_delay = 3.5
+        
+        # Shared event loop for all async operations
+        self._loop = None
 
         # Initialize mercapi
         if not self.scraper:
@@ -62,6 +65,38 @@ class Mercari:
         if self._mercapi is None:
             self._mercapi = self._mercapi_class()
         return self._mercapi
+    
+    def _get_or_create_loop(self):
+        """Get existing event loop or create new one"""
+        if self._loop is None or self._loop.is_closed():
+            try:
+                # Try to get running loop
+                self._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop, create new one
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+        return self._loop
+    
+    def _run_async(self, coro):
+        """Run async coroutine safely"""
+        loop = self._get_or_create_loop()
+        
+        # Check if loop is already running (e.g., in Flask with async context)
+        try:
+            if loop.is_running():
+                # Create a new loop in a thread
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, coro)
+                    return future.result()
+            else:
+                # Run in existing loop
+                return loop.run_until_complete(coro)
+        except Exception as e:
+            # Last resort: try asyncio.run with fresh loop
+            logger.warning(f"Event loop issue, creating fresh loop: {e}")
+            return asyncio.run(coro)
 
     def _rate_limit(self):
         """Apply rate limiting between requests"""
@@ -103,8 +138,7 @@ class Mercari:
                 result = await m.search('test')
                 return result is not None
 
-            # Use asyncio.run() for clean event loop handling
-            return asyncio.run(_test())
+            return self._run_async(_test())
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
@@ -170,24 +204,34 @@ class Mercari:
                         'description': ''
                     }
 
-                    # Get best available image (photos > thumbnails)
+                    # Get best available image
+                    # mercapi structure: item might have photos array or thumbnail string
                     photos = getattr(item, 'photos', [])
                     thumbnails = getattr(item, 'thumbnails', [])
+                    thumbnail = getattr(item, 'thumbnail', None)
                     
-                    if photos:
-                        # Use full-size photo if available
+                    # Try to get highest quality image
+                    if photos and len(photos) > 0:
+                        # photos array - use first photo (usually highest quality)
                         item_dict['image_url'] = photos[0]
-                    elif thumbnails:
-                        # Fallback to thumbnail
+                    elif thumbnail:
+                        # Single thumbnail string - often higher quality than thumbnails array
+                        item_dict['image_url'] = thumbnail
+                    elif thumbnails and len(thumbnails) > 0:
+                        # thumbnails array - fallback
                         item_dict['image_url'] = thumbnails[0]
+                    
+                    # Log what we got for debugging
+                    if not item_dict['image_url']:
+                        logger.debug(f"No image for item {item_id}: photos={bool(photos)}, thumbnail={bool(thumbnail)}, thumbnails={bool(thumbnails)}")
 
                     items_data.append(item_dict)
                     item_count += 1
 
                 return items_data
 
-            # Execute async search with asyncio.run() for clean event loop handling
-            items_data = asyncio.run(_perform_search())
+            # Execute async search with shared event loop
+            items_data = self._run_async(_perform_search())
 
             # Convert to Items object
             items = Items(items_data)
@@ -256,12 +300,12 @@ class Mercari:
 
             logger.info(f"Getting item details: {item_id}")
 
-            # Run async in sync context with asyncio.run()
+            # Run async in sync context with shared event loop
             async def _get_item():
                 m = self._get_mercapi()
                 return await m.item(item_id)
 
-            full_item = asyncio.run(_get_item())
+            full_item = self._run_async(_get_item())
 
             if not full_item:
                 return None

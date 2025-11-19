@@ -405,3 +405,33 @@ window.showAlert = showAlert;
 window.copyToClipboard = copyToClipboard;
 window.formatPrice = formatPrice;
 window.formatDate = formatDate;
+
+// Clear all items function
+window.clearAllItems = function() {
+    if (!confirm('Are you sure you want to DELETE ALL ITEMS from database?\n\nThis will:\n1. Delete all items\n2. Start a new scan\n\nThis action cannot be undone!')) {
+        return;
+    }
+    
+    if (!confirm('FINAL WARNING: All items will be permanently deleted. Continue?')) {
+        return;
+    }
+    
+    fetch('/api/clear-all-items', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            // Reload page after 2 seconds
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+};
