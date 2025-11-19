@@ -701,6 +701,33 @@ This helps future agents avoid repeating mistakes!
 - **NOT working:** Telegram notifications (103 unsent items) ❌
 - **Cause:** TELEGRAM_BOT_TOKEN possibly not set on Railway worker
 
+### Session 5.5 - Database Image Storage Solution:
+**Problem:** ALL Cloudflare attempts failed (proxy, w_800, /orig/) - Railway IPs blocked
+**Solution:** Save photos in database as base64 during scanning
+
+**Changes:**
+- Created `image_utils.py` with `download_and_encode_image()` function
+- Downloads images with proper headers during item scanning
+- Stores as base64 data URIs in database (max 500KB per image)
+- Added `/api/image/<item_id>` endpoint to serve images from DB
+- Updated templates to use `/api/image/` instead of direct URLs
+- Added `image_data TEXT` column to items table
+- Modified `core.py` to download images before saving to DB
+- Modified `db.py add_item()` to accept image_data parameter
+
+**Deployment:**
+- Latest commit: f5af0b8 (feat: Store images in database to bypass Cloudflare blocking)
+- Migration needed: `ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT`
+- Service renamed: "MRS" → "worker" on Railway
+- Need to deploy: both web (auto) + worker (manual `railway up --service worker`)
+
+**Key Lessons:**
+- Cloudflare blocks ALL Railway IPs - no proxy/header workaround works
+- Database storage is reliable solution (no external dependencies)
+- Images downloaded DURING scanning (not lazy load) for guaranteed availability
+- Base64 adds ~33% size overhead but worth it for reliability
+- 500KB limit prevents database bloat (most Mercari images <200KB)
+
 ### Working Features:
 - ✅ Items добавляются в БД
 - ✅ get_item() вызывается для полной инфо
