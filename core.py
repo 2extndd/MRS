@@ -231,8 +231,13 @@ class MercariSearcher:
             else:
                 items = items_result if isinstance(items_result, list) else []
             
+            # CRITICAL: Ensure we respect limit (mercapi might return more)
+            if len(items) > limit:
+                logger.warning(f"mercapi returned {len(items)} items but limit is {limit}, truncating")
+                items = items[:limit]
+            
             items_found = len(items)
-            logger.info(f"API returned {items_found} items")
+            logger.info(f"API returned {items_found} items (limit: {limit})")
 
             # Process new items
             new_items_data = self._process_new_items(items, search_id)
