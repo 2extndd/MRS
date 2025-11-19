@@ -93,7 +93,7 @@
 
 <script>
 // Infinite scroll state
-let currentPage = 1;
+let currentOffset = 0;
 let isLoading = false;
 let hasMore = true;
 const itemsPerPage = 30;
@@ -103,14 +103,13 @@ function loadRecentItems(append = false) {
     if (isLoading || (!hasMore && append)) return;
 
     isLoading = true;
-    const page = append ? currentPage : 1;
 
     if (!append) {
-        currentPage = 1;
+        currentOffset = 0;
         hasMore = true;
     }
 
-    fetch(`/api/recent-items?limit=${itemsPerPage}&offset=${(page - 1) * itemsPerPage}`)
+    fetch(`/api/recent-items?limit=${itemsPerPage}&offset=${currentOffset}`)
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
@@ -179,9 +178,10 @@ function loadRecentItems(append = false) {
 
             if (append) {
                 container.insertAdjacentHTML('beforeend', html);
-                currentPage++;
+                currentOffset += data.items.length;
             } else {
                 container.innerHTML = html;
+                currentOffset = data.items.length;
             }
 
             isLoading = false;
@@ -281,7 +281,7 @@ setupInfiniteScroll();
 
 // Auto-refresh every 30 seconds (only first page, don't reset scroll)
 setInterval(() => {
-    if (currentPage === 1) {
+    if (currentOffset === 0 || currentOffset === itemsPerPage) {
         loadRecentItems(false);
     }
     refreshStats();
