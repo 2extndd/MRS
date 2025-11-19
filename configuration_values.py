@@ -19,7 +19,7 @@ class Config:
 
     # Application Info
     APP_NAME = "MercariSearcher"
-    APP_VERSION = "1.0.0"
+    APP_VERSION = "1.0.1"  # Force Worker restart to reload proxy config
     APP_DESCRIPTION = "Automated Mercari.jp item monitoring with Telegram notifications"
 
     # Mercari Settings
