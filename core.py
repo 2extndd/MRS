@@ -9,6 +9,7 @@ import logging
 import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+import concurrent.futures
 
 from pyMercariAPI import Mercari
 from db import get_db
@@ -113,7 +114,7 @@ class MercariSearcher:
             active_searches=len(ready_searches)
         )
 
-        # Process each search
+        # Process each search - PARALLEL execution for speed
         results = {
             'total_searches': len(ready_searches),
             'successful_searches': 0,
@@ -122,7 +123,9 @@ class MercariSearcher:
             'new_items': 0
         }
 
-        for search in ready_searches:
+        # Define worker function for thread pool
+        def process_single_search(search):
+            """Process a single search in a thread - each thread has its own DB connection"""
             try:
                 # Get query name for better logging
                 query_name = search.get('name', search.get('keyword', f"Query ID {search['id']}"))
@@ -133,16 +136,16 @@ class MercariSearcher:
                 logger.info(f"[SCAN] Search URL: {search.get('search_url', 'N/A')[:80]}...")
                 logger.info(f"{'='*60}")
 
+                # Each thread uses the shared DB instance (psycopg2 handles connections thread-safe)
                 self.db.add_log_entry('INFO', f"🔍 Scanning query: {query_name}", 'scanner', f"ID: {search['id']}")
 
                 # Perform search
                 items_result = self.search_query(search)
 
-                if items_result['success']:
-                    results['successful_searches'] += 1
-                    results['total_items_found'] += items_result['items_found']
-                    results['new_items'] += items_result['new_items']
+                # Update search scan time
+                self.db.update_search_scan_time(search['id'])
 
+                if items_result['success']:
                     logger.info(f"[SCAN] ✅ Search completed: {items_result['items_found']} total items from API, {items_result['new_items']} NEW items added to DB")
 
                     # Log names of new items found
@@ -158,25 +161,63 @@ class MercariSearcher:
                     self.db.add_log_entry('INFO',
                         f"✅ Found {items_result['items_found']} items ({items_result['new_items']} new) in {query_name}",
                         'search', f"ID: {search['id']}")
+                    
+                    return {
+                        'success': True,
+                        'items_found': items_result['items_found'],
+                        'new_items': items_result['new_items'],
+                        'search_id': search['id']
+                    }
                 else:
-                    results['failed_searches'] += 1
                     error_msg = items_result.get('error', 'Unknown error')
                     logger.warning(f"[SCAN] ❌ Search failed: {error_msg}")
                     self.db.add_log_entry('WARNING', f"Search failed: {error_msg}", 'search', f"ID: {search['id']}, Query: {query_name}")
-
-                # Update search scan time
-                self.db.update_search_scan_time(search['id'])
-
-                # Rate limiting between searches
-                time.sleep(config.REQUEST_DELAY_MIN)
+                    
+                    return {
+                        'success': False,
+                        'error': error_msg,
+                        'search_id': search['id']
+                    }
 
             except Exception as e:
                 logger.error(f"Error processing search {search['id']}: {e}")
                 self.db.add_log_entry('ERROR', f"Error processing search: {str(e)}", 'search', f"ID: {search['id']}")
                 self.db.log_error(f"Error processing search {search['id']}: {str(e)}", 'search_cycle')
-                results['failed_searches'] += 1
-                self.total_errors += 1
                 self.shared_state.add_error(str(e))
+                
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'search_id': search['id']
+                }
+
+        # Execute searches in parallel using thread pool
+        # Max workers = min(number of searches, 5) to avoid rate limiting
+        max_workers = min(len(ready_searches), 5)
+        logger.info(f"[PARALLEL] Processing {len(ready_searches)} searches with {max_workers} parallel threads")
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all searches
+            future_to_search = {executor.submit(process_single_search, search): search for search in ready_searches}
+            
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(future_to_search):
+                search = future_to_search[future]
+                try:
+                    result = future.result()
+                    
+                    if result['success']:
+                        results['successful_searches'] += 1
+                        results['total_items_found'] += result.get('items_found', 0)
+                        results['new_items'] += result.get('new_items', 0)
+                    else:
+                        results['failed_searches'] += 1
+                        self.total_errors += 1
+                        
+                except Exception as e:
+                    logger.error(f"Thread exception for search {search['id']}: {e}")
+                    results['failed_searches'] += 1
+                    self.total_errors += 1
 
         # Calculate duration
         duration = time.time() - start_time
