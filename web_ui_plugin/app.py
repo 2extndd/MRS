@@ -357,33 +357,38 @@ def api_get_recent_items():
         for item in all_items:
             try:
                 # Parse found_at timestamp
-                if isinstance(item.get('found_at'), str):
-                    # Try parsing RFC 2822 format (e.g., "Mon, 17 Nov 2025 16:21:17 GMT")
-                    from email.utils import parsedate_to_datetime
-                    try:
-                        item_time = parsedate_to_datetime(item['found_at'])
-                        # Make timezone-aware if needed
-                        if item_time.tzinfo is None:
-                            item_time = MOSCOW_TZ.localize(item_time)
-                    except:
-                        # Fallback to ISO format
-                        item_time = datetime.fromisoformat(item['found_at'].replace('Z', '+00:00'))
-                        if item_time.tzinfo is None:
-                            item_time = MOSCOW_TZ.localize(item_time)
-
-                    # Compare timezone-aware datetimes
-                    if item_time >= cutoff_time:
-                        # Parse JSON fields if needed
-                        if isinstance(item.get('images'), str):
+                item_time = None
+                
+                if item.get('found_at'):
+                    if isinstance(item['found_at'], str):
+                        # Try parsing RFC 2822 format
+                        from email.utils import parsedate_to_datetime
+                        try:
+                            item_time = parsedate_to_datetime(item['found_at'])
+                        except:
+                            # Try ISO format
                             try:
-                                item['images'] = json.loads(item['images'])
+                                item_time = datetime.fromisoformat(item['found_at'].replace('Z', '+00:00'))
                             except:
-                                item['images'] = []
-
-                        # Get first image URL
-                        item['image_url'] = item['images'][0] if item.get('images') else None
-
+                                # Try simple datetime parse
+                                try:
+                                    item_time = datetime.strptime(item['found_at'], '%Y-%m-%d %H:%M:%S.%f')
+                                except:
+                                    pass
+                    elif isinstance(item['found_at'], datetime):
+                        item_time = item['found_at']
+                
+                # If we got a time, check if it's recent
+                if item_time:
+                    # Make timezone-aware if needed
+                    if item_time.tzinfo is None:
+                        item_time = MOSCOW_TZ.localize(item_time)
+                    
+                    # Compare with cutoff
+                    if item_time >= cutoff_time:
+                        # Use existing image_url from DB
                         recent_items.append(item)
+                        
             except Exception as e:
                 logger.warning(f"Error parsing item timestamp: {e}")
                 continue
@@ -423,31 +428,40 @@ def api_test_search():
 
 @app.route('/api/force-scan', methods=['POST'])
 def api_force_scan():
-    """Force scan all queries manually"""
+    """Force scan all queries manually - runs in background to avoid timeout"""
     try:
         logger.info("🔍 Force scan triggered via API")
         db.add_log_entry('INFO', 'Manual scan triggered from web UI', 'api')
 
-        # Import and run scanner
-        from core import MercariSearcher
-        searcher = MercariSearcher()
-        results = searcher.search_all_queries()
-
-        logger.info(f"✅ Force scan completed: {results}")
-        db.add_log_entry('INFO',
-            f"Manual scan completed: {results.get('new_items', 0)} new items found",
-            'api',
-            f"Total: {results.get('total_items_found', 0)}, Searches: {results.get('successful_searches', 0)}")
-
+        # Run scanner in separate thread to avoid blocking Flask and asyncio conflicts
+        import threading
+        
+        def run_scan():
+            try:
+                from core import MercariSearcher
+                searcher = MercariSearcher()
+                results = searcher.search_all_queries()
+                
+                logger.info(f"✅ Force scan completed: {results}")
+                db.add_log_entry('INFO',
+                    f"Manual scan completed: {results.get('new_items', 0)} new items found",
+                    'api',
+                    f"Total: {results.get('total_items_found', 0)}, Searches: {results.get('successful_searches', 0)}")
+            except Exception as e:
+                logger.error(f"❌ Error in force scan thread: {e}")
+                db.add_log_entry('ERROR', f'Manual scan failed: {str(e)}', 'api')
+        
+        # Start scan in background thread
+        scan_thread = threading.Thread(target=run_scan, daemon=True)
+        scan_thread.start()
+        
         return jsonify({
             'success': True,
-            'new_items': results.get('new_items', 0),
-            'total_items': results.get('total_items_found', 0),
-            'message': f'Scan completed! Found {results.get("new_items", 0)} new items.'
+            'message': 'Scan started in background! Check logs for results.'
         })
     except Exception as e:
-        logger.error(f"❌ Error in force scan: {e}")
-        db.add_log_entry('ERROR', f'Manual scan failed: {str(e)}', 'api')
+        logger.error(f"❌ Error starting force scan: {e}")
+        db.add_log_entry('ERROR', f'Failed to start manual scan: {str(e)}', 'api')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -455,12 +469,11 @@ def api_force_scan():
 def api_test_notification():
     """Send test Telegram notification"""
     try:
-        import asyncio
-        from simple_telegram_worker import send_test_notification
-
-        # Send test notification
-        result = asyncio.run(send_test_notification())
-
+        from simple_telegram_worker import send_system_message
+        
+        # Send test notification (synchronous, no asyncio)
+        result = send_system_message("🧪 Test notification from MercariSearcher Web UI")
+        
         if result:
             return jsonify({'success': True, 'message': 'Test notification sent successfully'})
         else:
