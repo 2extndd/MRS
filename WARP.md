@@ -530,7 +530,7 @@ railway logs --service worker | head -20
 - Размер может отсутствовать если не указан в description
 - WARP.md defaults устарели - реальные значения берутся из Web UI config page
 
-### 2025-01-XX (Session 5.3): CRITICAL FIXES - TWO bugs preventing items from being added!
+### 2025-01-XX (Session 5.3): CRITICAL FIXES + Mercari Shops support
 - **БАГ #1: Item ID attribute** - Items НЕ добавлялись из-за item.id (должно быть item.id_)
 - **БАГ #2: Items object iteration** - Итерация Items объекта напрямую (нужно items_result.items)
 - **Результат:** "Found 6 items (0 new)" - for loop никогда не выполнялся!
@@ -555,6 +555,13 @@ railway logs --service worker | head -20
 3. Но for loop не выполнился (итерация объекта, не списка)
 4. _process_new_items получил пустой/неправильный список
 5. Результат: 0 новых items добавлено
+
+### Mercari Shops Support:
+- **Проблема:** mercapi.item() возвращает None для Shops items
+- **Определение:** image_url содержит 'mercari-shops-static.com'
+- **Качество фото:** /-/small/ → /-/large/ (лучшее доступное)
+- **Обычный Mercari:** /orig/ (оригинал)
+- **Данные:** Для Shops только search data (size, description, seller = null)
 
 ### 2025-01-XX (Session 5.2): Hot reload debug + API counter fix
 - **Hot reload logging:** Детальные логи показывают все ключи из БД и изменения
