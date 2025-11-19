@@ -207,9 +207,29 @@ class Config:
                                 proxies.proxy_rotator = proxies.ProxyRotator(proxies.proxy_manager)
                                 stats = proxies.proxy_manager.get_proxy_stats()
                                 logger.info(f"[CONFIG] ✅ Proxy system initialized: {stats['working']} working, {stats['failed']} failed")
+
+                                # Log to Web UI
+                                try:
+                                    from db import get_db
+                                    db = get_db()
+                                    db.add_log_entry('INFO',
+                                        f"Proxy system initialized: {stats['working']} working, {stats['failed']} failed (tested against CDN)",
+                                        'proxy')
+                                except Exception as e:
+                                    logger.error(f"Failed to log proxy init to DB: {e}")
                             else:
                                 logger.warning(f"[CONFIG] ⚠️  No working proxies found after validation")
                                 proxies.proxy_rotator = None
+
+                                # Log to Web UI
+                                try:
+                                    from db import get_db
+                                    db = get_db()
+                                    db.add_log_entry('WARNING',
+                                        f"No working proxies found after validation (tested {len(cls.PROXY_LIST)} proxies)",
+                                        'proxy')
+                                except Exception as e:
+                                    logger.error(f"Failed to log proxy warning to DB: {e}")
                         else:
                             logger.info(f"[CONFIG] Proxy system disabled")
                             proxies.proxy_manager = None
