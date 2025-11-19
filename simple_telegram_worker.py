@@ -57,13 +57,13 @@ class TelegramWorker:
             # Create inline keyboard
             keyboard = self._create_item_keyboard(item)
 
-            # Ensure HIGH RESOLUTION photo for Telegram
+            # Get HIGH RESOLUTION photo for Telegram
             image_url = item.get('image_url')
             if image_url:
-                import re
-                # Force high resolution (w_1200) for Telegram
-                image_url = re.sub(r'w_\d+', 'w_1200', image_url)
-                image_url = re.sub(r'h_\d+', 'h_1200', image_url)
+                from image_handler import get_original_image_url
+                # Convert to highest quality available
+                image_url = get_original_image_url(image_url)
+                logger.debug(f"[TELEGRAM] High-res image URL: {image_url[:80]}...")
 
             # Send with photo if available
             if image_url:

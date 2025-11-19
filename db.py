@@ -144,6 +144,7 @@ class DatabaseManager:
                 stock_quantity INTEGER DEFAULT 1,
                 item_url TEXT NOT NULL,
                 image_url TEXT,
+                image_data TEXT,
                 seller_name TEXT,
                 seller_rating REAL,
                 location TEXT,
@@ -155,6 +156,27 @@ class DatabaseManager:
                 FOREIGN KEY (search_id) REFERENCES searches(id) ON DELETE CASCADE
             )
         """)
+        
+        # Migrate existing items table to add image_data column if not exists
+        if self.db_type == 'sqlite':
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("PRAGMA table_info(items)")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                if 'image_data' not in columns:
+                    print("[DB] Adding 'image_data' column to items table")
+                    self.execute_query("ALTER TABLE items ADD COLUMN image_data TEXT")
+            except Exception as e:
+                print(f"[DB] Migration warning (image_data): {e}")
+        else:
+            # PostgreSQL
+            try:
+                self.execute_query("""
+                    ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT
+                """)
+            except:
+                pass
 
         # Price history table for tracking price changes
         self.execute_query("""
@@ -476,7 +498,7 @@ class DatabaseManager:
         print(f"[DB] Item added: {kwargs.get('title', 'No title')}")
         return item_id
 
-    def get_unsent_items(self):
+    def get_unsent_items(self, limit=100):
         """Get items that haven't been sent to Telegram"""
         query = """
             SELECT i.*, s.keyword as search_keyword, s.thread_id as search_thread_id
@@ -484,8 +506,9 @@ class DatabaseManager:
             LEFT JOIN searches s ON i.search_id = s.id
             WHERE i.is_sent = %s
             ORDER BY i.found_at ASC
+            LIMIT %s
         """
-        return self.execute_query(query, (False,), fetch=True)
+        return self.execute_query(query, (False, limit), fetch=True)
 
     def mark_item_sent(self, item_id):
         """Mark item as sent"""

@@ -169,7 +169,7 @@ class Mercari:
             # Run async search in sync context with proper event loop handling
             async def _perform_search():
                 m = self._get_mercapi()
-                results = await m.search(keyword)
+                results = await m.search(query=keyword)
 
                 # Convert mercapi results to our Items format
                 items_data = []

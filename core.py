@@ -277,126 +277,82 @@ class MercariSearcher:
 
     def _process_new_items(self, items, search_id: int) -> List[Dict[str, Any]]:
         """
-        Process items and save new ones to database
-        Gets FULL item details (size, original photos) for each item
+        Process items and save new ones to database with HIGH-RESOLUTION images
+        Uses new image_handler module for original quality photos
 
         Args:
-            items: Items object from API
+            items: Items object from API (list of Item objects)
             search_id: Search ID
 
         Returns:
             List of new items data
         """
+        from image_handler import get_original_image_url, download_and_encode_image
+        
         new_items = []
         
         logger.info(f"[PROCESS] 📦 Processing {len(items)} items from API response...")
 
         for item in items:
             try:
-                # Get item ID (mercapi uses id_, our Item class uses id)
-                item_id = getattr(item, 'id_', None) or getattr(item, 'id', None)
+                # Item class has .id attribute
+                item_id = item.id
                 if not item_id:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
-                # STRATEGY: Try to get high-res photos WITHOUT slow get_item() calls
-                # 1. Use search data as base (fast)
-                # 2. Upgrade photo URL to high-res via manipulation
-                # 3. Only call get_item() if URL manipulation fails
-                full_item = item
-                needs_get_item = False
+                # Get full item details for size, photos, description
+                logger.info(f"[PROCESS] 📦 Getting full details for item: {item_id}")
                 
-                # Try to get good quality photo URL from search data
-                # NOTE: /orig/ URLs are blocked by Cloudflare (403), use w_800 instead
-                search_photo = getattr(item, 'image_url', None) or getattr(item, 'image', None)
-                if search_photo:
-                    import re
-                    # Try URL manipulation to get better quality (but not /orig/ - Cloudflare blocks it!)
-                    if 'mercari-shops-static.com' in search_photo:
-                        # Mercari Shops: small → large
-                        search_photo = re.sub(r'/-/small/', '/-/large/', search_photo)
-                        logger.info(f"   📸 Mercari Shops: upgraded to /large/")
-                    elif 'mercdn.net' in search_photo:
-                        # Regular Mercari: upgrade to w_800 (good quality, not blocked)
-                        if 'w_' in search_photo:
-                            # Replace w_240 with w_800
-                            search_photo = re.sub(r'w_\d+', 'w_800', search_photo)
-                            logger.info(f"   📸 URL upgraded to w_800 (high quality, not blocked)")
-                        elif '/thumb/' in search_photo:
-                            # Replace /thumb/ with better resolution
-                            search_photo = search_photo.replace('/thumb/', '/c_limit,f_auto,fl_progressive,q_90,w_800/')
-                            logger.info(f"   📸 URL upgraded from /thumb/ to w_800")
-                        else:
-                            logger.info(f"   📸 Using original search photo URL")
-                    else:
-                        needs_get_item = True  # Unknown domain
+                try:
+                    full_item = self.api.get_item(item_id)
                     
-                    # Update item's image_url
-                    if hasattr(item, 'image_url'):
-                        item.image_url = search_photo
-                else:
-                    needs_get_item = True  # No photo in search, need get_item
+                    # Increment API counter
+                    self.total_api_requests += 1
+                    self.shared_state.increment('total_api_requests')
+                    self.db.increment_api_counter()
+                    
+                    if not full_item:
+                        logger.warning(f"⚠️ get_item returned None, using search data")
+                        full_item = item
+                except Exception as e:
+                    logger.warning(f"⚠️ get_item failed: {e}, using search data")
+                    full_item = item
                 
-                # Only call get_item() if URL manipulation didn't work
-                if needs_get_item:
-                    try:
-                        logger.info(f"📦 Calling get_item() for full details: {item_id}")
-                        full_item_result = self.api.get_item(item_id)
-                        
-                        # Increment API counter
-                        self.total_api_requests += 1
-                        self.shared_state.increment('total_api_requests')
-                        self.db.increment_api_counter()
-                        
-                        if full_item_result:
-                            full_item = full_item_result
-                            logger.info(f"✅ Got full details via get_item()")
-                        else:
-                            logger.warning(f"⚠️ get_item returned None, using upgraded search data")
-                    except Exception as e:
-                        logger.warning(f"⚠️ get_item failed: {e}, using upgraded search data")
-                else:
-                    logger.info(f"✅ Using upgraded search data (no get_item needed)")
-                
-                # Get mercari_id from full_item (mercapi uses id_, our Item uses id)
-                mercari_id = getattr(full_item, 'id_', None) or getattr(full_item, 'id', None)
+                # Get mercari_id from Item object
+                mercari_id = full_item.id
                 if not mercari_id:
-                    logger.error(f"❌ Full item has no ID, skipping")
+                    logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
-                # Convert to dict
-                item_dict = full_item.to_dict()
-
-                # Image URL is already ORIGINAL from get_item() (mercapi photos field)
+                # Get image URL - Item class has .image_url attribute
                 image_url = full_item.image_url
                 
-                # Ensure it's good quality (but NOT /orig/ - Cloudflare blocks it!)
+                # Convert to high-resolution URL
                 if image_url:
-                    import re
+                    original_url = get_original_image_url(image_url)
+                    logger.info(f"[PROCESS] 📸 Image URL: {original_url[:80]}...")
+                    image_url = original_url
+                else:
+                    logger.warning(f"[PROCESS] ⚠️ No image URL for item {mercari_id}")
 
-                    # For Mercari Shops items: replace /small/ with /large/ (best available)
-                    if 'mercari-shops-static.com' in image_url:
-                        image_url = re.sub(r'/-/small/', '/-/large/', image_url)
-                        logger.info(f"   Mercari Shops: using /large/ quality")
-
-                    # For regular Mercari items: use w_800 (good quality, not blocked)
-                    elif 'w_' in image_url:
-                        image_url = re.sub(r'w_\d+', 'w_800', image_url)
-                        image_url = re.sub(r'h_\d+', 'h_800', image_url)
-
-                logger.info(f"   Size: {full_item.size or 'N/A'}")
-                logger.info(f"   Photo: {('w_800' if 'w_800' in (image_url or '') else 'thumbnail')}")
-
-                # Download and encode image for database storage (bypass Cloudflare)
+                # Download and encode HIGH-RESOLUTION image
                 image_data = None
                 if image_url:
-                    from image_utils import download_and_encode_image
-                    logger.info(f"📥 Downloading image: {image_url[:80]}...")
-                    image_data = download_and_encode_image(image_url)
+                    logger.info(f"[PROCESS] 📥 Downloading HIGH-RES image...")
+                    image_data = download_and_encode_image(image_url, timeout=20, use_proxy=False)
                     if image_data:
-                        logger.info(f"✅ Image saved ({len(image_data)/1024:.1f}KB base64)")
+                        logger.info(f"[PROCESS] ✅ HIGH-RES image saved ({len(image_data)/1024:.1f}KB base64)")
                     else:
-                        logger.warning(f"⚠️ Failed to download image, URL fallback only")
+                        logger.warning(f"[PROCESS] ⚠️ Failed to download image, URL only")
+
+                # Log item info
+                logger.info(f"[PROCESS] 📋 Item info:")
+                logger.info(f"[PROCESS]    Title: {full_item.title[:60]}")
+                logger.info(f"[PROCESS]    Price: ¥{full_item.price:,}")
+                logger.info(f"[PROCESS]    Size: {full_item.size or 'N/A'}")
+                logger.info(f"[PROCESS]    Brand: {full_item.brand or 'N/A'}")
+                logger.info(f"[PROCESS]    Image: {'✅ HIGH-RES' if image_data else '⚠️ URL only'}")
 
                 # Add to database
                 db_item_id = self.db.add_item(
@@ -422,26 +378,27 @@ class MercariSearcher:
 
                 # If item was added (new), add to list
                 if db_item_id:
+                    item_dict = full_item.to_dict()
                     item_dict['db_id'] = db_item_id
+                    item_dict['image_data'] = image_data  # Include for notifications
                     new_items.append(item_dict)
                     self.total_items_found += 1
-                    logger.info(f"[PROCESS] ✅ NEW item added to DB (ID: {db_item_id}): {full_item.title[:50]}")
+                    logger.info(f"[PROCESS] ✅ NEW item added to DB (ID: {db_item_id})")
                 else:
                     logger.debug(f"[PROCESS] ⏭️  Item already exists in DB: {mercari_id}")
 
             except Exception as e:
                 item_id_str = item_id if 'item_id' in locals() else 'unknown'
-                logger.error(f"Failed to process item {item_id_str}: {e}")
-                # Log to database for tracking
+                logger.error(f"[PROCESS] ❌ Failed to process item {item_id_str}: {e}")
                 self.db.log_error(f"Failed to process item {item_id_str}: {str(e)}", 'item_processing')
                 import traceback
                 logger.error(traceback.format_exc())
                 continue
 
         if new_items:
-            logger.info(f"[PROCESS] ✅ Successfully saved {len(new_items)} NEW items to database")
+            logger.info(f"[PROCESS] ✅ Successfully saved {len(new_items)} NEW items with HIGH-RES images")
         else:
-            logger.info(f"[PROCESS] ℹ️  No new items to save (all items already in database)")
+            logger.info(f"[PROCESS] ℹ️  No new items (all already in database)")
 
         return new_items
 

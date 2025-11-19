@@ -35,7 +35,7 @@ async def test_search():
 
     try:
         # Search with keyword only first
-        results = await m.search(keyword=keyword, limit=6)
+        results = await m.search(query=keyword)
 
         print(f"\n✅ Search successful!")
         print(f"   Found: {len(results.items)} items")
