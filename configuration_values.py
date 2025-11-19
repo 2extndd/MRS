@@ -134,8 +134,14 @@ class Config:
             db = get_db()
             new_config = db.get_all_config()
 
-            if new_config != cls._config_cache:
-                logger.info(f"[CONFIG] Configuration changed, hot reloading... Keys in DB: {list(new_config.keys())}")
+            # Compare only config values, not metadata like updated_at
+            # Filter to only config_ keys
+            config_keys = [k for k in new_config.keys() if k.startswith('config_')]
+            old_values = {k: cls._config_cache.get(k) for k in config_keys} if cls._config_cache else {}
+            new_values = {k: new_config.get(k) for k in config_keys}
+            
+            if new_values != old_values:
+                logger.info(f"[CONFIG] Configuration changed, hot reloading... Keys in DB: {config_keys}")
 
                 # Update runtime settings from database
                 # Check both old and new key names for compatibility
