@@ -469,7 +469,12 @@ class MercariSearcher:
                     item_dict['image_data'] = image_data  # Include for notifications
                     new_items.append(item_dict)
                     self.total_items_found += 1
-                    logger.info(f"[PROCESS] ✅ NEW item added to DB (ID: {db_item_id})")
+                    
+                    # Log new item with title and price
+                    item_title = full_item.title[:60] if hasattr(full_item, 'title') else 'Unknown'
+                    item_price = full_item.price if hasattr(full_item, 'price') else 0
+                    logger.info(f"[PROCESS] ✅ NEW ITEM ADDED: \"{item_title}\" - ¥{item_price:,} (DB ID: {db_item_id})")
+                    self.db.add_log_entry('INFO', f"🆕 NEW: {item_title} - ¥{item_price:,}", 'new_item', f"ID: {mercari_id}")
                 else:
                     logger.debug(f"[PROCESS] ⏭️  Item already exists in DB: {mercari_id}")
 
