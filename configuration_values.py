@@ -139,14 +139,19 @@ class Config:
             # Filter to only config_ keys
             config_keys = [k for k in new_config.keys() if k.startswith('config_')]
             
-            # Check if config actually changed
+            # Check if config actually changed by comparing with cached DB values
             config_changed = False
             if cls._config_cache is None:
                 config_changed = True  # First load
+                cls._config_cache = {}  # Initialize empty cache
             else:
-                old_values = {k: cls._config_cache.get(k) for k in config_keys}
-                new_values = {k: new_config.get(k) for k in config_keys}
-                config_changed = (new_values != old_values)
+                # Compare ONLY config_ keys from database
+                for key in config_keys:
+                    old_val = cls._config_cache.get(key)
+                    new_val = new_config.get(key)
+                    if old_val != new_val:
+                        config_changed = True
+                        break
             
             if config_changed:
                 logger.info(f"[CONFIG] Configuration changed, hot reloading... Keys in DB: {config_keys}")
