@@ -509,7 +509,11 @@ railway logs --service worker | head -20
 
 ## 🔄 Recent Changes Log
 
-### 2025-01-XX (Session 4): Photo quality fix, pagination, error logging
+### 2025-01-XX (Session 4): Photo quality, pagination, error logging, UI branding
+- **CRITICAL FIX:** config.html missing {% endblock %} - caused 500 error on entire site
+- **Favicon:** Blue circle with 'M' letter (favicon.svg)
+- **Branding:** "powered by extndd" link in navbar (https://t.me/extndd)
+- **Web UI URL:** https://web-production-fe38.up.railway.app/
 - **HIGH-RES photos:** Force w_1200 in core.py AND simple_telegram_worker.py (both web UI and Telegram)
 - **Items page:** Removed "Sent" status badge, price section bigger and more visible
 - **Pagination:** 60 items per page with smart pagination controls
