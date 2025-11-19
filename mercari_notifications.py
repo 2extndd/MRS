@@ -90,8 +90,8 @@ class MercariNotificationApp:
             logger.error(f"Failed to initialize searcher: {e}")
             raise
 
-    def search_and_notify(self):
-        """Main search cycle with notifications"""
+    def search_cycle(self):
+        """Search cycle - ONLY searches and adds to DB"""
         logger.info("\n" + "=" * 60)
         logger.info(f"Starting search cycle at {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')}")
         logger.info("=" * 60)
@@ -99,15 +99,6 @@ class MercariNotificationApp:
         try:
             # Perform searches
             results = self.searcher.search_all_queries()
-
-            # ALWAYS check for pending notifications (even if new_items=0 in this cycle)
-            logger.info("Checking for pending notifications...")
-            notification_stats = process_pending_notifications()
-            
-            if notification_stats['total'] > 0:
-                logger.info(f"Notifications: {notification_stats['sent']}/{notification_stats['total']} sent")
-            else:
-                logger.info("No pending notifications")
 
             # Update metrics
             metrics_storage.set_last_search_time()
@@ -120,6 +111,23 @@ class MercariNotificationApp:
             logger.error(f"Search cycle error: {e}")
             self.shared_state.add_error(str(e))
             self.db.log_error(str(e), 'search_cycle')
+    
+    def telegram_cycle(self):
+        """Telegram notification cycle - INDEPENDENT from search"""
+        logger.info("[TELEGRAM] Processing pending notifications...")
+        
+        try:
+            notification_stats = process_pending_notifications(max_items=10)
+            
+            if notification_stats['total'] > 0:
+                logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
+            else:
+                logger.debug("[TELEGRAM] No pending notifications")
+                
+        except Exception as e:
+            logger.error(f"[TELEGRAM] Notification cycle error: {e}")
+            self.shared_state.add_error(str(e))
+            self.db.log_error(str(e), 'telegram_cycle')
 
     def cleanup_old_data(self):
         """Periodic cleanup of old data"""
@@ -207,12 +215,19 @@ class MercariNotificationApp:
         # Clear existing jobs
         schedule.clear()
 
-        # Schedule tasks - use config.SEARCH_INTERVAL (Query Delay)
-        schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_and_notify)
+        # INDEPENDENT PROCESSES:
+        # 1. Search cycle - scans and adds to DB
+        schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
+        
+        # 2. Telegram cycle - sends from DB (INDEPENDENT!)
+        schedule.every(5).seconds.do(self.telegram_cycle)
+        
+        # 3. Maintenance tasks
         schedule.every().day.at("03:00").do(self.cleanup_old_data)
         schedule.every(2).hours.do(self.refresh_proxies)
 
         logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
+        logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 5s (INDEPENDENT)")
 
     def shutdown(self):
         """Shutdown application"""
