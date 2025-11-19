@@ -117,7 +117,7 @@ function loadRecentItems() {
                             <a href="${item.item_url}" target="_blank" class="text-decoration-none">
                                 <div style="aspect-ratio: 4/5; overflow: hidden; background: #f8f9fa;">
                                     ${imageUrl ?
-                                        `<img src="${imageUrl}" class="d-block w-100 h-100" style="object-fit: cover;" loading="lazy"
+                                        `<img src="/api/image-proxy?url=" + encodeURIComponent(imageUrl) class="d-block w-100 h-100" style="object-fit: cover;" loading="lazy"
                                               onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\\'d-flex align-items-center justify-content-center h-100 flex-column\\'><i class=\\'bi bi-image\\' style=\\'font-size: 2rem; color: #999;\\'></i><small class=\\'text-muted mt-2\\'>Click to view</small></div>';">` :
                                         `<div class="bg-light d-flex align-items-center justify-content-center h-100 flex-column">
                                             <i class="bi bi-image" style="font-size: 2rem; color: #999;"></i>
