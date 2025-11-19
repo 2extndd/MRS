@@ -694,18 +694,20 @@ class DatabaseManager:
         import json
         try:
             value_str = json.dumps(value) if not isinstance(value, str) else value
-            query = """
-                INSERT INTO key_value_store (key, value, updated_at)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = CURRENT_TIMESTAMP
-            """
             if self.db_type == 'sqlite':
+                # SQLite: INSERT OR REPLACE (no need for 3 parameters)
                 query = """
                     INSERT OR REPLACE INTO key_value_store (key, value, updated_at)
                     VALUES (?, ?, datetime('now'))
                 """
-                self.execute_query(query, (key, value_str, value_str))
+                self.execute_query(query, (key, value_str))
             else:
+                # PostgreSQL: INSERT ... ON CONFLICT
+                query = """
+                    INSERT INTO key_value_store (key, value, updated_at)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = CURRENT_TIMESTAMP
+                """
                 self.execute_query(query, (key, value_str, value_str))
             print(f"[DB] Config saved: {key}")
             return True
