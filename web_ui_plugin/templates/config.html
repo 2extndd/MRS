@@ -185,3 +185,183 @@
 </div>
 
 <!-- Read-only Info -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-info-circle"></i> System Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <strong>App Name:</strong> {{ config.APP_NAME }}<br>
+                <strong>Version:</strong> {{ config.APP_VERSION }}
+            </div>
+            <div class="col-md-4">
+                <strong>Mercari URL:</strong> <code>{{ config.MERCARI_BASE_URL }}</code>
+            </div>
+            <div class="col-md-4">
+                <strong>Display Currency:</strong> {{ config.DISPLAY_CURRENCY }}<br>
+                <strong>Port:</strong> {{ config.PORT }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Save system settings
+function saveSystemSettings() {
+    const form = document.getElementById('systemSettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/config/system', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ System settings saved!\n' + (data.note || ''));
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Save Telegram settings
+function saveTelegramSettings() {
+    const form = document.getElementById('telegramSettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/config/telegram', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Telegram settings saved!');
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Test Telegram bot
+function testTelegramBot() {
+    fetch('/api/notifications/test', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Test message sent to Telegram!');
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Save proxy settings
+function saveProxySettings() {
+    const form = document.getElementById('proxySettingsForm');
+    const formData = new FormData(form);
+    const data = {
+        proxy_enabled: form.proxyEnabled.checked,
+        proxy_list: formData.get('proxy_list')
+    };
+    
+    fetch('/api/config/proxy', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Proxy settings saved!');
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Test proxies
+function testProxies() {
+    alert('⏳ Testing proxies... This may take a minute.');
+    fetch('/api/proxy/test', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Proxy test completed!\n\nWorking: ${data.working}/${data.total}\n${data.message}`);
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Save Railway settings
+function saveRailwaySettings() {
+    const form = document.getElementById('railwaySettingsForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/api/config/railway', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Railway settings saved!');
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Refresh Railway status
+function refreshRailwayStatus() {
+    fetch('/api/railway/status')
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const status = data.status;
+            document.getElementById('error-403').textContent = status.errors['403'];
+            document.getElementById('error-401').textContent = status.errors['401'];
+            document.getElementById('error-429').textContent = status.errors['429'];
+            document.getElementById('total-errors').textContent = status.total_errors;
+            document.getElementById('first-error').textContent = status.first_error;
+            document.getElementById('last-redeploy').textContent = status.last_redeploy;
+            document.getElementById('redeploy-status').textContent = status.status;
+            document.getElementById('redeploy-status').className = 'badge bg-' + 
+                (status.status === 'active' ? 'success' : status.status === 'warning' ? 'warning' : 'danger');
+        }
+    });
+}
+
+// Force redeploy
+function forceRedeploy() {
+    if (!confirm('⚠️ Are you sure you want to force redeploy?\n\nThis will restart the Railway service.')) {
+        return;
+    }
+    
+    alert('⏳ Triggering redeploy...');
+    fetch('/api/railway/redeploy', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Redeploy triggered successfully!');
+            refreshRailwayStatus();
+        } else {
+            alert('❌ Failed: ' + data.error);
+        }
+    });
+}
+
+// Auto-refresh Railway status every 30 seconds
+setInterval(refreshRailwayStatus, 30000);
+refreshRailwayStatus();
+</script>
+{% endblock %}
