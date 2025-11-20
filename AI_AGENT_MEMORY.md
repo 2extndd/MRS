@@ -912,3 +912,263 @@ schedule.every(5).seconds.do(self.telegram_cycle)                      # 5s
 **Дата финального релиза**: 19 ноября 2024, 23:30
 **Git tag**: v1.1
 **Статус**: ✅ ГОТОВО К PRODUCTION
+
+---
+
+## 🚀 VERSION 1.2 - WEB UI & AUTO-SCAN FIXES (20 ноября 2024)
+
+### Критические исправления
+
+#### 1. Auto-scan не работал на Railway ❌→✅
+**Проблема**: Background scheduler вообще НЕ ЗАПУСКАЛСЯ на Railway
+- В `wsgi.py` был неправильный импорт: `from mercari_notifications import MercariApp`
+- Но класс называется `MercariNotificationApp`
+- Получался `ImportError`, scheduler падал молча
+- Работал только manual "Force Scan All" через Web UI
+
+**Решение**:
+```python
+# Было (НЕПРАВИЛЬНО):
+from mercari_notifications import MercariApp
+
+# Стало (ПРАВИЛЬНО):
+from mercari_notifications import MercariNotificationApp
+```
+
+**Файлы изменены**:
+- `wsgi.py` - исправлен импорт класса
+- Добавлено логирование ошибок с traceback
+
+**Результат**: ✅ Auto-scan теперь работает каждые N секунд
+
+---
+
+#### 2. USD цены показывали $0.00 ❌→✅
+**Проблема**: Все цены в Web UI отображались как $0.00
+- `config_usd_conversion_rate` не был инициализирован в БД
+- При hot-reload config.USD_CONVERSION_RATE перезаписывался нулём
+
+**Решение (3 уровня защиты)**:
+
+**Уровень 1 - Инициализация БД**:
+```python
+# db.py
+def _ensure_default_config(self):
+    usd_rate = self.load_config('config_usd_conversion_rate')
+    if usd_rate is None or usd_rate == 0:
+        self.save_config('config_usd_conversion_rate', 0.0067)
+```
+
+**Уровень 2 - Safe Config в app.py**:
+```python
+def get_safe_config():
+    """Get config with fallback for USD_CONVERSION_RATE"""
+    safe_config = type('SafeConfig', (object,), {
+        'USD_CONVERSION_RATE': config.USD_CONVERSION_RATE or 0.0067
+    })()
+    # Copy all other attributes...
+    return safe_config
+```
+
+**Уровень 3 - JavaScript fallback**:
+```javascript
+// dashboard.html, items.html
+const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
+const usdPrice = (item.price * usdRate).toFixed(2);
+```
+
+**Jinja2 template fallback**:
+```jinja2
+{# items.html #}
+${{ (item.price * (config.USD_CONVERSION_RATE or 0.0067))|round(2) }}
+```
+
+**Файлы изменены**:
+- `db.py` - добавлена `_ensure_default_config()`
+- `web_ui_plugin/app.py` - добавлена `get_safe_config()`, все routes используют её
+- `web_ui_plugin/templates/dashboard.html` - JS fallback
+- `web_ui_plugin/templates/items.html` - JS + Jinja2 fallback
+
+**Результат**: ✅ Цены отображаются корректно, даже если config не установлен
+
+---
+
+#### 3. Timestamps с микросекундами ❌→✅
+**Проблема**: Timestamps отображались с лишними микросекундами
+```
+2025-11-19 22:43:32.585535 GMT+3
+                   ^^^^^^^^ <- ненужные
+```
+
+**Решение**:
+
+**Python функция в app.py**:
+```python
+def clean_timestamp(ts_str):
+    """Remove microseconds from timestamp string"""
+    if '.' in ts_str:
+        parts = ts_str.split('.')
+        # Split at dot, keep timezone if present
+        if ' ' in parts[1]:
+            tz_part = parts[1].split(' ', 1)[1]
+            return f"{parts[0]} {tz_part}".strip()
+        return parts[0]
+    return ts_str
+```
+
+**Jinja2 фильтр**:
+```python
+@app.template_filter('clean_timestamp')
+def clean_timestamp_filter(ts):
+    return clean_timestamp(str(ts)) if ts else ''
+```
+
+**JavaScript функция**:
+```javascript
+function cleanTimestamp(ts) {
+    if (ts.includes('.')) {
+        const parts = ts.split('.');
+        if (parts[1].includes(' ')) {
+            const tzPart = parts[1].split(' ').slice(1).join(' ');
+            return tzPart ? `${parts[0]} ${tzPart}` : parts[0];
+        }
+        return parts[0];
+    }
+    return ts;
+}
+```
+
+**Использование**:
+```jinja2
+{# templates #}
+{{ item.found_at|clean_timestamp }}
+```
+
+```javascript
+// JavaScript
+${cleanTimestamp(item.found_at)}
+```
+
+**Файлы изменены**:
+- `web_ui_plugin/app.py` - добавлены `clean_timestamp()` и фильтр
+- `web_ui_plugin/templates/items.html` - Jinja2 фильтр + JS функция
+- `web_ui_plugin/templates/dashboard.html` - JS функция
+- `web_ui_plugin/templates/logs.html` - применён clean_timestamp
+
+**Результат**: ✅ Timestamps теперь чистые: `2025-11-19 22:43:32 GMT+3`
+
+---
+
+#### 4. Dark theme - white flash при обновлении ✅
+**Проблема**: При перезагрузке страницы в dark theme был белый "мелёк"
+
+**Решение (тройная защита)**:
+1. Inline script в `<head>` устанавливает `data-theme` до загрузки CSS
+2. Critical inline CSS перед Bootstrap с `!important`
+3. Inline styles на `documentElement`
+
+**Код в base.html**:
+```html
+<head>
+    <!-- Prevent white flash - BEFORE CSS! -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.style.backgroundColor = '#0d1117';
+                document.documentElement.style.color = '#f0f6fc';
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+
+    <!-- Critical inline CSS -->
+    <style>
+        [data-theme="dark"] body {
+            background-color: #0d1117 !important;
+            color: #f0f6fc !important;
+        }
+        [data-theme="dark"] .navbar {
+            background-color: #161b22 !important;
+        }
+    </style>
+
+    <!-- Bootstrap CSS loads AFTER -->
+    <link href="...bootstrap.min.css">
+</head>
+```
+
+**Результат**: ✅ Белый flash исчез
+
+---
+
+### Созданные инструменты
+
+#### test_search_logic.py
+Диагностический скрипт для проверки auto-scan логики:
+- Показывает все searches и их readiness
+- Проверяет `get_searches_ready_for_scan()`
+- Выводит recent items
+
+**Использование**:
+```bash
+python3 test_search_logic.py
+```
+
+#### fix_usd_rate.py
+Emergency fix для установки USD_CONVERSION_RATE:
+- Проверяет текущее значение
+- Устанавливает 0.0067
+- Верифицирует изменение
+
+**Использование**:
+```bash
+python3 fix_usd_rate.py
+```
+
+---
+
+### Итоговые изменения за сессию
+
+**Файлы изменены**:
+1. `wsgi.py` - исправлен критический ImportError
+2. `db.py` - добавлена инициализация config
+3. `web_ui_plugin/app.py` - safe config + timestamp cleaning
+4. `web_ui_plugin/templates/base.html` - dark theme flash fix
+5. `web_ui_plugin/templates/dashboard.html` - USD fallback + timestamp cleaning
+6. `web_ui_plugin/templates/items.html` - USD fallback + timestamp cleaning
+
+**Новые файлы**:
+1. `test_search_logic.py` - диагностика auto-scan
+2. `fix_usd_rate.py` - emergency USD rate fix
+
+**Commits**:
+1. `critical: Fix auto-scan not working on Railway` (657c1be)
+2. `fix: USD prices showing as $0.00 in Web UI` (e8e1146)
+3. `fix: Remove microseconds from timestamps + safe USD config` (pending)
+
+---
+
+### Текущий статус
+
+**Версия**: 1.2
+**Дата**: 20 ноября 2024, 01:30 MSK
+**Статус**: ✅ КРИТИЧЕСКИЕ БАГИ ИСПРАВЛЕНЫ
+
+**Что работает**:
+- ✅ Auto-scan на Railway (каждые N секунд)
+- ✅ USD цены отображаются корректно
+- ✅ Timestamps без микросекунд
+- ✅ Dark theme без white flash
+- ✅ Web UI быстро загружается
+- ✅ Telegram уведомления автоматические
+
+**Что настроить**:
+1. В Web UI → Config → USD Conversion Rate должен быть 0.0067
+2. Каждый query должен иметь Thread ID
+3. Scan Interval и Scan Limit настроены индивидуально
+
+---
+
+**Дата обновления**: 20 ноября 2024, 01:30 MSK
+**Статус**: ✅ READY FOR PRODUCTION
