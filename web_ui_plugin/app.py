@@ -312,17 +312,15 @@ def api_force_telegram_cycle():
     try:
         logger.info("[API] Forcing telegram_cycle...")
 
-        # Import and get the app instance
-        # Since we can't access the thread's instance, we'll call the function directly
-        from mercari_notifications import MercariNotificationApp
+        # Call process_pending_notifications directly (don't create full app instance)
+        from simple_telegram_worker import process_pending_notifications
 
-        # Create temporary instance
-        temp_app = MercariNotificationApp()
-        temp_app.telegram_cycle()
+        stats = process_pending_notifications(max_items=5)
 
         return jsonify({
             'success': True,
-            'message': 'telegram_cycle executed (check logs)'
+            'message': 'telegram_cycle executed',
+            'stats': stats
         })
 
     except Exception as e:

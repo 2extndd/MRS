@@ -249,6 +249,11 @@ class MercariNotificationApp:
                         self._setup_schedule()
                         last_interval = config.SEARCH_INTERVAL
 
+                # Log schedule state BEFORE run_pending
+                if loop_iteration % 10 == 0:
+                    jobs_before = schedule.get_jobs()
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] Before run_pending: {len(jobs_before)} jobs', 'scheduler')
+
                 schedule.run_pending()
 
                 # Log after first run_pending()
@@ -258,7 +263,11 @@ class MercariNotificationApp:
 
                 # Log every 10 iterations AFTER run_pending()
                 if loop_iteration % 10 == 0:
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] run_pending() completed at iteration {loop_iteration}', 'scheduler')
+                    from datetime import datetime as dt_check
+                    current_time_check = dt_check.now()
+                    jobs_after = schedule.get_jobs()
+                    next_times = [str(job.next_run) for job in jobs_after]
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] After run_pending at {current_time_check}: next_run times = {next_times}', 'scheduler')
 
                 time.sleep(1)
             except KeyboardInterrupt:
