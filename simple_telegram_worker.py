@@ -53,7 +53,9 @@ class TelegramWorker:
         """
         try:
             item_title = item.get('title', 'Unknown')[:40]
+            item_id = item.get('id', 'NO_ID')
             logger.info(f"[TW] Sending notification for: {item_title}...")
+            self.db.add_log_entry('INFO', f'[TW.send] Sending item {item_id}: {item_title}', 'telegram')
 
             # Get thread_id from item's search or use global default
             thread_id = item.get('search_thread_id') or self.thread_id
@@ -95,20 +97,25 @@ class TelegramWorker:
                 if item_id:
                     self.db.mark_item_sent(item_id)
                     logger.info(f"[TW] ✅ Marked item {item_id} as sent in database")
+                    self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent & marked {item_id}', 'telegram')
                 else:
                     logger.error(f"[TW] ❌ CRITICAL: Item has no ID, cannot mark as sent! Item: {item.get('title', 'Unknown')[:50]}")
                     logger.error(f"[TW] Item keys: {list(item.keys())}")
+                    self.db.add_log_entry('ERROR', f'[TW.send] Item has no ID!', 'telegram')
 
                 # Update stats
                 self.shared_state.increment('total_notifications_sent')
                 self.shared_state.set('last_telegram_send_time', time.time())
 
                 logger.info(f"[TW] Notification sent for item: {item.get('title', 'Unknown')[:50]}")
+            else:
+                self.db.add_log_entry('WARNING', f'[TW.send] ❌ Failed {item_id}', 'telegram')
 
             return success
 
         except Exception as e:
             logger.error(f"Failed to send notification: {e}")
+            self.db.add_log_entry('ERROR', f'[TW.send] Exception: {str(e)[:100]}', 'telegram')
             # Log error to database
             self.db.log_error(f"Failed to send Telegram notification: {str(e)}", 'telegram')
             return False
