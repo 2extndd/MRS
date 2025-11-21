@@ -230,6 +230,16 @@ class TelegramWorker:
                     logger.warning(f"[TW] Telegram API returned {error_detail}")
                     self.db.add_log_entry('WARNING', f'[TW._send_photo] {error_detail}', 'telegram')
 
+                    # If thread not found, try without thread_id
+                    if response.status_code == 400 and "thread not found" in response.text:
+                        if "message_thread_id" in payload:
+                            logger.info("[TW] Thread not found, retrying without thread_id...")
+                            payload.pop("message_thread_id")
+                            response = requests.post(url, json=payload, timeout=30)
+                            if response.status_code == 200:
+                                logger.info("[TW] ✅ Photo sent successfully (without thread)")
+                                return True
+
                 # Handle rate limiting
                 if response.status_code == 429:
                     retry_after = response.json().get('parameters', {}).get('retry_after', self.retry_delay)
@@ -293,6 +303,16 @@ class TelegramWorker:
 
                 if response.status_code == 200:
                     return True
+
+                # If thread not found, try without thread_id
+                if response.status_code == 400 and "thread not found" in response.text:
+                    if "message_thread_id" in payload:
+                        logger.info("[TW] Thread not found, retrying without thread_id...")
+                        payload.pop("message_thread_id")
+                        response = requests.post(url, json=payload, timeout=30)
+                        if response.status_code == 200:
+                            logger.info("[TW] ✅ Message sent successfully (without thread)")
+                            return True
 
                 # Handle rate limiting
                 if response.status_code == 429:
