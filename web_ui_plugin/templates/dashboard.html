@@ -415,7 +415,8 @@ setupInfiniteScroll();
 setInterval(() => {
     refreshStats();
     updateTimeAgo(); // Update relative timestamps
-    refreshNewItems(); // Only fetch NEW items
+    // refreshNewItems() disabled - causes items to lose data
+    // Users can manually refresh page to see new items
 }, 20000);
 </script>
 {% endblock %}
