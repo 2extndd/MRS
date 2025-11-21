@@ -227,30 +227,42 @@ def logs():
 
 # ==================== API ROUTES ====================
 
-@app.route('/api/telegram/status')
+@app.route('/api/telegram-status')
 def api_telegram_status():
     """Check Telegram configuration status"""
-    from configuration_values import config
-    
-    status = {
-        'bot_token_set': bool(config.TELEGRAM_BOT_TOKEN),
-        'bot_token_length': len(config.TELEGRAM_BOT_TOKEN) if config.TELEGRAM_BOT_TOKEN else 0,
-        'chat_id_set': bool(config.TELEGRAM_CHAT_ID),
-        'chat_id': config.TELEGRAM_CHAT_ID if config.TELEGRAM_CHAT_ID else None,
-        'thread_id': config.TELEGRAM_THREAD_ID if hasattr(config, 'TELEGRAM_THREAD_ID') else None,
-    }
-    
-    # Check unsent items
     try:
-        unsent = db.get_unsent_items(limit=1)
-        status['unsent_items_exist'] = len(unsent) > 0
-        status['unsent_count'] = db.get_statistics().get('unsent_items', 0)
+        # Force reload config from DB
+        config.reload_if_needed()
+
+        status = {
+            'configured': bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID),
+            'bot_token_set': bool(config.TELEGRAM_BOT_TOKEN),
+            'chat_id_set': bool(config.TELEGRAM_CHAT_ID),
+            'thread_id_set': bool(config.TELEGRAM_THREAD_ID),
+            'bot_token_length': len(config.TELEGRAM_BOT_TOKEN) if config.TELEGRAM_BOT_TOKEN else 0,
+            'chat_id': config.TELEGRAM_CHAT_ID if config.TELEGRAM_CHAT_ID else None,
+            'thread_id': config.TELEGRAM_THREAD_ID if config.TELEGRAM_THREAD_ID else None
+        }
+
+        # Try to initialize TelegramWorker to test
+        try:
+            from simple_telegram_worker import TelegramWorker
+            worker = TelegramWorker()
+            status['worker_initialized'] = True
+            status['error'] = None
+        except Exception as e:
+            status['worker_initialized'] = False
+            status['error'] = str(e)
+
+        return jsonify({
+            'success': True,
+            'status': status
+        })
     except Exception as e:
-        status['unsent_items_exist'] = False
-        status['unsent_count'] = 0
-        status['error'] = str(e)
-    
-    return jsonify(status)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/api/stats')
 def api_stats():
