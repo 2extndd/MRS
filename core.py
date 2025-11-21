@@ -417,6 +417,12 @@ class MercariSearcher:
                 logger.info(f"[PROCESS]    Brand: {full_item.brand or 'N/A'}")
                 logger.info(f"[PROCESS]    Image: {'✅ HIGH-RES' if image_data else '⚠️ URL only'}")
 
+                # Build correct item URL based on ID format
+                if mercari_id.startswith('m'):
+                    correct_item_url = f"https://jp.mercari.com/item/{mercari_id}"
+                else:
+                    correct_item_url = f"https://jp.mercari.com/shops/product/{mercari_id}"
+                
                 # Add to database
                 db_item_id = self.db.add_item(
                     mercari_id=mercari_id,
@@ -429,7 +435,7 @@ class MercariSearcher:
                     size=full_item.size,
                     shipping_cost=full_item.shipping_cost,
                     stock_quantity=full_item.stock_quantity,
-                    item_url=full_item.url,
+                    item_url=correct_item_url,
                     image_url=image_url,
                     seller_name=full_item.seller_name,
                     seller_rating=full_item.seller_rating,
@@ -451,7 +457,7 @@ class MercariSearcher:
                             'title': full_item.title,
                             'price': full_item.price,
                             'currency': full_item.currency,
-                            'item_url': full_item.url,
+                            'item_url': correct_item_url,
                             'image_url': image_url,
                             'brand': full_item.brand,
                             'condition': full_item.condition,
