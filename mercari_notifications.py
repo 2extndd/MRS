@@ -92,6 +92,7 @@ class MercariNotificationApp:
 
     def search_cycle(self):
         """Search cycle - ONLY searches and adds to DB"""
+        self.db.add_log_entry('INFO', '[SEARCH_CYCLE] *** FUNCTION CALLED ***', 'search')
         logger.info("\n" + "=" * 60)
         logger.info(f"Starting search cycle at {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')}")
         logger.info("=" * 60)
@@ -114,6 +115,7 @@ class MercariNotificationApp:
     
     def telegram_cycle(self):
         """Telegram notification cycle - INDEPENDENT from search"""
+        self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] *** FUNCTION CALLED ***', 'telegram')
         logger.info("[TELEGRAM] Processing pending notifications...")
 
         try:
