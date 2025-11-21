@@ -225,7 +225,11 @@ class MercariNotificationApp:
                     logger.info(f"[SCHEDULER] ⏰ First iteration starting...")
                     logger.info(f"[SCHEDULER] Current time: {current_time}")
                     logger.info(f"[SCHEDULER] Jobs: {', '.join(jobs_info)}")
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] First loop iteration. Time: {current_time}. Jobs: {len(schedule.get_jobs())}', 'scheduler')
+
+                    # Log to DB with full details
+                    jobs_detail = ', '.join(jobs_info)
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] Time: {current_time}', 'scheduler')
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] Jobs detail: {jobs_detail}', 'scheduler')
 
                 if loop_iteration % 10 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
