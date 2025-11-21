@@ -266,11 +266,11 @@ def api_telegram_status():
 
 @app.route('/api/error-logs')
 def api_error_logs():
-    """Get ERROR level logs from database"""
+    """Get ERROR level logs and scheduler/wsgi logs from database"""
     try:
         # Query database for ERROR logs
         query = """
-            SELECT timestamp, level, message, category
+            SELECT timestamp, level, message
             FROM logs
             WHERE level = 'ERROR'
             ORDER BY timestamp DESC
@@ -278,22 +278,24 @@ def api_error_logs():
         """
         error_logs = db.execute_query(query, fetch=True)
 
-        # Also get wsgi and scheduler category logs
+        # Get wsgi and scheduler logs (by message prefix)
         query2 = """
-            SELECT timestamp, level, message, category
+            SELECT timestamp, level, message
             FROM logs
-            WHERE category IN ('wsgi', 'scheduler', 'telegram', 'telegram_photo')
+            WHERE message LIKE '[wsgi]%' OR message LIKE '[WSGI]%'
+               OR message LIKE '[scheduler]%' OR message LIKE '[SCHEDULER]%'
+               OR message LIKE '[telegram]%' OR message LIKE '[TELEGRAM]%'
             ORDER BY timestamp DESC
-            LIMIT 50
+            LIMIT 100
         """
         category_logs = db.execute_query(query2, fetch=True)
 
         return jsonify({
             'success': True,
             'error_logs': error_logs or [],
-            'category_logs': category_logs or [],
+            'scheduler_logs': category_logs or [],
             'total_errors': len(error_logs) if error_logs else 0,
-            'total_category': len(category_logs) if category_logs else 0
+            'total_scheduler': len(category_logs) if category_logs else 0
         })
 
     except Exception as e:
