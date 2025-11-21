@@ -202,13 +202,23 @@ class MercariNotificationApp:
 
         last_interval = config.SEARCH_INTERVAL
 
+        logger.info("[SCHEDULER] ⏰ Entering main loop...")
+        logger.info(f"[SCHEDULER] Jobs scheduled: {len(schedule.get_jobs())}")
+
+        loop_iteration = 0
         while True:
             try:
+                loop_iteration += 1
+
+                # Log every 10 seconds (every 10 iterations)
+                if loop_iteration % 10 == 0:
+                    logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
+
                 # HOT RELOAD CONFIG EVERY ITERATION
                 if config.reload_if_needed():
                     logger.info("[CONFIG] ✅ Configuration reloaded from database")
                     self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
-                    
+
                     # If search interval changed, recreate schedule
                     if config.SEARCH_INTERVAL != last_interval:
                         logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
@@ -222,7 +232,9 @@ class MercariNotificationApp:
                 logger.info("\nShutdown requested by user")
                 break
             except Exception as e:
-                logger.error(f"Scheduler error: {e}")
+                logger.error(f"[SCHEDULER] ❌ Scheduler error: {e}")
+                import traceback
+                logger.error(f"[SCHEDULER] Traceback:\n{traceback.format_exc()}")
                 time.sleep(5)
 
         # Cleanup
