@@ -315,23 +315,55 @@ function addQuery() {
 // Edit Query
 function editQuery(queryId) {
     fetch(`/api/queries/${queryId}`)
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) {
+                throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+        })
         .then(data => {
-            if (data.success) {
+            if (data.success && data.query) {
                 const query = data.query;
-                document.getElementById('edit_query_id').value = query.id;
-                document.getElementById('edit_search_url').value = query.search_url || '';
-                document.getElementById('edit_name').value = query.name || '';
-                document.getElementById('edit_thread_id').value = query.thread_id || '';
-                document.getElementById('edit_scan_interval').value = query.scan_interval || 300;
-                document.getElementById('edit_scan_limit').value = query.scan_limit || 50;
                 
-                new bootstrap.Modal(document.getElementById('editQueryModal')).show();
+                // Safely set values with null checks
+                const editQueryIdEl = document.getElementById('edit_query_id');
+                const editSearchUrlEl = document.getElementById('edit_search_url');
+                const editNameEl = document.getElementById('edit_name');
+                const editThreadIdEl = document.getElementById('edit_thread_id');
+                const editScanIntervalEl = document.getElementById('edit_scan_interval');
+                const editScanLimitEl = document.getElementById('edit_scan_limit');
+                
+                if (!editQueryIdEl || !editSearchUrlEl || !editNameEl || !editThreadIdEl || !editScanIntervalEl || !editScanLimitEl) {
+                    console.error('Edit form elements not found!');
+                    alert('❌ Error: Edit form not properly loaded');
+                    return;
+                }
+                
+                editQueryIdEl.value = query.id || '';
+                editSearchUrlEl.value = query.search_url || '';
+                editNameEl.value = query.name || '';
+                editThreadIdEl.value = query.thread_id || '';
+                editScanIntervalEl.value = query.scan_interval || 300;
+                editScanLimitEl.value = query.scan_limit || 50;
+                
+                // Show modal
+                const modalEl = document.getElementById('editQueryModal');
+                if (modalEl) {
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                } else {
+                    console.error('Edit modal not found!');
+                    alert('❌ Error: Edit modal not found');
+                }
             } else {
-                alert('❌ Error loading query: ' + data.error);
+                console.error('API response:', data);
+                alert('❌ Error loading query: ' + (data.error || 'Query not found'));
             }
         })
-        .catch(err => alert('❌ Error: ' + err));
+        .catch(err => {
+            console.error('Edit query error:', err);
+            alert('❌ Network error: ' + err.message);
+        });
 }
 
 // Update Query
