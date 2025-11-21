@@ -264,6 +264,39 @@ def api_telegram_status():
             'error': str(e)
         })
 
+@app.route('/api/scheduler-status')
+def api_scheduler_status():
+    """Get scheduler status and job information"""
+    try:
+        import schedule
+
+        jobs = schedule.get_jobs()
+
+        job_info = []
+        for job in jobs:
+            job_info.append({
+                'function': str(job.job_func),
+                'interval': str(job.interval),
+                'unit': str(job.unit),
+                'next_run': str(job.next_run) if job.next_run else 'Never',
+                'last_run': str(job.last_run) if hasattr(job, 'last_run') and job.last_run else 'Never'
+            })
+
+        return jsonify({
+            'success': True,
+            'total_jobs': len(jobs),
+            'jobs': job_info,
+            'message': f"Found {len(jobs)} scheduled jobs"
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/test-telegram-send')
 def api_test_telegram_send():
     """Manually trigger telegram notification cycle for debugging"""
