@@ -35,8 +35,11 @@ def get_original_image_url(image_url: str) -> str:
     
     try:
         # Mercari Shops: replace /small/ with /large/
-        if 'mercari-shops-static.com' in image_url:
-            return re.sub(r'/-/small/', '/-/large/', image_url)
+        if 'mercari-shops-static.com' in image_url or '/shops/' in image_url:
+            # Handle different shops URL formats
+            image_url = re.sub(r'/-/small/', '/-/large/', image_url)
+            image_url = re.sub(r'/small/', '/large/', image_url)
+            return image_url
         
         # Regular Mercari: upgrade to w_1200 (high quality, not blocked by Cloudflare)
         if 'mercdn.net' in image_url:

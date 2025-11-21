@@ -316,6 +316,8 @@ class Mercari:
             item_id = item_url
             if '/item/' in item_url:
                 item_id = item_url.split('/item/')[-1].split('?')[0]
+            elif '/shops/product/' in item_url:
+                item_id = item_url.split('/shops/product/')[-1].split('?')[0]
 
             logger.info(f"Getting item details: {item_id}")
 
