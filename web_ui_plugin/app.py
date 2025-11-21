@@ -227,6 +227,31 @@ def logs():
 
 # ==================== API ROUTES ====================
 
+@app.route('/api/telegram/status')
+def api_telegram_status():
+    """Check Telegram configuration status"""
+    from configuration_values import config
+    
+    status = {
+        'bot_token_set': bool(config.TELEGRAM_BOT_TOKEN),
+        'bot_token_length': len(config.TELEGRAM_BOT_TOKEN) if config.TELEGRAM_BOT_TOKEN else 0,
+        'chat_id_set': bool(config.TELEGRAM_CHAT_ID),
+        'chat_id': config.TELEGRAM_CHAT_ID if config.TELEGRAM_CHAT_ID else None,
+        'thread_id': config.TELEGRAM_THREAD_ID if hasattr(config, 'TELEGRAM_THREAD_ID') else None,
+    }
+    
+    # Check unsent items
+    try:
+        unsent = db.get_unsent_items(limit=1)
+        status['unsent_items_exist'] = len(unsent) > 0
+        status['unsent_count'] = db.get_statistics().get('unsent_items', 0)
+    except Exception as e:
+        status['unsent_items_exist'] = False
+        status['unsent_count'] = 0
+        status['error'] = str(e)
+    
+    return jsonify(status)
+
 @app.route('/api/stats')
 def api_stats():
     """Get statistics API - formatted for auto-refresh"""
