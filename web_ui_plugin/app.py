@@ -264,6 +264,46 @@ def api_telegram_status():
             'error': str(e)
         })
 
+@app.route('/api/error-logs')
+def api_error_logs():
+    """Get ERROR level logs from database"""
+    try:
+        # Query database for ERROR logs
+        query = """
+            SELECT timestamp, level, message, category
+            FROM logs
+            WHERE level = 'ERROR'
+            ORDER BY timestamp DESC
+            LIMIT 50
+        """
+        error_logs = db.execute_query(query, fetch=True)
+
+        # Also get wsgi and scheduler category logs
+        query2 = """
+            SELECT timestamp, level, message, category
+            FROM logs
+            WHERE category IN ('wsgi', 'scheduler', 'telegram', 'telegram_photo')
+            ORDER BY timestamp DESC
+            LIMIT 50
+        """
+        category_logs = db.execute_query(query2, fetch=True)
+
+        return jsonify({
+            'success': True,
+            'error_logs': error_logs or [],
+            'category_logs': category_logs or [],
+            'total_errors': len(error_logs) if error_logs else 0,
+            'total_category': len(category_logs) if category_logs else 0
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/scheduler-status')
 def api_scheduler_status():
     """Get scheduler status and job information"""
