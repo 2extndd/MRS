@@ -92,14 +92,14 @@ class MercariNotificationApp:
 
     def search_cycle(self):
         """Search cycle - ONLY searches and adds to DB"""
-        from datetime import datetime as dt_now
-        current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
-        self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] *** CALLED at {current_time_str} ***', 'search')
-        logger.info("\n" + "=" * 60)
-        logger.info(f"Starting search cycle at {current_time_str}")
-        logger.info("=" * 60)
-
         try:
+            from datetime import datetime as dt_now
+            current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
+            self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] *** CALLED at {current_time_str} ***', 'search')
+            logger.info("\n" + "=" * 60)
+            logger.info(f"Starting search cycle at {current_time_str}")
+            logger.info("=" * 60)
+
             # Perform searches
             results = self.searcher.search_all_queries()
 
@@ -110,10 +110,13 @@ class MercariNotificationApp:
             if redeployer:
                 redeployer.check_and_redeploy_if_needed()
 
+            self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] Completed successfully', 'search')
+
         except Exception as e:
             logger.error(f"Search cycle error: {e}")
             self.shared_state.add_error(str(e))
             self.db.log_error(str(e), 'search_cycle')
+            self.db.add_log_entry('ERROR', f'[SEARCH_CYCLE] Exception: {str(e)[:150]}', 'search')
     
     def telegram_cycle(self):
         """Telegram notification cycle - INDEPENDENT from search"""
