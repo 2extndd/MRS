@@ -235,6 +235,7 @@ class MercariNotificationApp:
 
         logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
         logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 10s (35 items per batch)")
+        logger.info(f"[SCHEDULER] 🔧 Total jobs scheduled: {len(schedule.get_jobs())}")
 
     def shutdown(self):
         """Shutdown application"""

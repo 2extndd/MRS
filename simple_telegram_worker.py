@@ -91,14 +91,19 @@ class TelegramWorker:
 
             if success:
                 # Mark as sent in database
-                if item.get('id'):
-                    self.db.mark_item_sent(item['id'])
+                item_id = item.get('id')
+                if item_id:
+                    self.db.mark_item_sent(item_id)
+                    logger.info(f"[TW] ✅ Marked item {item_id} as sent in database")
+                else:
+                    logger.error(f"[TW] ❌ CRITICAL: Item has no ID, cannot mark as sent! Item: {item.get('title', 'Unknown')[:50]}")
+                    logger.error(f"[TW] Item keys: {list(item.keys())}")
 
                 # Update stats
                 self.shared_state.increment('total_notifications_sent')
                 self.shared_state.set('last_telegram_send_time', time.time())
 
-                logger.info(f"Notification sent for item: {item.get('title', 'Unknown')[:50]}")
+                logger.info(f"[TW] Notification sent for item: {item.get('title', 'Unknown')[:50]}")
 
             return success
 
@@ -428,8 +433,16 @@ def process_pending_notifications(max_items: int = 35) -> Dict[str, int]:
     Returns:
         Dictionary with statistics
     """
-    worker = TelegramWorker()
-    return worker.process_pending_notifications(max_items=max_items)
+    try:
+        logger.info("[TW] Creating TelegramWorker instance...")
+        worker = TelegramWorker()
+        logger.info("[TW] TelegramWorker created successfully")
+        return worker.process_pending_notifications(max_items=max_items)
+    except Exception as e:
+        logger.error(f"[TW] Failed to create TelegramWorker: {e}")
+        import traceback
+        logger.error(f"[TW] Traceback:\n{traceback.format_exc()}")
+        return {'total': 0, 'sent': 0, 'failed': 0}
 
 
 def send_system_message(message: str) -> bool:
