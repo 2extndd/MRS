@@ -213,7 +213,11 @@ class MercariNotificationApp:
             try:
                 loop_iteration += 1
 
-                # Log every 10 seconds (every 10 iterations)
+                # Log first iteration and every 10 seconds
+                if loop_iteration == 1:
+                    logger.info(f"[SCHEDULER] ⏰ First iteration starting...")
+                    self.db.add_log_entry('INFO', '[SCHEDULER] First loop iteration', 'scheduler')
+
                 if loop_iteration % 10 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
 
@@ -230,6 +234,12 @@ class MercariNotificationApp:
                         last_interval = config.SEARCH_INTERVAL
 
                 schedule.run_pending()
+
+                # Log after first run_pending()
+                if loop_iteration == 1:
+                    logger.info(f"[SCHEDULER] ⏰ First run_pending() completed")
+                    self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
+
                 time.sleep(1)
             except KeyboardInterrupt:
                 logger.info("\nShutdown requested by user")
