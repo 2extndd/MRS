@@ -36,19 +36,26 @@ try:
         """Start the search scheduler in background thread"""
         try:
             logger.info("=" * 60)
-            logger.info("Starting background scheduler thread...")
+            logger.info("[WSGI] Starting background scheduler thread...")
             logger.info("=" * 60)
 
             from mercari_notifications import MercariNotificationApp
 
+            logger.info("[WSGI] Imported MercariNotificationApp")
+
             # Create app instance and run scheduler
+            logger.info("[WSGI] Creating MercariNotificationApp instance...")
             mercari_app = MercariNotificationApp()
+            logger.info("[WSGI] MercariNotificationApp created successfully")
+
+            logger.info("[WSGI] Calling run_scheduler()...")
             mercari_app.run_scheduler()
+            logger.info("[WSGI] run_scheduler() returned (this should never happen)")
 
         except Exception as e:
-            logger.error(f"Background scheduler error: {e}")
+            logger.error(f"[WSGI] ❌ Background scheduler error: {e}")
             import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"[WSGI] Traceback:\n{traceback.format_exc()}")
 
     # Start scheduler in daemon thread (dies when main process exits)
     scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
