@@ -316,12 +316,12 @@ class TelegramWorker:
             logger.error(f"Failed to send system message: {e}")
             return False
 
-    def process_pending_notifications(self, max_items: int = 50) -> Dict[str, int]:
+    def process_pending_notifications(self, max_items: int = 35) -> Dict[str, int]:
         """
         Process pending notifications from database - LIMITED to avoid blocking
 
         Args:
-            max_items: Maximum items to process per cycle (default 50)
+            max_items: Maximum items to process per cycle (default 35)
 
         Returns:
             Dictionary with processing statistics
@@ -405,12 +405,12 @@ def send_notifications(items: List[Dict[str, Any]]) -> Dict[str, int]:
     return stats
 
 
-def process_pending_notifications(max_items: int = 50) -> Dict[str, int]:
+def process_pending_notifications(max_items: int = 35) -> Dict[str, int]:
     """
     Process pending notifications from database
 
     Args:
-        max_items: Maximum items to process per cycle (default 50)
+        max_items: Maximum items to process per cycle (default 35)
 
     Returns:
         Dictionary with statistics
