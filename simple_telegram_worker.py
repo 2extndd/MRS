@@ -226,7 +226,9 @@ class TelegramWorker:
                     logger.info("[TW] ✅ Photo sent successfully")
                     return True
                 else:
-                    logger.warning(f"[TW] Telegram API returned status {response.status_code}: {response.text[:200]}")
+                    error_detail = f"Status {response.status_code}: {response.text[:150]}"
+                    logger.warning(f"[TW] Telegram API returned {error_detail}")
+                    self.db.add_log_entry('WARNING', f'[TW._send_photo] {error_detail}', 'telegram')
 
                 # Handle rate limiting
                 if response.status_code == 429:

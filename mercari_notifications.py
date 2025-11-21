@@ -92,9 +92,11 @@ class MercariNotificationApp:
 
     def search_cycle(self):
         """Search cycle - ONLY searches and adds to DB"""
-        self.db.add_log_entry('INFO', '[SEARCH_CYCLE] *** FUNCTION CALLED ***', 'search')
+        from datetime import datetime as dt_now
+        current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
+        self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] *** CALLED at {current_time_str} ***', 'search')
         logger.info("\n" + "=" * 60)
-        logger.info(f"Starting search cycle at {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        logger.info(f"Starting search cycle at {current_time_str}")
         logger.info("=" * 60)
 
         try:
