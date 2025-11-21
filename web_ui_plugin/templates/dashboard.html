@@ -335,27 +335,22 @@ function updateTimeAgo() {
     });
 }
 
-// Refresh only NEW items (prepend new items to top)
+// Full refresh of items (like Kufar bot - complete replacement)
 function refreshNewItems() {
-    fetch('/api/recent-items?limit=10&offset=0')
+    fetch('/api/recent-items?limit=30&offset=0')
         .then(r => r.json())
         .then(data => {
             if (!data.success || !data.items || data.items.length === 0) return;
             
+            console.log(`🔄 Обновление карточек: ${data.items.length} элементов`);
+            
             const container = document.getElementById('recent-items-container');
-            const existingIds = new Set();
-            container.querySelectorAll('[data-item-id]').forEach(el => {
-                existingIds.add(el.getAttribute('data-item-id'));
-            });
-            
-            // Only add NEW items that don't exist yet
-            const newItems = data.items.filter(item => !existingIds.has(String(item.id)));
-            if (newItems.length === 0) return;
-            
             const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
+            
+            // ПОЛНАЯ ЗАМЕНА контента - как в Kufar боте
             let html = '';
             
-            newItems.forEach(item => {
+            data.items.forEach(item => {
                 const imageUrl = item.image_url || '';
                 const usdPrice = (item.price * usdRate).toFixed(2);
                 const titleWords = item.title.split(' ');
@@ -400,23 +395,31 @@ function refreshNewItems() {
                 `;
             });
             
-            // Prepend new items to top
-            container.insertAdjacentHTML('afterbegin', html);
-            currentOffset += newItems.length;
+            // Полная замена контента (как в Kufar боте)
+            container.innerHTML = html;
+            
+            // Сбросить offset для infinite scroll
+            currentOffset = data.items.length;
+            hasMore = data.items.length >= 30;
+            
+            console.log(`✅ Карточки полностью обновлены: ${data.items.length} элементов`);
         })
-        .catch(err => console.error('Error refreshing new items:', err));
+        .catch(err => console.error('❌ Ошибка обновления карточек:', err));
 }
 
 // Initial load
 loadRecentItems();
 setupInfiniteScroll();
 
-// Auto-refresh every 20 seconds
+// Auto-refresh every 20 seconds (like Kufar bot)
 setInterval(() => {
+    // Проверяем, что пользователь не взаимодействует с формами
+    if (document.visibilityState !== 'visible' || document.querySelector('input:focus, textarea:focus, select:focus')) {
+        return;
+    }
+    
     refreshStats();
-    updateTimeAgo(); // Update relative timestamps
-    // refreshNewItems() disabled - causes items to lose data
-    // Users can manually refresh page to see new items
+    refreshNewItems(); // Full replacement - no data loss
 }, 20000);
 </script>
 {% endblock %}
