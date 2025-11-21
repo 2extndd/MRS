@@ -233,6 +233,7 @@ class MercariNotificationApp:
 
                 if loop_iteration % 10 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] Loop iteration {loop_iteration}', 'scheduler')
 
                 # HOT RELOAD CONFIG EVERY ITERATION
                 if config.reload_if_needed():
@@ -252,6 +253,10 @@ class MercariNotificationApp:
                 if loop_iteration == 1:
                     logger.info(f"[SCHEDULER] ⏰ First run_pending() completed")
                     self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
+
+                # Log every 10 iterations AFTER run_pending()
+                if loop_iteration % 10 == 0:
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] run_pending() completed at iteration {loop_iteration}', 'scheduler')
 
                 time.sleep(1)
             except KeyboardInterrupt:
