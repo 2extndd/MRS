@@ -264,6 +264,38 @@ def api_telegram_status():
             'error': str(e)
         })
 
+@app.route('/api/test-telegram-send')
+def api_test_telegram_send():
+    """Manually trigger telegram notification cycle for debugging"""
+    try:
+        logger.info("[API] Manual telegram send test triggered")
+
+        # Import and call process_pending_notifications
+        from simple_telegram_worker import process_pending_notifications
+
+        # Process up to 5 items for testing
+        result = process_pending_notifications(max_items=5)
+
+        logger.info(f"[API] Telegram test result: {result}")
+
+        return jsonify({
+            'success': True,
+            'result': result,
+            'message': f"Sent {result['sent']}/{result['total']} notifications"
+        })
+
+    except Exception as e:
+        logger.error(f"[API] Telegram test failed: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"[API] Traceback:\n{error_trace}")
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': error_trace
+        })
+
 @app.route('/api/stats')
 def api_stats():
     """Get statistics API - formatted for auto-refresh"""
