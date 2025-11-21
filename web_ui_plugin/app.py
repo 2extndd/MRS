@@ -306,6 +306,33 @@ def api_error_logs():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/force-telegram-cycle')
+def api_force_telegram_cycle():
+    """Manually trigger telegram_cycle for testing"""
+    try:
+        logger.info("[API] Forcing telegram_cycle...")
+
+        # Import and get the app instance
+        # Since we can't access the thread's instance, we'll call the function directly
+        from mercari_notifications import MercariNotificationApp
+
+        # Create temporary instance
+        temp_app = MercariNotificationApp()
+        temp_app.telegram_cycle()
+
+        return jsonify({
+            'success': True,
+            'message': 'telegram_cycle executed (check logs)'
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/scheduler-status')
 def api_scheduler_status():
     """Get scheduler status and job information"""
