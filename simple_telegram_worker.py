@@ -435,13 +435,22 @@ def process_pending_notifications(max_items: int = 35) -> Dict[str, int]:
     """
     try:
         logger.info("[TW] Creating TelegramWorker instance...")
+        from db import get_db
+        db = get_db()
+        db.add_log_entry('INFO', '[TW] Creating TelegramWorker...', 'telegram')
         worker = TelegramWorker()
         logger.info("[TW] TelegramWorker created successfully")
-        return worker.process_pending_notifications(max_items=max_items)
+        db.add_log_entry('INFO', '[TW] TelegramWorker created, calling process_pending_notifications...', 'telegram')
+        result = worker.process_pending_notifications(max_items=max_items)
+        db.add_log_entry('INFO', f'[TW] Returned: {result}', 'telegram')
+        return result
     except Exception as e:
         logger.error(f"[TW] Failed to create TelegramWorker: {e}")
         import traceback
+        error_msg = f"[TW] Failed: {e}\n{traceback.format_exc()}"
         logger.error(f"[TW] Traceback:\n{traceback.format_exc()}")
+        from db import get_db
+        get_db().add_log_entry('ERROR', error_msg[:500], 'telegram')
         return {'total': 0, 'sent': 0, 'failed': 0}
 
 
