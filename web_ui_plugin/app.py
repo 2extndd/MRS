@@ -270,18 +270,34 @@ def api_test_telegram_send():
     try:
         logger.info("[API] Manual telegram send test triggered")
 
-        # Import and call process_pending_notifications
-        from simple_telegram_worker import process_pending_notifications
+        # Get ONE unsent item for detailed debugging
+        unsent_items = db.get_unsent_items(limit=1)
 
-        # Process up to 5 items for testing
-        result = process_pending_notifications(max_items=5)
+        if not unsent_items:
+            return jsonify({
+                'success': True,
+                'result': 'No unsent items',
+                'unsent_count': 0
+            })
 
-        logger.info(f"[API] Telegram test result: {result}")
+        test_item = unsent_items[0]
+        logger.info(f"[API] Testing with item: {test_item.get('title', 'Unknown')[:60]}")
+        logger.info(f"[API] Item keys: {list(test_item.keys())}")
+        logger.info(f"[API] Item ID: {test_item.get('id')}")
+
+        # Try to send ONE item
+        from simple_telegram_worker import TelegramWorker
+        worker = TelegramWorker()
+
+        success = worker.send_item_notification(test_item)
 
         return jsonify({
             'success': True,
-            'result': result,
-            'message': f"Sent {result['sent']}/{result['total']} notifications"
+            'send_success': success,
+            'item_id': test_item.get('id'),
+            'item_title': test_item.get('title', 'Unknown')[:60],
+            'item_keys': list(test_item.keys()),
+            'message': 'Sent successfully' if success else 'Failed to send (check logs for details)'
         })
 
     except Exception as e:
