@@ -52,11 +52,16 @@ class TelegramWorker:
             True if sent successfully
         """
         try:
+            item_title = item.get('title', 'Unknown')[:40]
+            logger.info(f"[TW] Sending notification for: {item_title}...")
+
             # Get thread_id from item's search or use global default
             thread_id = item.get('search_thread_id') or self.thread_id
-            
+            logger.debug(f"[TW] Using thread_id: {thread_id}")
+
             # Format message
             message = self._format_item_message(item)
+            logger.debug(f"[TW] Message formatted ({len(message)} chars)")
 
             # Create inline keyboard
             keyboard = self._create_item_keyboard(item)
@@ -202,10 +207,14 @@ class TelegramWorker:
                 if thread_id or self.thread_id:
                     payload["message_thread_id"] = thread_id or self.thread_id
 
+                logger.info(f"[TW] Sending photo to Telegram (attempt {attempt+1}/{self.max_retries})...")
                 response = requests.post(url, json=payload, timeout=30)
 
                 if response.status_code == 200:
+                    logger.info("[TW] ✅ Photo sent successfully")
                     return True
+                else:
+                    logger.warning(f"[TW] Telegram API returned status {response.status_code}: {response.text[:200]}")
 
                 # Handle rate limiting
                 if response.status_code == 429:
@@ -330,7 +339,7 @@ class TelegramWorker:
         Returns:
             Dictionary with processing statistics
         """
-        logger.info("Processing pending notifications...")
+        logger.info(f"[TW] Processing pending notifications (max {max_items})...")
 
         # Get unsent items - LIMITED
         unsent_items = self.db.get_unsent_items(limit=max_items)
@@ -342,10 +351,10 @@ class TelegramWorker:
         }
 
         if not unsent_items:
-            logger.info("No pending notifications")
+            logger.info("[TW] No pending notifications (all items sent or no items in DB)")
             return stats
 
-        logger.info(f"Processing {len(unsent_items)} pending notifications (max {max_items} per cycle)")
+        logger.info(f"[TW] Found {len(unsent_items)} unsent items, processing...")
 
         for item in unsent_items:
             success = self.send_item_notification(item)

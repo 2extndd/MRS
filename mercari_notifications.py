@@ -115,18 +115,23 @@ class MercariNotificationApp:
     def telegram_cycle(self):
         """Telegram notification cycle - INDEPENDENT from search"""
         logger.info("[TELEGRAM] Processing pending notifications...")
-        
+
         try:
             # Process 35 items per cycle
             notification_stats = process_pending_notifications(max_items=35)
-            
+
             if notification_stats['total'] > 0:
                 logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
+                if notification_stats['failed'] > 0:
+                    logger.warning(f"[TELEGRAM] Failed to send {notification_stats['failed']} notifications")
             else:
-                logger.debug("[TELEGRAM] No pending notifications")
-                
+                logger.info("[TELEGRAM] No pending notifications")
+
         except Exception as e:
             logger.error(f"[TELEGRAM] Notification cycle error: {e}")
+            logger.error(f"[TELEGRAM] Error details: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"[TELEGRAM] Traceback:\n{traceback.format_exc()}")
             self.shared_state.add_error(str(e))
             self.db.log_error(str(e), 'telegram_cycle')
 
