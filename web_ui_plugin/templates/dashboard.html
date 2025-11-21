@@ -335,13 +335,87 @@ function updateTimeAgo() {
     });
 }
 
-// Full refresh of items - NO auto-refresh to prevent data loss
-// Users should manually refresh page (F5) to see new items
+// Escape HTML to prevent XSS and parsing issues
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+// Create item card HTML (like Kufar bot)
+function createItemCardHTML(item) {
+    const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
+    const imageUrl = item.image_url || '';
+    const usdPrice = (item.price * usdRate).toFixed(2);
+    const titleWords = item.title.split(' ');
+    const shortTitle = titleWords.slice(0, 6).join(' ') + (titleWords.length > 6 ? '...' : '');
+    
+    return `
+        <div class="col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2 mb-3" data-item-id="${item.id}">
+            <div class="card h-100 shadow-sm">
+                <a href="${escapeHtml(item.item_url)}" target="_blank" class="text-decoration-none">
+                    <div class="item-image-container" style="aspect-ratio: 4/5; overflow: hidden; background: var(--bg-card); border-radius: 0.25rem 0.25rem 0 0;">
+                        ${imageUrl ?
+                            `<img src="${escapeHtml(imageUrl)}" class="d-block w-100 h-100" style="object-fit: cover;" loading="lazy" referrerpolicy="no-referrer" crossorigin="anonymous"
+                                  onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\\'d-flex align-items-center justify-content-center h-100 flex-column\\'><i class=\\'bi bi-image\\' style=\\'font-size: 2.5rem; color: #ccc;\\'></i><small class=\\'text-muted mt-2\\'>Tap to view</small></div>';">` :
+                            `<div class="bg-light d-flex align-items-center justify-content-center h-100 flex-column">
+                                <i class="bi bi-image" style="font-size: 2.5rem; color: #ccc;"></i>
+                                <small class="text-muted mt-2">Tap to view</small>
+                            </div>`
+                        }
+                    </div>
+                </a>
+                <div class="card-body p-2 d-flex flex-column" style="min-height: 125px;">
+                    <h6 class="card-title mb-2 fw-bold text-truncate" style="font-size: 0.8rem; line-height: 1.25; max-height: 2.5rem; overflow: hidden; word-wrap: break-word;">
+                        ${escapeHtml(shortTitle)}
+                    </h6>
+                    <div class="mt-auto">
+                        <div class="mb-2" style="min-height: 42px;">
+                            <div class="fw-bold" style="font-size: 1.1rem; line-height: 1.2;">$${usdPrice}</div>
+                            <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}</div>
+                        </div>
+                        <div class="d-flex flex-column gap-1">
+                            ${item.search_keyword ?
+                                `<span class="badge bg-primary align-self-start" style="font-size: 0.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${escapeHtml(item.search_keyword.substring(0, 15))}</span>` : ''
+                            }
+                            ${item.found_at ?
+                                `<small class="text-muted time-ago" style="font-size: 0.65rem;" data-timestamp="${escapeHtml(item.found_at)}">${timeAgo(item.found_at)}</small>` : ''
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Full refresh with HTML escaping (like Kufar bot)
 function refreshNewItems() {
-    // Disabled - causes price and badge to disappear
-    // innerHTML parsing by browser loses element data
-    // Users can press F5 or use Force Scan button
-    console.log('⚠️ Auto-refresh disabled - use F5 to refresh');
+    fetch('/api/recent-items?limit=30&offset=0')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.items || data.items.length === 0) return;
+            
+            console.log(`🔄 Обновление карточек: ${data.items.length} элементов`);
+            
+            const container = document.getElementById('recent-items-container');
+            
+            // ПОЛНАЯ ЗАМЕНА контента с escapeHtml
+            container.innerHTML = data.items.map(item => createItemCardHTML(item)).join('');
+            
+            // Сбросить offset для infinite scroll
+            currentOffset = data.items.length;
+            hasMore = data.items.length >= 30;
+            
+            console.log(`✅ Карточки обновлены: ${data.items.length} элементов`);
+        })
+        .catch(err => console.error('❌ Ошибка обновления:', err));
 }
 
 // Initial load
