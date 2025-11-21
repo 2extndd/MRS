@@ -21,12 +21,16 @@ class TelegramWorker:
 
     def __init__(self):
         """Initialize Telegram worker"""
+        # Try to get from config (which hot-reloads from DB)
+        # Force reload to get latest values from DB
+        config.reload_if_needed()
+
         self.bot_token = config.TELEGRAM_BOT_TOKEN
         self.chat_id = config.TELEGRAM_CHAT_ID
         self.thread_id = config.TELEGRAM_THREAD_ID
 
         if not self.bot_token or not self.chat_id:
-            raise ValueError("Telegram bot token and chat ID are required")
+            raise ValueError("Telegram bot token and chat ID are required. Please set them in Web UI → Config")
 
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.db = get_db()
