@@ -189,12 +189,20 @@ class Mercari:
                         continue
 
                     # Build item data dict
+                    # Determine correct URL based on item ID format
+                    # Items starting with 'm' are regular items: /item/
+                    # Other IDs (like 2JGxdQkWpG38dXwNH9o93g) are shop products: /shops/product/
+                    if item_id.startswith('m'):
+                        item_url = f"https://jp.mercari.com/item/{item_id}"
+                    else:
+                        item_url = f"https://jp.mercari.com/shops/product/{item_id}"
+                    
                     item_dict = {
                         'mercari_id': item_id,
                         'title': getattr(item, 'name', ''),
                         'price': getattr(item, 'price', 0),
                         'currency': 'JPY',
-                        'item_url': f"https://jp.mercari.com/item/{item_id}",
+                        'item_url': item_url,
                         'image_url': None,
                         'brand': None,
                         'condition': None,
@@ -322,12 +330,18 @@ class Mercari:
                 return None
 
             # Convert to our Item format
+            # Determine correct URL based on item ID format
+            if item_id.startswith('m'):
+                item_url = f"https://jp.mercari.com/item/{item_id}"
+            else:
+                item_url = f"https://jp.mercari.com/shops/product/{item_id}"
+            
             item_data = {
                 'mercari_id': item_id,
                 'title': getattr(full_item, 'name', ''),
                 'price': getattr(full_item, 'price', 0),
                 'currency': 'JPY',
-                'item_url': f"https://jp.mercari.com/item/{item_id}",
+                'item_url': item_url,
                 'image_url': None,
                 'description': getattr(full_item, 'description', ''),
                 'brand': None,
