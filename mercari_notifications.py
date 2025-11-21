@@ -215,8 +215,17 @@ class MercariNotificationApp:
 
                 # Log first iteration and every 10 seconds
                 if loop_iteration == 1:
+                    # Debug: Check schedule state
+                    from datetime import datetime
+                    current_time = datetime.now()
+                    jobs_info = []
+                    for job in schedule.get_jobs():
+                        jobs_info.append(f"{job.job_func.__name__}: next={job.next_run}")
+
                     logger.info(f"[SCHEDULER] ⏰ First iteration starting...")
-                    self.db.add_log_entry('INFO', '[SCHEDULER] First loop iteration', 'scheduler')
+                    logger.info(f"[SCHEDULER] Current time: {current_time}")
+                    logger.info(f"[SCHEDULER] Jobs: {', '.join(jobs_info)}")
+                    self.db.add_log_entry('INFO', f'[SCHEDULER] First loop iteration. Time: {current_time}. Jobs: {len(schedule.get_jobs())}', 'scheduler')
 
                 if loop_iteration % 10 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
