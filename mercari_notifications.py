@@ -299,17 +299,17 @@ class MercariNotificationApp:
         # INDEPENDENT PROCESSES:
         # 1. Search cycle - scans and adds to DB
         schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
-        
+
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
-        # Run every 10 seconds with 35 items per batch
-        schedule.every(10).seconds.do(self.telegram_cycle)
+        # Run every 45 seconds with 35 items per batch (35 items * 1s delay = ~40s + API calls)
+        schedule.every(45).seconds.do(self.telegram_cycle)
         
         # 3. Maintenance tasks
         schedule.every().day.at("03:00").do(self.cleanup_old_data)
         schedule.every(2).hours.do(self.refresh_proxies)
 
         logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
-        logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 10s (35 items per batch)")
+        logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 45s (35 items per batch)")
         logger.info(f"[SCHEDULER] 🔧 Total jobs scheduled: {len(schedule.get_jobs())}")
 
     def shutdown(self):
