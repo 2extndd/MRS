@@ -166,27 +166,39 @@ class MercariNotificationApp:
         # Initial schedule setup
         self._setup_schedule()
 
-        # Send startup notification
-        try:
-            active_searches = self.db.get_active_searches()
-            logger.info(f"[STARTUP] ✅ Active searches: {len(active_searches)}")
-            for search in active_searches:
-                logger.info(f"[STARTUP]    - {search.get('name')} (ID: {search.get('id')})")
-
-            send_system_message(
-                f"🚀 MercariSearcher started\n"
-                f"Version: {config.APP_VERSION}\n"
-                f"Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}\n"
-                f"Active searches: {len(active_searches)}"
-            )
-            logger.info(f"[STARTUP] ✅ Startup notification sent to Telegram")
-        except Exception as e:
-            logger.warning(f"[STARTUP] ⚠️  Failed to send startup notification: {e}")
-
-        # Run scheduler loop
-        logger.info("[STARTUP] ✅ Scheduler is running. Press Ctrl+C to stop.")
+        # Run scheduler loop FIRST (most important!)
+        logger.info("[STARTUP] ✅ Scheduler loop starting...")
         logger.info(f"[STARTUP] Config hot reload: enabled (every {config._reload_interval}s)")
         logger.info("="*60)
+
+        # Send startup notification AFTER loop starts (non-blocking)
+        # This runs in a separate thread to not block the scheduler
+        def send_startup_notification():
+            try:
+                import time
+                time.sleep(2)  # Small delay to ensure loop started
+
+                active_searches = self.db.get_active_searches()
+                logger.info(f"[STARTUP] ✅ Active searches: {len(active_searches)}")
+                for search in active_searches:
+                    logger.info(f"[STARTUP]    - {search.get('name')} (ID: {search.get('id')})")
+
+                send_system_message(
+                    f"🚀 MercariSearcher started\n"
+                    f"Version: {config.APP_VERSION}\n"
+                    f"Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}\n"
+                    f"Active searches: {len(active_searches)}"
+                )
+                logger.info(f"[STARTUP] ✅ Startup notification sent to Telegram")
+            except Exception as e:
+                logger.warning(f"[STARTUP] ⚠️  Failed to send startup notification: {e}")
+                import traceback
+                logger.warning(f"[STARTUP] Traceback:\n{traceback.format_exc()}")
+
+        # Start notification in background thread (non-blocking)
+        import threading
+        notification_thread = threading.Thread(target=send_startup_notification, daemon=True)
+        notification_thread.start()
 
         last_interval = config.SEARCH_INTERVAL
 
