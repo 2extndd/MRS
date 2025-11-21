@@ -34,28 +34,48 @@ try:
     # Start background scheduler in separate thread
     def start_scheduler():
         """Start the search scheduler in background thread"""
+        from db import get_db
+        db = None
+
         try:
             logger.info("=" * 60)
             logger.info("[WSGI] Starting background scheduler thread...")
             logger.info("=" * 60)
 
+            # Get DB connection for logging
+            db = get_db()
+            db.add_log_entry('INFO', '[WSGI] Starting background scheduler thread...', 'wsgi')
+
             from mercari_notifications import MercariNotificationApp
 
             logger.info("[WSGI] Imported MercariNotificationApp")
+            db.add_log_entry('INFO', '[WSGI] Imported MercariNotificationApp', 'wsgi')
 
             # Create app instance and run scheduler
             logger.info("[WSGI] Creating MercariNotificationApp instance...")
+            db.add_log_entry('INFO', '[WSGI] Creating MercariNotificationApp instance...', 'wsgi')
+
             mercari_app = MercariNotificationApp()
+
             logger.info("[WSGI] MercariNotificationApp created successfully")
+            db.add_log_entry('INFO', '[WSGI] MercariNotificationApp created successfully', 'wsgi')
 
             logger.info("[WSGI] Calling run_scheduler()...")
+            db.add_log_entry('INFO', '[WSGI] Calling run_scheduler()...', 'wsgi')
+
             mercari_app.run_scheduler()
+
             logger.info("[WSGI] run_scheduler() returned (this should never happen)")
+            db.add_log_entry('ERROR', '[WSGI] run_scheduler() returned unexpectedly!', 'wsgi')
 
         except Exception as e:
             logger.error(f"[WSGI] ❌ Background scheduler error: {e}")
             import traceback
+            error_msg = f"[WSGI] Scheduler error: {e}\n{traceback.format_exc()}"
             logger.error(f"[WSGI] Traceback:\n{traceback.format_exc()}")
+
+            if db:
+                db.add_log_entry('ERROR', error_msg, 'wsgi')
 
     # Start scheduler in daemon thread (dies when main process exits)
     scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")

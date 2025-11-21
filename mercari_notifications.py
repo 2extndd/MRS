@@ -205,6 +205,9 @@ class MercariNotificationApp:
         logger.info("[SCHEDULER] ⏰ Entering main loop...")
         logger.info(f"[SCHEDULER] Jobs scheduled: {len(schedule.get_jobs())}")
 
+        # Log to DB (persistent)
+        self.db.add_log_entry('INFO', f'[SCHEDULER] Entering main loop with {len(schedule.get_jobs())} jobs', 'scheduler')
+
         loop_iteration = 0
         while True:
             try:
