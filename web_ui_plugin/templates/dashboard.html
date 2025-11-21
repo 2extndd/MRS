@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - MercariSearcher{% endblock %}
+{% block title %}Dashboard - MRS{% endblock %}
 
 {% block content %}
 <h1 class="mb-3 d-none d-md-block">Dashboard</h1>
@@ -116,6 +116,26 @@ function cleanTimestamp(ts) {
     return ts;
 }
 
+// Format relative time (e.g., "5 minutes ago")
+function timeAgo(timestamp) {
+    if (!timestamp) return '';
+    
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffMs = now - then;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    
+    if (diffSec < 60) return 'только что';
+    if (diffMin < 60) return `${diffMin} мин. назад`;
+    if (diffHour < 24) return `${diffHour} ч. назад`;
+    if (diffDay < 7) return `${diffDay} дн. назад`;
+    
+    return cleanTimestamp(timestamp);
+}
+
 // Load recent items
 function loadRecentItems(append = false) {
     if (isLoading || (!hasMore && append)) return;
@@ -157,14 +177,18 @@ function loadRecentItems(append = false) {
             let html = '';
             data.items.forEach(item => {
                 // Use direct image URL from Mercari CDN (fast!)
-                let imageUrl = item.image_url || '';
+                const imageUrl = item.image_url || '';
 
                 // Calculate USD price (fallback to 0.0067 if not set)
                 const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
                 const usdPrice = (item.price * usdRate).toFixed(2);
+                
+                // Truncate title to 8 words
+                const titleWords = item.title.split(' ');
+                const shortTitle = titleWords.slice(0, 8).join(' ') + (titleWords.length > 8 ? '...' : '');
 
                 html += `
-                    <div class="col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2 mb-3">
+                    <div class="col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2 mb-3" data-item-id="${item.id}">
                         <div class="card h-100 shadow-sm">
                             <a href="${item.item_url}" target="_blank" class="text-decoration-none">
                                 <div class="item-image-container" style="aspect-ratio: 4/5; overflow: hidden; background: var(--bg-card); border-radius: 0.25rem 0.25rem 0 0;">
@@ -178,17 +202,22 @@ function loadRecentItems(append = false) {
                                     }
                                 </div>
                             </a>
-                            <div class="card-body p-2">
-                                <h6 class="card-title mb-1 fw-bold" style="font-size: 0.8rem; line-height: 1.2; height: 2.4rem; overflow: hidden;">
-                                    ${item.title.substring(0, 50)}${item.title.length > 50 ? '...' : ''}
+                            <div class="card-body p-2 d-flex flex-column">
+                                <h6 class="card-title mb-2 fw-bold" style="font-size: 0.8rem; line-height: 1.2; height: 2.4rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                                    ${shortTitle}
                                 </h6>
-                                <div class="mb-1">
-                                    <div class="fw-bold item-price" style="font-size: 1.1rem;">$${usdPrice}</div>
-                                    <div class="text-muted" style="font-size: 0.7rem;">¥${item.price}</div>
+                                <div class="mb-2 mt-auto">
+                                    <div class="fw-bold item-price" style="font-size: 1.1rem; line-height: 1.2;">$${usdPrice}</div>
+                                    <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}</div>
                                 </div>
-                                ${item.search_keyword ?
-                                    `<span class="badge bg-primary" style="font-size: 0.6rem;">${item.search_keyword.substring(0, 15)}</span>` : ''
-                                }
+                                <div class="d-flex justify-content-between align-items-center">
+                                    ${item.search_keyword ?
+                                        `<span class="badge bg-primary" style="font-size: 0.6rem;">${item.search_keyword.substring(0, 15)}</span>` : '<span></span>'
+                                    }
+                                    ${item.found_at ?
+                                        `<small class="text-muted time-ago" style="font-size: 0.65rem;" data-timestamp="${item.found_at}">${timeAgo(item.found_at)}</small>` : ''
+                                    }
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -294,16 +323,95 @@ function refreshStats() {
         .catch(err => console.error('Stats refresh failed:', err));
 }
 
+// Update time ago labels
+function updateTimeAgo() {
+    document.querySelectorAll('.time-ago').forEach(el => {
+        const timestamp = el.getAttribute('data-timestamp');
+        if (timestamp) {
+            el.textContent = timeAgo(timestamp);
+        }
+    });
+}
+
+// Refresh only NEW items (prepend new items to top)
+function refreshNewItems() {
+    fetch('/api/recent-items?limit=10&offset=0')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.items || data.items.length === 0) return;
+            
+            const container = document.getElementById('recent-items-container');
+            const existingIds = new Set();
+            container.querySelectorAll('[data-item-id]').forEach(el => {
+                existingIds.add(el.getAttribute('data-item-id'));
+            });
+            
+            // Only add NEW items that don't exist yet
+            const newItems = data.items.filter(item => !existingIds.has(String(item.id)));
+            if (newItems.length === 0) return;
+            
+            const usdRate = {{ config.USD_CONVERSION_RATE }} || 0.0067;
+            let html = '';
+            
+            newItems.forEach(item => {
+                const imageUrl = item.image_url || '';
+                const usdPrice = (item.price * usdRate).toFixed(2);
+                const titleWords = item.title.split(' ');
+                const shortTitle = titleWords.slice(0, 8).join(' ') + (titleWords.length > 8 ? '...' : '');
+                
+                html += `
+                    <div class="col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2 mb-3" data-item-id="${item.id}">
+                        <div class="card h-100 shadow-sm">
+                            <a href="${item.item_url}" target="_blank" class="text-decoration-none">
+                                <div class="item-image-container" style="aspect-ratio: 4/5; overflow: hidden; background: var(--bg-card); border-radius: 0.25rem 0.25rem 0 0;">
+                                    ${imageUrl ?
+                                        `<img src="${imageUrl}" class="d-block w-100 h-100" style="object-fit: cover;" loading="lazy" referrerpolicy="no-referrer" crossorigin="anonymous"
+                                              onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\\'d-flex align-items-center justify-content-center h-100 flex-column\\'><i class=\\'bi bi-image\\' style=\\'font-size: 2.5rem; color: #ccc;\\'></i><small class=\\'text-muted mt-2\\'>Tap to view</small></div>';">` :
+                                        `<div class="bg-light d-flex align-items-center justify-content-center h-100 flex-column">
+                                            <i class="bi bi-image" style="font-size: 2.5rem; color: #ccc;"></i>
+                                            <small class="text-muted mt-2">Tap to view</small>
+                                        </div>`
+                                    }
+                                </div>
+                            </a>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <h6 class="card-title mb-2 fw-bold" style="font-size: 0.8rem; line-height: 1.2; height: 2.4rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                                    ${shortTitle}
+                                </h6>
+                                <div class="mb-2 mt-auto">
+                                    <div class="fw-bold item-price" style="font-size: 1.1rem; line-height: 1.2;">$${usdPrice}</div>
+                                    <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}</div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    ${item.search_keyword ?
+                                        `<span class="badge bg-primary" style="font-size: 0.6rem;">${item.search_keyword.substring(0, 15)}</span>` : '<span></span>'
+                                    }
+                                    ${item.found_at ?
+                                        `<small class="text-muted time-ago" style="font-size: 0.65rem;" data-timestamp="${item.found_at}">${timeAgo(item.found_at)}</small>` : ''
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Prepend new items to top
+            container.insertAdjacentHTML('afterbegin', html);
+            currentOffset += newItems.length;
+        })
+        .catch(err => console.error('Error refreshing new items:', err));
+}
+
 // Initial load
 loadRecentItems();
 setupInfiniteScroll();
 
-// Auto-refresh every 30 seconds (only first page, don't reset scroll)
+// Auto-refresh every 20 seconds
 setInterval(() => {
-    if (currentOffset === 0 || currentOffset === itemsPerPage) {
-        loadRecentItems(false);
-    }
     refreshStats();
-}, 30000);
+    updateTimeAgo(); // Update relative timestamps
+    refreshNewItems(); // Only fetch NEW items
+}, 20000);
 </script>
 {% endblock %}

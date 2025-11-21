@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Items - MercariSearcher{% endblock %}
+{% block title %}Items - MRS{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -9,6 +9,39 @@
             <h1 class="h3 mb-0">
                 <i class="bi bi-box me-2"></i>Items
             </h1>
+        </div>
+    </div>
+</div>
+
+<!-- Search Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold">Поиск по названию (разделяйте запросы через ";")</label>
+                        <input type="text" class="form-control" id="searchInput" 
+                               placeholder='Например: nike; adidas; puma' 
+                               oninput="filterItems()">
+                        <small class="text-muted">Поддерживается множественный поиск через точку с запятой</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Быстрые действия</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="clearSearch()">
+                                <i class="bi bi-x-circle"></i> Очистить
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm flex-fill" onclick="window.location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted" id="items-count">Всего товаров: {{ items|length if items else 0 }}</small>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -43,12 +76,13 @@
                 
                 <div class="card-body d-flex flex-column p-3">
                     <!-- Title -->
-                    <h6 class="card-title mb-2 fw-bold" style="font-size: 14px; line-height: 1.3;">
-                        {{ item.title[:60] }}{% if item.title|length > 60 %}...{% endif %}
+                    <h6 class="card-title mb-2 fw-bold" style="font-size: 14px; line-height: 1.3; height: 2.6rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                        {% set words = item.title.split(' ') %}
+                        {{ words[:8]|join(' ') }}{% if words|length > 8 %}...{% endif %}
                     </h6>
                     
                     <!-- Price with Size - BIGGER & MORE VISIBLE -->
-                    <div class="mb-2 p-2 bg-light rounded">
+                    <div class="mb-2 mt-auto p-2 bg-light rounded">
                         <span class="fw-bold text-dark" style="font-size: 18px; display: block;">
                             ${{ (item.price * (config.USD_CONVERSION_RATE or 0.0067))|round(2) }}
                         </span>
@@ -68,7 +102,7 @@
                     
                     <!-- Found timestamp -->
                     {% if item.found_at %}
-                    <small class="text-muted mt-auto" style="font-size: 11px;">
+                    <small class="text-muted mt-auto time-ago" style="font-size: 11px;" data-timestamp="{{ item.found_at }}">
                         {{ item.found_at|clean_timestamp }}
                     </small>
                     {% endif %}
@@ -120,6 +154,62 @@ function cleanTimestamp(ts) {
     return ts;
 }
 
+// Format relative time (e.g., "5 minutes ago")
+function timeAgo(timestamp) {
+    if (!timestamp) return '';
+    
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffMs = now - then;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    
+    if (diffSec < 60) return 'только что';
+    if (diffMin < 60) return `${diffMin} мин. назад`;
+    if (diffHour < 24) return `${diffHour} ч. назад`;
+    if (diffDay < 7) return `${diffDay} дн. назад`;
+    
+    return cleanTimestamp(timestamp);
+}
+
+// Filter items by multiple search terms (separated by semicolon)
+function filterItems() {
+    const searchValue = document.getElementById('searchInput').value.toLowerCase();
+    const searchTerms = searchValue.split(';').map(term => term.trim()).filter(term => term.length > 0);
+    
+    const items = document.querySelectorAll('#items-grid-container > div');
+    let visibleCount = 0;
+    
+    items.forEach(item => {
+        const title = item.querySelector('.card-title')?.textContent.toLowerCase() || '';
+        
+        if (searchTerms.length === 0) {
+            // No search terms - show all
+            item.style.display = '';
+            visibleCount++;
+        } else {
+            // Check if title matches ANY search term
+            const matches = searchTerms.some(term => title.includes(term));
+            item.style.display = matches ? '' : 'none';
+            if (matches) visibleCount++;
+        }
+    });
+    
+    // Update count display (if exists)
+    const countDisplay = document.getElementById('items-count');
+    if (countDisplay) {
+        countDisplay.textContent = `Показано: ${visibleCount} из ${items.length}`;
+    }
+}
+
+// Clear search
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    filterItems();
+}
+
 // Load more items
 function loadMoreItems() {
     if (isLoading || !hasMore) return;
@@ -164,15 +254,15 @@ function loadMoreItems() {
                                 }
                             </a>
                             <div class="card-body d-flex flex-column p-3">
-                                <h6 class="card-title mb-2 fw-bold" style="font-size: 14px; line-height: 1.3;">
-                                    ${item.title.substring(0, 60)}${item.title.length > 60 ? '...' : ''}
+                                <h6 class="card-title mb-2 fw-bold" style="font-size: 14px; line-height: 1.3; height: 2.6rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                                    ${item.title.split(' ').slice(0, 8).join(' ')}${item.title.split(' ').length > 8 ? '...' : ''}
                                 </h6>
-                                <div class="mb-2 p-2 bg-light rounded">
+                                <div class="mb-2 mt-auto p-2 bg-light rounded">
                                     <span class="fw-bold text-dark" style="font-size: 18px; display: block;">$${usdPrice}</span>
                                     <span class="text-muted" style="font-size: 13px;">¥${item.price}${item.size ? ' · ' + item.size : ''}</span>
                                 </div>
                                 ${item.search_keyword ? `<div class="mb-2"><span class="badge bg-primary" style="font-size: 11px;">${item.search_keyword}</span></div>` : ''}
-                                ${item.found_at ? `<small class="text-muted mt-auto" style="font-size: 11px;">${cleanTimestamp(item.found_at)}</small>` : ''}
+                                ${item.found_at ? `<small class="text-muted mt-auto time-ago" style="font-size: 11px;" data-timestamp="${item.found_at}">${timeAgo(item.found_at)}</small>` : ''}
                             </div>
                         </div>
                     </div>
@@ -207,9 +297,23 @@ function setupInfiniteScroll() {
     });
 }
 
+// Update time ago labels
+function updateTimeAgo() {
+    document.querySelectorAll('.time-ago').forEach(el => {
+        const timestamp = el.getAttribute('data-timestamp');
+        if (timestamp) {
+            el.textContent = timeAgo(timestamp);
+        }
+    });
+}
+
 // Initial setup
 document.addEventListener('DOMContentLoaded', function() {
     setupInfiniteScroll();
+    updateTimeAgo(); // Initialize time ago on load
+    
+    // Update time ago every 20 seconds
+    setInterval(updateTimeAgo, 20000);
 });
 </script>
 {% endblock %}

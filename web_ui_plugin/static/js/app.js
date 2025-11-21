@@ -1,9 +1,9 @@
-/* MercariSearcher - Advanced Web UI with Auto-Refresh (from KS1) */
+/* MRS - Advanced Web UI with Auto-Refresh */
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
-    console.log('✅ MercariSearcher Web UI loaded successfully');
+    console.log('✅ MRS Web UI loaded successfully');
 });
 
 function initializeApp() {

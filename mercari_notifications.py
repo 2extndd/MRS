@@ -117,7 +117,8 @@ class MercariNotificationApp:
         logger.info("[TELEGRAM] Processing pending notifications...")
         
         try:
-            notification_stats = process_pending_notifications(max_items=10)
+            # Process more items per cycle (50 instead of 10)
+            notification_stats = process_pending_notifications(max_items=50)
             
             if notification_stats['total'] > 0:
                 logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
@@ -220,8 +221,8 @@ class MercariNotificationApp:
         schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
         
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
-        # Increased to 10 seconds to avoid race conditions
-        schedule.every(10).seconds.do(self.telegram_cycle)
+        # Run every 5 seconds to process queue faster
+        schedule.every(5).seconds.do(self.telegram_cycle)
         
         # 3. Maintenance tasks
         schedule.every().day.at("03:00").do(self.cleanup_old_data)

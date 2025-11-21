@@ -401,7 +401,8 @@ def api_get_items():
     """Get items API - WITHOUT heavy image_data for fast loading"""
     try:
         limit = request.args.get('limit', 50, type=int)
-        all_items = db.get_all_items(limit=limit)
+        offset = request.args.get('offset', 0, type=int)
+        all_items = db.get_all_items(limit=limit, offset=offset)
         
         # OPTIMIZATION: Remove heavy image_data from response
         # Frontend will use image_url instead
@@ -421,8 +422,9 @@ def api_get_recent_items():
         from datetime import datetime
         import pytz
 
-        # Just get latest 30 items - NO filtering, like items page
-        items = db.get_all_items(limit=30)
+        limit = request.args.get('limit', 30, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        items = db.get_all_items(limit=limit, offset=offset)
         
         # OPTIMIZATION: Remove heavy image_data from response
         # This makes API response 10-50x smaller!

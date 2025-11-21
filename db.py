@@ -564,7 +564,7 @@ class DatabaseManager:
         query = "UPDATE items SET is_sent = %s, sent_at = %s WHERE id = %s"
         self.execute_query(query, (True, get_moscow_time(), item_id))
 
-    def get_all_items(self, limit=100):
+    def get_all_items(self, limit=100, offset=0):
         """Get recent items - FAST: without heavy image_data column"""
         query = """
             SELECT 
@@ -577,9 +577,9 @@ class DatabaseManager:
             FROM items i
             LEFT JOIN searches s ON i.search_id = s.id
             ORDER BY i.found_at DESC
-            LIMIT %s
+            LIMIT %s OFFSET %s
         """
-        return self.execute_query(query, (limit,), fetch=True)
+        return self.execute_query(query, (limit, offset), fetch=True)
 
     def get_item_by_mercari_id(self, mercari_id):
         """Get item by Mercari ID"""
