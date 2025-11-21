@@ -345,9 +345,11 @@ class TelegramWorker:
             Dictionary with processing statistics
         """
         logger.info(f"[TW] Processing pending notifications (max {max_items})...")
+        self.db.add_log_entry('INFO', f'[TW.process] Getting unsent items (max={max_items})...', 'telegram')
 
         # Get unsent items - LIMITED
         unsent_items = self.db.get_unsent_items(limit=max_items)
+        self.db.add_log_entry('INFO', f'[TW.process] Got {len(unsent_items)} unsent items', 'telegram')
 
         stats = {
             'total': len(unsent_items),
