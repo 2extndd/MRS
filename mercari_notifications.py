@@ -12,6 +12,19 @@ import time
 from datetime import datetime
 import pytz
 
+# CRITICAL FIX: Force schedule library to use UTC time
+# Railway server is in UTC, but schedule uses naive datetime.now() which causes timezone issues
+# This monkey-patch makes schedule use UTC time for all comparisons
+_original_datetime_now = datetime.now
+def _utc_now_patch(*args, **kwargs):
+    """Return UTC time instead of local time for schedule library"""
+    if args or kwargs:
+        return _original_datetime_now(*args, **kwargs)
+    return datetime.utcnow()
+
+# Apply patch
+datetime.now = _utc_now_patch
+
 from configuration_values import config
 from db import get_db
 from core import MercariSearcher
