@@ -120,14 +120,18 @@ class MercariNotificationApp:
 
         try:
             # Process 35 items per cycle
+            self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] Calling process_pending_notifications...', 'telegram')
             notification_stats = process_pending_notifications(max_items=35)
+            self.db.add_log_entry('INFO', f'[TELEGRAM_CYCLE] Got stats: {notification_stats}', 'telegram')
 
             if notification_stats['total'] > 0:
                 logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
+                self.db.add_log_entry('INFO', f'[TELEGRAM_CYCLE] Sent {notification_stats["sent"]}/{notification_stats["total"]}', 'telegram')
                 if notification_stats['failed'] > 0:
                     logger.warning(f"[TELEGRAM] Failed to send {notification_stats['failed']} notifications")
             else:
                 logger.info("[TELEGRAM] No pending notifications")
+                self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] No pending notifications', 'telegram')
 
         except Exception as e:
             logger.error(f"[TELEGRAM] Notification cycle error: {e}")
