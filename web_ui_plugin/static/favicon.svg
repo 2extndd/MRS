@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <circle cx="50" cy="50" r="45" fill="url(#grad)"/>
-  <text x="50" y="72" font-family="'Segoe UI', Arial, sans-serif" font-size="65" font-weight="bold" fill="white" text-anchor="middle">M</text>
+  <!-- Black background circle -->
+  <circle cx="50" cy="50" r="45" fill="#000000"/>
+  <!-- White border -->
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <!-- Black letter M -->
+  <text x="50" y="72" font-family="'Segoe UI', Arial, sans-serif" font-size="65" font-weight="bold" fill="#FFFFFF" text-anchor="middle">M</text>
 </svg>
