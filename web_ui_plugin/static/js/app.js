@@ -72,20 +72,10 @@ function initializeFormValidation() {
 
 // ===== AUTO-REFRESH FUNCTIONALITY (Main feature from KS1!) =====
 function initializeAutoRefresh() {
-    // Only auto-refresh dashboard page
-    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-        console.log('🔄 Auto-refresh enabled for dashboard');
-
-        // Refresh stats every 10 seconds
-        setInterval(function() {
-            refreshDashboardStats();
-        }, 10000); // 10 seconds
-
-        // Refresh recent items every 30 seconds
-        setInterval(function() {
-            refreshRecentItems();
-        }, 30000); // 30 seconds
-    }
+    // NOTE: Auto-refresh now handled by dashboard template internally
+    // Dashboard has its own refreshStats() and refreshNewItems() every 20s
+    // This function kept for backward compatibility but does nothing
+    console.log('✅ Auto-refresh handled by page templates');
 }
 
 function refreshDashboardStats() {
@@ -117,24 +107,9 @@ function refreshDashboardStats() {
         });
 }
 
-function refreshRecentItems() {
-    // Don't refresh if user is typing
-    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
-        return;
-    }
-
-    fetch('/api/recent-items')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.items) {
-                updateRecentItemsDisplay(data.items);
-                console.log(`✅ Recent items refreshed: ${data.items.length} items`);
-            }
-        })
-        .catch(error => {
-            console.error('❌ Error refreshing recent items:', error);
-        });
-}
+// NOTE: refreshRecentItems() removed from here
+// Dashboard template handles auto-refresh internally with refreshNewItems()
+// This prevents the conflict that was causing data loss in cards
 
 function updateStatCard(id, value) {
     const card = document.getElementById(id);
@@ -148,40 +123,9 @@ function updateStatCard(id, value) {
     }
 }
 
-function updateRecentItemsDisplay(items) {
-    const container = document.getElementById('recent-items-container');
-    if (!container) return;
-
-    // Clear and rebuild (smooth transition)
-    container.innerHTML = '';
-
-    items.slice(0, 30).forEach(item => {
-        const card = createItemCard(item);
-        container.appendChild(card);
-    });
-}
-
-function createItemCard(item) {
-    const col = document.createElement('div');
-    col.className = 'col-6 col-md-3 col-lg-2 mb-3 fade-in';
-
-    const imageUrl = item.image_url || 'https://via.placeholder.com/300x300/cccccc/666666?text=No+Image';
-    const price = item.price ? `¥${item.price.toLocaleString()}` : 'Price N/A';
-    const title = (item.title || 'No title').substring(0, 40) + (item.title && item.title.length > 40 ? '...' : '');
-
-    col.innerHTML = `
-        <div class="card item-card h-100">
-            <img src="${escapeHtml(imageUrl)}" class="card-img-top" alt="${escapeHtml(title)}" style="aspect-ratio: 4/5; object-fit: cover;">
-            <div class="card-body p-2">
-                <p class="card-text small mb-1" style="font-size: 0.75rem;">${escapeHtml(title)}</p>
-                <p class="card-text text-primary fw-bold mb-1" style="font-size: 0.85rem;">${escapeHtml(price)}</p>
-                ${item.search_name ? `<span class="badge bg-secondary" style="font-size: 0.65rem;">${escapeHtml(item.search_name)}</span>` : ''}
-            </div>
-        </div>
-    `;
-
-    return col;
-}
+// NOTE: updateRecentItemsDisplay() removed from here
+// Dashboard template now handles auto-refresh with full card rendering
+// This prevents data loss (USD price, timestamp, query badge, clickable links)
 
 function escapeHtml(text) {
     const div = document.createElement('div');
