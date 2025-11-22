@@ -97,20 +97,22 @@ class TelegramWorker:
                 )
 
             if success:
-                # Mark as sent in database
+                # NOTE: Item is already marked as sent in get_unsent_items() to prevent race conditions
+                # We just update sent_at timestamp here
                 item_id = item.get('id')
                 if item_id:
                     try:
-                        self.db.mark_item_sent(item_id)
-                        logger.info(f"[TW] ✅ Marked item {item_id} as sent in database")
-                        self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent & marked {item_id}', 'telegram')
+                        # Update sent_at timestamp (is_sent already True from get_unsent_items)
+                        from utils import get_moscow_time
+                        query = "UPDATE items SET sent_at = %s WHERE id = %s"
+                        self.db.execute_query(query, (get_moscow_time(), item_id))
+                        logger.info(f"[TW] ✅ Updated sent_at for item {item_id}")
+                        self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent item {item_id}', 'telegram')
                     except Exception as db_error:
-                        logger.error(f"[TW] ❌ CRITICAL: Failed to mark item {item_id} as sent in DB: {db_error}")
-                        self.db.add_log_entry('ERROR', f'[TW.send] DB error marking {item_id}: {str(db_error)[:100]}', 'telegram')
-                        # Even if DB marking fails, the message was sent successfully
-                        return True
+                        logger.warning(f"[TW] ⚠️  Failed to update sent_at for item {item_id}: {db_error}")
+                        # Not critical - item was already marked as sent in get_unsent_items()
                 else:
-                    logger.error(f"[TW] ❌ CRITICAL: Item has no ID, cannot mark as sent! Item: {item.get('title', 'Unknown')[:50]}")
+                    logger.error(f"[TW] ❌ CRITICAL: Item has no ID! Item: {item.get('title', 'Unknown')[:50]}")
                     logger.error(f"[TW] Item keys: {list(item.keys())}")
                     self.db.add_log_entry('ERROR', f'[TW.send] Item has no ID!', 'telegram')
 
@@ -123,7 +125,17 @@ class TelegramWorker:
 
                 logger.info(f"[TW] Notification sent for item: {item.get('title', 'Unknown')[:50]}")
             else:
-                self.db.add_log_entry('WARNING', f'[TW.send] ❌ Failed {item_id}', 'telegram')
+                # If send FAILED, mark item as NOT sent so it will be retried
+                item_id = item.get('id')
+                if item_id:
+                    try:
+                        query = "UPDATE items SET is_sent = %s WHERE id = %s"
+                        self.db.execute_query(query, (False, item_id))
+                        logger.warning(f"[TW] ⚠️  Marked item {item_id} as unsent for retry")
+                        self.db.add_log_entry('WARNING', f'[TW.send] ❌ Failed {item_id}, marked for retry', 'telegram')
+                    except Exception as db_error:
+                        logger.error(f"[TW] ❌ Failed to mark item {item_id} as unsent: {db_error}")
+                        self.db.add_log_entry('ERROR', f'[TW.send] DB error {item_id}: {str(db_error)[:100]}', 'telegram')
 
             return success
 

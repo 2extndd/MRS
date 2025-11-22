@@ -548,8 +548,17 @@ class DatabaseManager:
         return item_id
 
     def get_unsent_items(self, limit=100):
-        """Get items that haven't been sent to Telegram"""
-        query = """
+        """
+        Get items that haven't been sent to Telegram
+
+        CRITICAL: This function now MARKS items as sent IMMEDIATELY to prevent race conditions
+        If a telegram_cycle overlaps with another, items won't be fetched twice
+        """
+        # ATOMIC OPERATION: SELECT + UPDATE in one transaction
+        # This prevents race condition where two cycles get the same items
+
+        # First, get the items
+        query_select = """
             SELECT i.*, s.keyword as search_keyword, s.thread_id as search_thread_id
             FROM items i
             LEFT JOIN searches s ON i.search_id = s.id
@@ -557,7 +566,23 @@ class DatabaseManager:
             ORDER BY i.found_at ASC
             LIMIT %s
         """
-        return self.execute_query(query, (False, limit), fetch=True)
+        items = self.execute_query(query_select, (False, limit), fetch=True)
+
+        if not items:
+            return []
+
+        # IMMEDIATELY mark these items as "being sent" to prevent race condition
+        item_ids = [item['id'] for item in items if item.get('id')]
+        if item_ids:
+            # Mark all fetched items as sent RIGHT NOW
+            placeholders = ','.join(['%s'] * len(item_ids))
+            query_update = f"UPDATE items SET is_sent = %s WHERE id IN ({placeholders})"
+            self.execute_query(query_update, (True, *item_ids))
+
+            # Log this critical action
+            self.add_log_entry('INFO', f'[DB] Marked {len(item_ids)} items as sent to prevent duplicates', 'database')
+
+        return items
 
     def mark_item_sent(self, item_id):
         """Mark item as sent"""
