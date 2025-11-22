@@ -713,6 +713,39 @@ def health():
     return jsonify({'status': 'ok', 'app': config.APP_NAME, 'version': config.APP_VERSION})
 
 
+@app.route('/api/logs')
+def api_get_logs():
+    """Get application logs from database"""
+    try:
+        category = request.args.get('category', None)
+        limit = request.args.get('limit', 50, type=int)
+
+        query = """
+            SELECT id, created_at, level, category, message
+            FROM logs
+            WHERE 1=1
+        """
+        params = []
+
+        if category:
+            query += " AND category = %s"
+            params.append(category)
+
+        query += " ORDER BY created_at DESC LIMIT %s"
+        params.append(limit)
+
+        logs = db.execute_query(query, tuple(params), fetch=True)
+
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'count': len(logs)
+        })
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host=config.WEB_UI_HOST, port=config.PORT, debug=True)
 
