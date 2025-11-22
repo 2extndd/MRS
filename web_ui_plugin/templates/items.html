@@ -13,36 +13,21 @@
     </div>
 </div>
 
-<!-- Search Filter -->
-<div class="row mb-4">
+<!-- Search Filter - Compact -->
+<div class="row mb-3">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-8">
-                        <label class="form-label small fw-bold">Поиск по названию (разделяйте запросы через ";")</label>
-                        <input type="text" class="form-control" id="searchInput" 
-                               placeholder='Например: nike; adidas; puma' 
-                               oninput="filterItems()">
-                        <small class="text-muted">Поддерживается множественный поиск через точку с запятой</small>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold">Быстрые действия</label>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="clearSearch()">
-                                <i class="bi bi-x-circle"></i> Очистить
-                            </button>
-                            <button class="btn btn-outline-primary btn-sm flex-fill" onclick="window.location.reload()">
-                                <i class="bi bi-arrow-clockwise"></i> Обновить
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <small class="text-muted" id="items-count">Всего товаров: {{ items|length if items else 0 }}</small>
-                </div>
-            </div>
+        <div class="input-group">
+            <input type="text" class="form-control" id="searchInput" 
+                   placeholder="Поиск по названию (разделяйте через ;)" 
+                   oninput="filterItems()">
+            <button class="btn btn-outline-secondary" onclick="clearSearch()" title="Очистить">
+                <i class="bi bi-x-circle"></i>
+            </button>
+            <button class="btn btn-primary" onclick="filterItems()" title="Найти">
+                <i class="bi bi-search"></i>
+            </button>
         </div>
+        <small class="text-muted" id="items-count">Всего товаров: {{ items|length if items else 0 }}</small>
     </div>
 </div>
 
