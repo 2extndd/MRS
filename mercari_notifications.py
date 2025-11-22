@@ -12,19 +12,6 @@ import time
 from datetime import datetime
 import pytz
 
-# CRITICAL FIX: Force schedule library to use UTC time
-# Railway server is in UTC, but schedule uses naive datetime.now() which causes timezone issues
-# This monkey-patch makes schedule use UTC time for all comparisons
-_original_datetime_now = datetime.now
-def _utc_now_patch(*args, **kwargs):
-    """Return UTC time instead of local time for schedule library"""
-    if args or kwargs:
-        return _original_datetime_now(*args, **kwargs)
-    return datetime.utcnow()
-
-# Apply patch
-datetime.now = _utc_now_patch
-
 from configuration_values import config
 from db import get_db
 from core import MercariSearcher
@@ -34,8 +21,9 @@ from railway_redeploy import redeployer
 from metrics_storage import metrics_storage
 from proxies import proxy_manager
 
-# Moscow timezone (GMT+3 / UTC+3)
+# Timezones
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+UTC_TZ = pytz.UTC
 
 # Setup logging
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -316,13 +304,16 @@ class MercariNotificationApp:
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
         # Run every 45 seconds with 35 items per batch (35 items * 1s delay = ~40s + API calls)
         schedule.every(45).seconds.do(self.telegram_cycle)
-        
+
         # 3. Maintenance tasks
-        schedule.every().day.at("03:00").do(self.cleanup_old_data)
+        # Use UTC timezone for scheduled tasks (Railway is UTC)
+        # 03:00 UTC = 06:00 MSK (Moscow time)
+        schedule.every().day.at("03:00", "UTC").do(self.cleanup_old_data)
         schedule.every(2).hours.do(self.refresh_proxies)
 
         logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
         logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 45s (35 items per batch)")
+        logger.info(f"[SCHEDULER] 🧹 Cleanup: daily at 03:00 UTC (06:00 MSK)")
         logger.info(f"[SCHEDULER] 🔧 Total jobs scheduled: {len(schedule.get_jobs())}")
 
     def shutdown(self):

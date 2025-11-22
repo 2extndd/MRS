@@ -51,6 +51,7 @@ class TelegramWorker:
         Returns:
             True if sent successfully
         """
+        item_id = None
         try:
             item_title = item.get('title', 'Unknown')[:40]
             item_id = item.get('id', 'NO_ID')
@@ -71,10 +72,14 @@ class TelegramWorker:
             # Get HIGH RESOLUTION photo for Telegram
             image_url = item.get('image_url')
             if image_url:
-                from image_handler import get_original_image_url
-                # Convert to highest quality available
-                image_url = get_original_image_url(image_url)
-                logger.debug(f"[TELEGRAM] High-res image URL: {image_url[:80]}...")
+                try:
+                    from image_handler import get_original_image_url
+                    # Convert to highest quality available
+                    image_url = get_original_image_url(image_url)
+                    logger.debug(f"[TW] High-res image URL: {image_url[:80]}...")
+                except Exception as img_error:
+                    logger.warning(f"[TW] ⚠️  Error converting image URL: {img_error}, using original")
+                    # Continue with original image_url
 
             # Send with photo if available
             if image_url:
@@ -95,17 +100,26 @@ class TelegramWorker:
                 # Mark as sent in database
                 item_id = item.get('id')
                 if item_id:
-                    self.db.mark_item_sent(item_id)
-                    logger.info(f"[TW] ✅ Marked item {item_id} as sent in database")
-                    self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent & marked {item_id}', 'telegram')
+                    try:
+                        self.db.mark_item_sent(item_id)
+                        logger.info(f"[TW] ✅ Marked item {item_id} as sent in database")
+                        self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent & marked {item_id}', 'telegram')
+                    except Exception as db_error:
+                        logger.error(f"[TW] ❌ CRITICAL: Failed to mark item {item_id} as sent in DB: {db_error}")
+                        self.db.add_log_entry('ERROR', f'[TW.send] DB error marking {item_id}: {str(db_error)[:100]}', 'telegram')
+                        # Even if DB marking fails, the message was sent successfully
+                        return True
                 else:
                     logger.error(f"[TW] ❌ CRITICAL: Item has no ID, cannot mark as sent! Item: {item.get('title', 'Unknown')[:50]}")
                     logger.error(f"[TW] Item keys: {list(item.keys())}")
                     self.db.add_log_entry('ERROR', f'[TW.send] Item has no ID!', 'telegram')
 
                 # Update stats
-                self.shared_state.increment('total_notifications_sent')
-                self.shared_state.set('last_telegram_send_time', time.time())
+                try:
+                    self.shared_state.increment('total_notifications_sent')
+                    self.shared_state.set('last_telegram_send_time', time.time())
+                except Exception as stats_error:
+                    logger.warning(f"[TW] ⚠️  Failed to update stats: {stats_error}")
 
                 logger.info(f"[TW] Notification sent for item: {item.get('title', 'Unknown')[:50]}")
             else:
@@ -114,10 +128,15 @@ class TelegramWorker:
             return success
 
         except Exception as e:
-            logger.error(f"Failed to send notification: {e}")
-            self.db.add_log_entry('ERROR', f'[TW.send] Exception: {str(e)[:100]}', 'telegram')
+            logger.error(f"[TW] ❌ Failed to send notification for item {item_id}: {e}")
+            import traceback
+            logger.error(f"[TW] Traceback:\n{traceback.format_exc()}")
+            self.db.add_log_entry('ERROR', f'[TW.send] Exception {item_id}: {str(e)[:100]}', 'telegram')
             # Log error to database
-            self.db.log_error(f"Failed to send Telegram notification: {str(e)}", 'telegram')
+            try:
+                self.db.log_error(f"Failed to send Telegram notification for item {item_id}: {str(e)}", 'telegram')
+            except:
+                pass  # Don't crash if DB logging fails
             return False
 
     def _format_item_message(self, item: Dict[str, Any]) -> str:
@@ -376,34 +395,67 @@ class TelegramWorker:
         logger.info(f"[TW] Processing pending notifications (max {max_items})...")
         self.db.add_log_entry('INFO', f'[TW.process] Getting unsent items (max={max_items})...', 'telegram')
 
-        # Get unsent items - LIMITED
-        unsent_items = self.db.get_unsent_items(limit=max_items)
-        self.db.add_log_entry('INFO', f'[TW.process] Got {len(unsent_items)} unsent items', 'telegram')
-
         stats = {
-            'total': len(unsent_items),
+            'total': 0,
             'sent': 0,
-            'failed': 0
+            'failed': 0,
+            'errors': []
         }
 
-        if not unsent_items:
-            logger.info("[TW] No pending notifications (all items sent or no items in DB)")
-            return stats
+        try:
+            # Get unsent items - LIMITED
+            unsent_items = self.db.get_unsent_items(limit=max_items)
+            self.db.add_log_entry('INFO', f'[TW.process] Got {len(unsent_items)} unsent items', 'telegram')
 
-        logger.info(f"[TW] Found {len(unsent_items)} unsent items, processing...")
+            stats['total'] = len(unsent_items)
 
-        for item in unsent_items:
-            success = self.send_item_notification(item)
+            if not unsent_items:
+                logger.info("[TW] No pending notifications (all items sent or no items in DB)")
+                return stats
 
-            if success:
-                stats['sent'] += 1
-            else:
-                stats['failed'] += 1
+            logger.info(f"[TW] Found {len(unsent_items)} unsent items, processing...")
 
-            # Rate limiting between messages
-            time.sleep(1)
+            for index, item in enumerate(unsent_items):
+                try:
+                    item_id = item.get('id', 'UNKNOWN')
+                    item_title = item.get('title', 'No title')[:40]
+                    logger.info(f"[TW] Processing item {index+1}/{len(unsent_items)}: ID={item_id}")
 
-        logger.info(f"Processed {stats['sent']}/{stats['total']} notifications")
+                    success = self.send_item_notification(item)
+
+                    if success:
+                        stats['sent'] += 1
+                    else:
+                        stats['failed'] += 1
+                        error_msg = f"Failed to send item {item_id}: {item_title}"
+                        stats['errors'].append(error_msg)
+                        logger.warning(f"[TW] ❌ {error_msg}")
+
+                    # Rate limiting between messages
+                    time.sleep(1)
+
+                except Exception as item_error:
+                    stats['failed'] += 1
+                    error_msg = f"Exception processing item {item.get('id', 'UNKNOWN')}: {str(item_error)[:100]}"
+                    stats['errors'].append(error_msg)
+                    logger.error(f"[TW] ❌ {error_msg}")
+                    self.db.add_log_entry('ERROR', f'[TW.process] {error_msg}', 'telegram')
+                    # Continue with next item instead of crashing
+                    continue
+
+            logger.info(f"[TW] ✅ Processed {stats['sent']}/{stats['total']} notifications")
+            if stats['failed'] > 0:
+                logger.warning(f"[TW] ⚠️  Failed: {stats['failed']}")
+                for error in stats['errors'][:5]:  # Log first 5 errors
+                    logger.warning(f"[TW]    - {error}")
+
+        except Exception as e:
+            error_msg = f"CRITICAL ERROR in process_pending_notifications: {str(e)}"
+            logger.error(f"[TW] ❌ {error_msg}")
+            import traceback
+            logger.error(f"[TW] Traceback:\n{traceback.format_exc()}")
+            self.db.add_log_entry('ERROR', f'[TW.process] CRITICAL: {error_msg[:200]}', 'telegram')
+            stats['errors'].append(error_msg)
 
         return stats
 
