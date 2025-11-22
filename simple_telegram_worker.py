@@ -443,8 +443,8 @@ class TelegramWorker:
                         stats['errors'].append(error_msg)
                         logger.warning(f"[TW] ❌ {error_msg}")
 
-                    # Rate limiting between messages
-                    time.sleep(1)
+                    # Rate limiting between messages (0.5s = 2 items/sec)
+                    time.sleep(0.5)
 
                 except Exception as item_error:
                     stats['failed'] += 1

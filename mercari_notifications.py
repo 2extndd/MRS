@@ -126,9 +126,9 @@ class MercariNotificationApp:
         logger.info("[TELEGRAM] Processing pending notifications...")
 
         try:
-            # Process 35 items per cycle
+            # Process 60 items per cycle (2 items/sec = faster delivery)
             self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] Calling process_pending_notifications...', 'telegram')
-            notification_stats = process_pending_notifications(max_items=35)
+            notification_stats = process_pending_notifications(max_items=60)
             self.db.add_log_entry('INFO', f'[TELEGRAM_CYCLE] Got stats: {notification_stats}', 'telegram')
 
             if notification_stats['total'] > 0:
@@ -303,8 +303,8 @@ class MercariNotificationApp:
         schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
 
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
-        # Run every 45 seconds with 35 items per batch (35 items * 1s delay = ~40s + API calls)
-        schedule.every(45).seconds.do(self.telegram_cycle)
+        # Run every 35 seconds with 60 items per batch (60 items * 0.5s delay = ~30s + API calls)
+        schedule.every(35).seconds.do(self.telegram_cycle)
 
         # 3. Maintenance tasks
         # Use UTC timezone for scheduled tasks (Railway is UTC)
@@ -313,7 +313,7 @@ class MercariNotificationApp:
         schedule.every(2).hours.do(self.refresh_proxies)
 
         logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
-        logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 45s (35 items per batch)")
+        logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 35s (60 items per batch, 2 items/sec)")
         logger.info(f"[SCHEDULER] 🧹 Cleanup: daily at 03:00 UTC (06:00 MSK)")
         logger.info(f"[SCHEDULER] 🔧 Total jobs scheduled: {len(schedule.get_jobs())}")
 
