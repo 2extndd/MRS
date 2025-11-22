@@ -93,6 +93,10 @@ class Config:
         "3098": "Other"
     }
 
+    # Global Category Blacklist (filter out unwanted categories)
+    # Items from these categories will be automatically rejected
+    CATEGORY_BLACKLIST = []  # Will be loaded from database
+
     # Size Mappings (Japanese to International)
     SIZE_MAPPINGS = {
         "XS": ["XS", "エックスエス"],
@@ -283,8 +287,29 @@ class Config:
                     cls.USD_CONVERSION_RATE = float(new_config['config_usd_conversion_rate'])
                     logger.info(f"[CONFIG] USD_CONVERSION_RATE: {old_val} → {cls.USD_CONVERSION_RATE}")
 
+                # Category blacklist (global filter)
+                if 'config_category_blacklist' in new_config:
+                    import json
+                    blacklist_data = new_config['config_category_blacklist']
+                    
+                    # Parse blacklist (could be JSON array or string)
+                    if isinstance(blacklist_data, list):
+                        cls.CATEGORY_BLACKLIST = blacklist_data
+                    elif isinstance(blacklist_data, str) and blacklist_data:
+                        try:
+                            cls.CATEGORY_BLACKLIST = json.loads(blacklist_data)
+                        except:
+                            # Fallback: treat as comma-separated string
+                            cls.CATEGORY_BLACKLIST = [c.strip() for c in blacklist_data.split(',') if c.strip()]
+                    else:
+                        cls.CATEGORY_BLACKLIST = []
+                    
+                    logger.info(f"[CONFIG] Category blacklist loaded: {len(cls.CATEGORY_BLACKLIST)} categories filtered")
+                    if cls.CATEGORY_BLACKLIST:
+                        logger.info(f"[CONFIG] Blacklisted categories: {cls.CATEGORY_BLACKLIST}")
+
                 cls._config_cache = new_config
-                logger.info(f"[CONFIG] ✅ Hot reload complete! search_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}")
+                logger.info(f"[CONFIG] ✅ Hot reload complete! search_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}, blacklist={len(cls.CATEGORY_BLACKLIST)}")
                 return True
 
         except Exception as e:

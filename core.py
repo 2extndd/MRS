@@ -388,6 +388,25 @@ class MercariSearcher:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
+                # GLOBAL CATEGORY FILTER: Check if item's category is blacklisted
+                item_category = getattr(full_item, 'category', None)
+                item_rejected = False
+                if item_category and config.CATEGORY_BLACKLIST:
+                    # Check if category matches any blacklisted category
+                    for blacklisted_cat in config.CATEGORY_BLACKLIST:
+                        if blacklisted_cat in item_category:
+                            logger.info(f"[FILTER] 🚫 Item rejected: category '{item_category}' is blacklisted")
+                            logger.info(f"[FILTER]    Title: {full_item.title[:60]}")
+                            logger.info(f"[FILTER]    Matched blacklist: '{blacklisted_cat}'")
+                            item_rejected = True
+                            break  # Stop checking other blacklist entries
+                
+                # Skip this item if it was rejected
+                if item_rejected:
+                    continue
+                            
+                # If we reach here, item passed the category filter
+                
                 # Get image URL - Item class has .image_url attribute
                 image_url = full_item.image_url
                 

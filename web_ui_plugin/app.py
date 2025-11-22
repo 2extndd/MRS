@@ -163,6 +163,16 @@ def configuration():
 
     # Create final config dict from Config class attributes + DB overrides
     # ВАЖНО: Ключи должны совпадать с именами полей в форме!
+    
+    # Load category blacklist from DB
+    category_blacklist = config_dict.get('category_blacklist', [])
+    if isinstance(category_blacklist, str):
+        import json
+        try:
+            category_blacklist = json.loads(category_blacklist)
+        except:
+            category_blacklist = []
+    
     final_config = {
         'SEARCH_INTERVAL': config_dict.get('search_interval', config.SEARCH_INTERVAL),
         'MAX_ITEMS_PER_SEARCH': config_dict.get('max_items_per_search', config.MAX_ITEMS_PER_SEARCH),
@@ -173,6 +183,7 @@ def configuration():
         'TELEGRAM_BOT_TOKEN': config_dict.get('telegram_bot_token', config.TELEGRAM_BOT_TOKEN),
         'TELEGRAM_CHAT_ID': config_dict.get('telegram_chat_id', config.TELEGRAM_CHAT_ID),
         'RAILWAY_TOKEN': config_dict.get('railway_token', config.RAILWAY_TOKEN),
+        'CATEGORY_BLACKLIST': category_blacklist,
         # Read-only values from config class
         'APP_NAME': config.APP_NAME,
         'APP_VERSION': config.APP_VERSION,

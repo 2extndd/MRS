@@ -58,6 +58,46 @@
     </div>
 </div>
 
+<!-- Category Blacklist (Global Filter) -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-funnel"></i> Category Filter</h5>
+    </div>
+    <div class="card-body">
+        <form id="categoryBlacklistForm">
+            <div class="mb-3">
+                <label class="form-label">Blacklisted Categories (one per line)</label>
+                <textarea class="form-control" name="category_blacklist" rows="6" id="categoryBlacklistInput"
+                          placeholder="ゲーム・おもちゃ・グッズ&#10;本・音楽・ゲーム&#10;エンタメ・ホビー">{{ config.CATEGORY_BLACKLIST|join('\n') if config.CATEGORY_BLACKLIST else '' }}</textarea>
+                <small class="text-muted">Items from these categories will be automatically filtered out and won't appear in Telegram. Enter category names in Japanese as they appear on Mercari.</small>
+            </div>
+            <div class="alert alert-info mb-3">
+                <strong>ℹ️ How it works:</strong> Any item whose category contains one of the blacklisted strings will be rejected before being saved to the database. This is a <strong>global filter</strong> that applies to all search queries.
+            </div>
+            <div class="mb-3">
+                <strong>Common categories to filter:</strong>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('ゲーム・おもちゃ・グッズ')">
+                        🎮 Games & Toys
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('本・音楽・ゲーム')">
+                        📚 Books & Music
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('エンタメ・ホビー')">
+                        🎪 Entertainment
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('ベビー・キッズ')">
+                        👶 Baby & Kids
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="saveCategoryBlacklist()">
+                <i class="bi bi-save"></i> Save Category Filter
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- Telegram Bot Settings -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -382,6 +422,62 @@ function forceRedeploy() {
 // Auto-refresh Railway status every 30 seconds
 setInterval(refreshRailwayStatus, 30000);
 refreshRailwayStatus();
+
+// Category Blacklist functions
+function addCategoryToBlacklist(category) {
+    const textarea = document.getElementById('categoryBlacklistInput');
+    const currentValue = textarea.value.trim();
+    
+    // Check if category already exists
+    const lines = currentValue.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.includes(category)) {
+        alert('⚠️ This category is already in the blacklist!');
+        return;
+    }
+    
+    // Add category
+    if (currentValue) {
+        textarea.value = currentValue + '\n' + category;
+    } else {
+        textarea.value = category;
+    }
+    
+    // Highlight the textarea briefly
+    textarea.style.borderColor = '#0d6efd';
+    setTimeout(() => { textarea.style.borderColor = ''; }, 1000);
+}
+
+function saveCategoryBlacklist() {
+    const textarea = document.getElementById('categoryBlacklistInput');
+    const categoriesText = textarea.value.trim();
+    
+    // Parse categories (one per line)
+    const categories = categoriesText
+        .split('\n')
+        .map(c => c.trim())
+        .filter(c => c.length > 0);
+    
+    console.log('[CONFIG] Saving category blacklist:', categories);
+    
+    fetch('/api/config/system', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            category_blacklist: JSON.stringify(categories)  // Save as JSON array
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Category filter saved!\n\n' + categories.length + ' categories will be filtered.\n\nFilters will apply automatically within 10 seconds.');
+        } else {
+            alert('❌ Failed to save: ' + data.error);
+        }
+    })
+    .catch(err => {
+        alert('❌ Error: ' + err);
+    });
+}
 
 // Initialize theme toggle button state
 function initThemeToggle() {
