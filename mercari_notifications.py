@@ -103,7 +103,6 @@ class MercariNotificationApp:
         try:
             from datetime import datetime as dt_now
             current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
-            self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] *** CALLED at {current_time_str} ***', 'search')
             logger.info("\n" + "=" * 60)
             logger.info(f"Starting search cycle at {current_time_str}")
             logger.info("=" * 60)
@@ -118,33 +117,32 @@ class MercariNotificationApp:
             if redeployer:
                 redeployer.check_and_redeploy_if_needed()
 
-            self.db.add_log_entry('INFO', f'[SEARCH_CYCLE] Completed successfully', 'search')
+            # Only log to DB if there were actual results
+            if results:
+                self.db.add_log_entry('INFO', f'[SEARCH] Completed at {current_time_str}', 'search')
 
         except Exception as e:
             logger.error(f"Search cycle error: {e}")
             self.shared_state.add_error(str(e))
             self.db.log_error(str(e), 'search_cycle')
-            self.db.add_log_entry('ERROR', f'[SEARCH_CYCLE] Exception: {str(e)[:150]}', 'search')
+            self.db.add_log_entry('ERROR', f'[SEARCH] Exception: {str(e)[:150]}', 'search')
     
     def telegram_cycle(self):
         """Telegram notification cycle - INDEPENDENT from search"""
-        self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] *** FUNCTION CALLED ***', 'telegram')
         logger.info("[TELEGRAM] Processing pending notifications...")
 
         try:
             # Process 60 items per cycle (2 items/sec = faster delivery)
-            self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] Calling process_pending_notifications...', 'telegram')
             notification_stats = process_pending_notifications(max_items=60)
-            self.db.add_log_entry('INFO', f'[TELEGRAM_CYCLE] Got stats: {notification_stats}', 'telegram')
 
             if notification_stats['total'] > 0:
                 logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
-                self.db.add_log_entry('INFO', f'[TELEGRAM_CYCLE] Sent {notification_stats["sent"]}/{notification_stats["total"]}', 'telegram')
+                # Only log to DB if there were actual notifications sent
+                self.db.add_log_entry('INFO', f'[TELEGRAM] Sent {notification_stats["sent"]}/{notification_stats["total"]}', 'telegram')
                 if notification_stats['failed'] > 0:
                     logger.warning(f"[TELEGRAM] Failed to send {notification_stats['failed']} notifications")
             else:
-                logger.info("[TELEGRAM] No pending notifications")
-                self.db.add_log_entry('INFO', '[TELEGRAM_CYCLE] No pending notifications', 'telegram')
+                logger.debug("[TELEGRAM] No pending notifications")  # Changed to debug to reduce noise
 
         except Exception as e:
             logger.error(f"[TELEGRAM] Notification cycle error: {e}")
@@ -250,9 +248,9 @@ class MercariNotificationApp:
                     self.db.add_log_entry('INFO', f'[SCHEDULER] Time: {current_time}', 'scheduler')
                     self.db.add_log_entry('INFO', f'[SCHEDULER] Jobs detail: {jobs_detail}', 'scheduler')
 
-                if loop_iteration % 10 == 0:
+                # Reduced logging frequency: every 60 iterations (1 minute) instead of 10 seconds
+                if loop_iteration % 60 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] Loop iteration {loop_iteration}', 'scheduler')
 
                 # HOT RELOAD CONFIG EVERY ITERATION
                 if config.reload_if_needed():
@@ -266,25 +264,12 @@ class MercariNotificationApp:
                         self._setup_schedule()
                         last_interval = config.SEARCH_INTERVAL
 
-                # Log schedule state BEFORE run_pending
-                if loop_iteration % 10 == 0:
-                    jobs_before = schedule.get_jobs()
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] Before run_pending: {len(jobs_before)} jobs', 'scheduler')
-
                 schedule.run_pending()
 
-                # Log after first run_pending()
+                # Log after first run_pending() only
                 if loop_iteration == 1:
                     logger.info(f"[SCHEDULER] ⏰ First run_pending() completed")
                     self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
-
-                # Log every 10 iterations AFTER run_pending()
-                if loop_iteration % 10 == 0:
-                    from datetime import datetime as dt_check
-                    current_time_check = dt_check.now()
-                    jobs_after = schedule.get_jobs()
-                    next_times = [str(job.next_run) for job in jobs_after]
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] After run_pending at {current_time_check}: next_run times = {next_times}', 'scheduler')
 
                 time.sleep(1)
             except KeyboardInterrupt:

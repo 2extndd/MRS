@@ -67,7 +67,7 @@ class Config:
     # Hot reload state
     _config_cache = {}
     _last_reload_time = 0
-    _reload_interval = 10  # Check every 10 seconds
+    _reload_interval = 60  # Check every 60 seconds (reduced from 10s to save CPU/DB)
 
     # Currency Settings
     DEFAULT_CURRENCY = "JPY"

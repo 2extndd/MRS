@@ -56,7 +56,6 @@ class TelegramWorker:
             item_title = item.get('title', 'Unknown')[:40]
             item_id = item.get('id', 'NO_ID')
             logger.info(f"[TW] Sending notification for: {item_title}...")
-            self.db.add_log_entry('INFO', f'[TW.send] Sending item {item_id}: {item_title}', 'telegram')
 
             # Get thread_id from item's search or use global default
             thread_id = item.get('search_thread_id') or self.thread_id
@@ -107,7 +106,6 @@ class TelegramWorker:
                         query = "UPDATE items SET sent_at = %s WHERE id = %s"
                         self.db.execute_query(query, (get_moscow_time(), item_id))
                         logger.info(f"[TW] ✅ Updated sent_at for item {item_id}")
-                        self.db.add_log_entry('INFO', f'[TW.send] ✅ Sent item {item_id}', 'telegram')
                     except Exception as db_error:
                         logger.warning(f"[TW] ⚠️  Failed to update sent_at for item {item_id}: {db_error}")
                         # Not critical - item was already marked as sent in get_unsent_items()
@@ -132,7 +130,6 @@ class TelegramWorker:
                         query = "UPDATE items SET is_sent = %s WHERE id = %s"
                         self.db.execute_query(query, (False, item_id))
                         logger.warning(f"[TW] ⚠️  Marked item {item_id} as unsent for retry")
-                        self.db.add_log_entry('WARNING', f'[TW.send] ❌ Failed {item_id}, marked for retry', 'telegram')
                     except Exception as db_error:
                         logger.error(f"[TW] ❌ Failed to mark item {item_id} as unsent: {db_error}")
                         self.db.add_log_entry('ERROR', f'[TW.send] DB error {item_id}: {str(db_error)[:100]}', 'telegram')
@@ -405,7 +402,6 @@ class TelegramWorker:
             Dictionary with processing statistics
         """
         logger.info(f"[TW] Processing pending notifications (max {max_items})...")
-        self.db.add_log_entry('INFO', f'[TW.process] Getting unsent items (max={max_items})...', 'telegram')
 
         stats = {
             'total': 0,
@@ -417,7 +413,6 @@ class TelegramWorker:
         try:
             # Get unsent items - LIMITED
             unsent_items = self.db.get_unsent_items(limit=max_items)
-            self.db.add_log_entry('INFO', f'[TW.process] Got {len(unsent_items)} unsent items', 'telegram')
 
             stats['total'] = len(unsent_items)
 
@@ -530,14 +525,12 @@ def process_pending_notifications(max_items: int = 35) -> Dict[str, int]:
     """
     try:
         logger.info("[TW] Creating TelegramWorker instance...")
-        from db import get_db
-        db = get_db()
-        db.add_log_entry('INFO', '[TW] Creating TelegramWorker...', 'telegram')
         worker = TelegramWorker()
         logger.info("[TW] TelegramWorker created successfully")
-        db.add_log_entry('INFO', '[TW] TelegramWorker created, calling process_pending_notifications...', 'telegram')
         result = worker.process_pending_notifications(max_items=max_items)
-        db.add_log_entry('INFO', f'[TW] Returned: {result}', 'telegram')
+        # Only log if there were items to send
+        if result.get('total', 0) > 0:
+            logger.info(f"[TW] Sent {result['sent']}/{result['total']} items")
         return result
     except Exception as e:
         logger.error(f"[TW] Failed to create TelegramWorker: {e}")
