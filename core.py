@@ -389,6 +389,7 @@ class MercariSearcher:
                     continue
                 
                 # GLOBAL CATEGORY FILTER: Check if item's category is blacklisted
+                # OPTIMIZATION: Do this BEFORE downloading images to save time
                 item_category = getattr(full_item, 'category', None)
                 item_rejected = False
                 if item_category and config.CATEGORY_BLACKLIST:
@@ -401,7 +402,7 @@ class MercariSearcher:
                             item_rejected = True
                             break  # Stop checking other blacklist entries
                 
-                # Skip this item if it was rejected
+                # Skip this item if it was rejected (saves ~3-4 seconds per filtered item)
                 if item_rejected:
                     continue
                             

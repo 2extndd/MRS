@@ -195,6 +195,16 @@ class Mercari:
                             call_params['status'] = [SearchRequestData.Status.STATUS_ON_SALE]
                     except ImportError:
                         logger.warning("Could not import mercapi Status enum, ignoring status filter")
+                
+                # IMPORTANT: Set sort order to CREATED_TIME (newest first)
+                # By default mercapi sorts by SORT_SCORE (relevance), but we want chronological order
+                try:
+                    from mercapi.requests.search import SearchRequestData
+                    call_params['sort_by'] = SearchRequestData.SortBy.SORT_CREATED_TIME
+                    call_params['sort_order'] = SearchRequestData.SortOrder.ORDER_DESC
+                    logger.info(f"Sort order: CREATED_TIME DESC (newest first)")
+                except ImportError:
+                    logger.warning("Could not import mercapi SortBy enum, using default sort")
 
                 logger.info(f"Calling mercapi.search() with params: {call_params}")
 
@@ -227,11 +237,37 @@ class Mercari:
                     else:
                         item_url = f"https://jp.mercari.com/shops/product/{item_id}"
                     
-                    # Extract category from item
+                    # Extract category from item - NEED FULL ITEM DATA
+                    # Search results don't include item_category, need to fetch full item
+                    # NOTE: Shops products return 404 on full_item(), skip category for them
                     item_category = None
-                    if hasattr(item, 'item_category') and item.item_category:
-                        if hasattr(item.item_category, 'name'):
-                            item_category = item.item_category.name
+                    full_item_data = None
+                    is_shops_product = not item_id.startswith('m')
+                    
+                    if hasattr(item, 'full_item') and not is_shops_product:
+                        try:
+                            # Call full_item() to get complete category information
+                            # Skip for shops products as they return 404
+                            full_item_data = await item.full_item()
+                            if full_item_data and hasattr(full_item_data, 'item_category') and full_item_data.item_category:
+                                category_obj = full_item_data.item_category
+                                # Build full category path for blacklist matching
+                                # Example: "ベビー・キッズ > キッズシューズ > スニーカー"
+                                category_parts = []
+                                if hasattr(category_obj, 'root_category_name') and category_obj.root_category_name:
+                                    category_parts.append(category_obj.root_category_name)
+                                if hasattr(category_obj, 'parent_category_name') and category_obj.parent_category_name:
+                                    category_parts.append(category_obj.parent_category_name)
+                                if hasattr(category_obj, 'name') and category_obj.name:
+                                    category_parts.append(category_obj.name)
+                                
+                                if category_parts:
+                                    item_category = ' > '.join(category_parts)
+                                    logger.debug(f"Item {item_id} category: {item_category}")
+                        except Exception as e:
+                            logger.debug(f"Failed to get full item data for {item_id}: {e}")
+                    elif is_shops_product:
+                        logger.debug(f"Item {item_id} is shops product, skipping full_item() call")
                     
                     item_dict = {
                         'mercari_id': item_id,
@@ -253,39 +289,56 @@ class Mercari:
                     }
 
                     # Get HIGH RESOLUTION image
-                    # mercapi returns small thumbnails, construct full-size URL
-                    photos = getattr(item, 'photos', [])
-                    thumbnails = getattr(item, 'thumbnails', [])
-                    thumbnail = getattr(item, 'thumbnail', None)
+                    # Priority: full_item_data (if available) > search result data
+                    photos = []
+                    thumbnails = []
+                    thumbnail = None
                     
-                    # Try to get any image first (priority: photos > thumbnails > thumbnail)
+                    # Try to get images from full_item_data first (better quality)
+                    if full_item_data:
+                        photos = getattr(full_item_data, 'photos', [])
+                        thumbnails = getattr(full_item_data, 'thumbnails', [])
+                        thumbnail = getattr(full_item_data, 'thumbnail', None)
+                    
+                    # Fallback to search result data if full_item_data not available
+                    if not photos and not thumbnails and not thumbnail:
+                        photos = getattr(item, 'photos', [])
+                        thumbnails = getattr(item, 'thumbnails', [])
+                        thumbnail = getattr(item, 'thumbnail', None)
+                    
+                    # Try to get any image (priority: photos > thumbnails > thumbnail)
                     base_image = None
                     if photos and len(photos) > 0:
                         base_image = photos[0]
+                        logger.debug(f"Item {item_id}: using photos[0]")
                     elif thumbnails and len(thumbnails) > 0:
                         base_image = thumbnails[0]
+                        logger.debug(f"Item {item_id}: using thumbnails[0]")
                     elif thumbnail:
                         base_image = thumbnail
+                        logger.debug(f"Item {item_id}: using thumbnail")
                     
                     # Convert thumbnail URL to full-size image
                     if base_image:
-                        # Mercari image URLs: replace thumbnail size with original
-                        # Example: .../c_limit,f_auto,fl_progressive,q_90,w_240/... → w_1200 or remove size params
                         import re
-                        # Remove size parameters to get full image
-                        full_image = re.sub(r'w_\d+', 'w_1200', base_image)  # 1200px width
-                        full_image = re.sub(r'h_\d+', 'h_1200', full_image)  # 1200px height
+                        full_image = base_image
                         
-                        # For shops products: convert small to large
-                        if 'shops' in item_url or 'mercari-shops-static.com' in full_image:
+                        # For shops products: convert /-/small/ to /-/large/
+                        if 'mercari-shops-static.com' in full_image:
                             full_image = re.sub(r'/-/small/', '/-/large/', full_image)
                             full_image = re.sub(r'/small/', '/large/', full_image)
+                            logger.debug(f"Item {item_id}: converted shops image to large")
+                        # For regular items: upgrade resolution
+                        elif 'mercdn.net' in full_image or 'mercari' in full_image:
+                            full_image = re.sub(r'w_\d+', 'w_1200', full_image)
+                            full_image = re.sub(r'h_\d+', 'h_1200', full_image)
+                            logger.debug(f"Item {item_id}: upgraded image resolution")
                         
                         item_dict['image_url'] = full_image
-                        logger.debug(f"Item {item_id}: image_url = {full_image[:80] if full_image else 'None'}")
+                        logger.debug(f"Item {item_id}: final image_url = {full_image[:80]}")
                     else:
                         item_dict['image_url'] = None
-                        logger.warning(f"No image for item {item_id} (shops product)")
+                        logger.warning(f"No image found for item {item_id}")
 
                     items_data.append(item_dict)
                     item_count += 1
