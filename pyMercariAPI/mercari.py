@@ -252,14 +252,14 @@ class Mercari:
                     thumbnails = getattr(item, 'thumbnails', [])
                     thumbnail = getattr(item, 'thumbnail', None)
                     
-                    # Try to get any image first
+                    # Try to get any image first (priority: photos > thumbnails > thumbnail)
                     base_image = None
                     if photos and len(photos) > 0:
                         base_image = photos[0]
-                    elif thumbnail:
-                        base_image = thumbnail
                     elif thumbnails and len(thumbnails) > 0:
                         base_image = thumbnails[0]
+                    elif thumbnail:
+                        base_image = thumbnail
                     
                     # Convert thumbnail URL to full-size image
                     if base_image:
@@ -269,10 +269,17 @@ class Mercari:
                         # Remove size parameters to get full image
                         full_image = re.sub(r'w_\d+', 'w_1200', base_image)  # 1200px width
                         full_image = re.sub(r'h_\d+', 'h_1200', full_image)  # 1200px height
+                        
+                        # For shops products: convert small to large
+                        if 'shops' in item_url or 'mercari-shops-static.com' in full_image:
+                            full_image = re.sub(r'/-/small/', '/-/large/', full_image)
+                            full_image = re.sub(r'/small/', '/large/', full_image)
+                        
                         item_dict['image_url'] = full_image
+                        logger.debug(f"Item {item_id}: image_url = {full_image[:80] if full_image else 'None'}")
                     else:
                         item_dict['image_url'] = None
-                        logger.debug(f"No image for item {item_id}")
+                        logger.warning(f"No image for item {item_id} (shops product)")
 
                     items_data.append(item_dict)
                     item_count += 1
@@ -481,6 +488,30 @@ class Mercari:
             if hasattr(full_item, 'photos') and full_item.photos:
                 # photos already contains full-size /orig/ URLs from mercapi
                 item_data['image_url'] = full_item.photos[0]
+            elif hasattr(full_item, 'thumbnails') and full_item.thumbnails:
+                # Fallback to thumbnails and upgrade to high-res
+                import re
+                thumbnail = full_item.thumbnails[0]
+                # Upgrade thumbnail to high-res
+                high_res = re.sub(r'w_\d+', 'w_1200', thumbnail)
+                high_res = re.sub(r'h_\d+', 'h_1200', high_res)
+                # For shops products: convert small to large
+                if '/shops/' in item_url or 'mercari-shops-static.com' in high_res:
+                    high_res = re.sub(r'/-/small/', '/-/large/', high_res)
+                    high_res = re.sub(r'/small/', '/large/', high_res)
+                item_data['image_url'] = high_res
+                logger.info(f"Using thumbnail for shops product {item_id}: {high_res[:80]}")
+            elif hasattr(full_item, 'thumbnail') and full_item.thumbnail:
+                # Last fallback: single thumbnail
+                import re
+                thumbnail = full_item.thumbnail
+                high_res = re.sub(r'w_\d+', 'w_1200', thumbnail)
+                high_res = re.sub(r'h_\d+', 'h_1200', high_res)
+                if '/shops/' in item_url or 'mercari-shops-static.com' in high_res:
+                    high_res = re.sub(r'/-/small/', '/-/large/', high_res)
+                    high_res = re.sub(r'/small/', '/large/', high_res)
+                item_data['image_url'] = high_res
+                logger.info(f"Using single thumbnail for shops product {item_id}: {high_res[:80]}")
             
             # Extract SIZE from description or item attributes
             item_data['size'] = self._extract_size(full_item)
