@@ -163,14 +163,44 @@ class Mercari:
 
             logger.info(f"Searching Mercari: {search_url[:80]}...")
 
-            # Extract keyword from URL if it's a full URL
-            keyword = self._extract_keyword_from_url(search_url)
+            # Extract ALL search parameters from URL (keyword + filters)
+            search_params = self._extract_search_params_from_url(search_url)
 
             # Run async search in sync context with proper event loop handling
             async def _perform_search():
                 m = self._get_mercapi()
-                results = await m.search(query=keyword)
-                
+
+                # Build mercapi search call with all extracted parameters
+                # Only include parameters that are not None/empty
+                call_params = {'query': search_params['query']}
+
+                if search_params['price_min'] is not None:
+                    call_params['price_min'] = search_params['price_min']
+
+                if search_params['price_max'] is not None:
+                    call_params['price_max'] = search_params['price_max']
+
+                if search_params['categories']:
+                    call_params['categories'] = search_params['categories']
+
+                if search_params['item_conditions']:
+                    call_params['item_conditions'] = search_params['item_conditions']
+
+                # Handle status enum
+                if search_params['status']:
+                    # Import Status enum from mercapi
+                    try:
+                        from mercapi.requests.search import SearchRequestData
+                        if 'on_sale' in search_params['status']:
+                            call_params['status'] = [SearchRequestData.Status.STATUS_ON_SALE]
+                    except ImportError:
+                        logger.warning("Could not import mercapi Status enum, ignoring status filter")
+
+                logger.info(f"Calling mercapi.search() with params: {call_params}")
+
+                # Call mercapi with extracted parameters
+                results = await m.search(**call_params)
+
                 # Log what mercapi returned
                 total_from_api = len(results.items) if hasattr(results, 'items') else 0
                 logger.info(f"mercapi returned {total_from_api} items, will limit to {limit}")
@@ -298,6 +328,96 @@ class Mercari:
         except Exception as e:
             logger.error(f"Failed to parse URL: {e}")
             return ""
+
+    def _extract_search_params_from_url(self, search_url: str) -> Dict[str, Any]:
+        """
+        Extract ALL search parameters from Mercari search URL
+
+        Args:
+            search_url: Full Mercari URL or keyword
+
+        Returns:
+            Dictionary with all search parameters for mercapi.search()
+        """
+        # Default params
+        search_params = {
+            'query': '',
+            'price_min': None,
+            'price_max': None,
+            'categories': [],
+            'item_conditions': [],
+            'status': []
+        }
+
+        # If it's not a URL, it's just a keyword
+        if not search_url.startswith('http'):
+            search_params['query'] = search_url
+            return search_params
+
+        # Parse URL
+        from urllib.parse import urlparse, parse_qs
+
+        try:
+            parsed = urlparse(search_url)
+            params = parse_qs(parsed.query)
+
+            # Extract keyword
+            keyword = params.get('keyword', [''])[0]
+            search_params['query'] = keyword.strip()
+
+            # Extract price filters
+            if 'price_min' in params:
+                try:
+                    search_params['price_min'] = int(params['price_min'][0])
+                    logger.info(f"Extracted price_min: {search_params['price_min']}")
+                except (ValueError, IndexError):
+                    pass
+
+            if 'price_max' in params:
+                try:
+                    search_params['price_max'] = int(params['price_max'][0])
+                    logger.info(f"Extracted price_max: {search_params['price_max']}")
+                except (ValueError, IndexError):
+                    pass
+
+            # Extract category_id (single category)
+            if 'category_id' in params:
+                try:
+                    category_id = int(params['category_id'][0])
+                    search_params['categories'] = [category_id]
+                    logger.info(f"Extracted category_id: {category_id}")
+                except (ValueError, IndexError):
+                    pass
+
+            # Extract item condition (status parameter in URL)
+            # status=on_sale means only active listings
+            if 'status' in params:
+                status_value = params['status'][0]
+                if status_value == 'on_sale':
+                    # mercapi uses Status enum - we'll handle this in search()
+                    search_params['status'] = ['on_sale']
+                    logger.info(f"Extracted status: on_sale")
+
+            # Extract item_condition if present (condition parameter in URL)
+            if 'item_condition_id' in params:
+                try:
+                    condition_ids = [int(c) for c in params['item_condition_id']]
+                    search_params['item_conditions'] = condition_ids
+                    logger.info(f"Extracted item_conditions: {condition_ids}")
+                except (ValueError, TypeError):
+                    pass
+
+            logger.info(f"Extracted search params: keyword='{search_params['query']}', "
+                       f"price_min={search_params['price_min']}, "
+                       f"price_max={search_params['price_max']}, "
+                       f"categories={search_params['categories']}")
+
+        except Exception as e:
+            logger.error(f"Failed to parse URL parameters: {e}")
+            # Fall back to keyword-only
+            search_params['query'] = self._extract_keyword_from_url(search_url)
+
+        return search_params
 
     def get_item(self, item_url: str) -> Optional[Item]:
         """
