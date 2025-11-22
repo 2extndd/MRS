@@ -66,10 +66,11 @@ class MercariNotificationApp:
         # Validate configuration
         errors = config.validate_config()
         if errors:
-            logger.error("Configuration errors:")
+            logger.warning("Configuration warnings (some features may not work):")
             for error in errors:
-                logger.error(f"  - {error}")
-            sys.exit(1)
+                logger.warning(f"  - {error}")
+            # Don't exit - allow web UI to work even if Telegram not configured
+            # sys.exit(1)  # Commented out to allow graceful degradation
 
         # Initialize searcher
         self.init_searcher()
