@@ -721,17 +721,18 @@ def api_get_logs():
         limit = request.args.get('limit', 50, type=int)
 
         query = """
-            SELECT id, created_at, level, category, message
+            SELECT id, timestamp, level, message
             FROM logs
             WHERE 1=1
         """
         params = []
 
+        # Filter by category in message (format: [category] message)
         if category:
-            query += " AND category = %s"
-            params.append(category)
+            query += " AND message LIKE %s"
+            params.append(f"[{category}]%")
 
-        query += " ORDER BY created_at DESC LIMIT %s"
+        query += " ORDER BY timestamp DESC LIMIT %s"
         params.append(limit)
 
         logs = db.execute_query(query, tuple(params), fetch=True)
