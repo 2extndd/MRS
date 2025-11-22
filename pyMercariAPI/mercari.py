@@ -227,6 +227,12 @@ class Mercari:
                     else:
                         item_url = f"https://jp.mercari.com/shops/product/{item_id}"
                     
+                    # Extract category from item
+                    item_category = None
+                    if hasattr(item, 'item_category') and item.item_category:
+                        if hasattr(item.item_category, 'name'):
+                            item_category = item.item_category.name
+                    
                     item_dict = {
                         'mercari_id': item_id,
                         'title': getattr(item, 'name', ''),
@@ -242,7 +248,7 @@ class Mercari:
                         'seller_name': None,
                         'seller_rating': None,
                         'location': None,
-                        'category': None,
+                        'category': item_category,
                         'description': ''
                     }
 
