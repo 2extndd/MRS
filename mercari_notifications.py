@@ -107,57 +107,102 @@ class MercariNotificationApp:
 
     def search_cycle(self):
         """Search cycle - ONLY searches and adds to DB"""
-        try:
-            from datetime import datetime as dt_now
-            current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
-            logger.info("\n" + "=" * 60)
-            logger.info(f"Starting search cycle at {current_time_str}")
-            logger.info("=" * 60)
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                from datetime import datetime as dt_now
+                current_time_str = dt_now.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
+                logger.info("\n" + "=" * 60)
+                logger.info(f"Starting search cycle at {current_time_str}")
+                logger.info("=" * 60)
 
-            # Perform searches
-            results = self.searcher.search_all_queries()
+                # Perform searches
+                results = self.searcher.search_all_queries()
 
-            # Update metrics
-            metrics_storage.set_last_search_time()
+                # Update metrics
+                metrics_storage.set_last_search_time()
 
-            # Check for auto-redeploy if configured
-            if redeployer:
-                redeployer.check_and_redeploy_if_needed()
+                # Check for auto-redeploy if configured
+                if redeployer:
+                    redeployer.check_and_redeploy_if_needed()
 
-            # Only log to DB if there were actual results
-            if results:
-                self.db.add_log_entry('INFO', f'[SEARCH] Completed at {current_time_str}', 'search')
+                # Only log to DB if there were actual results
+                if results:
+                    self.db.add_log_entry('INFO', f'[SEARCH] Completed at {current_time_str}', 'search')
+                
+                return  # Success, exit retry loop
 
-        except Exception as e:
-            logger.error(f"Search cycle error: {e}")
-            self.shared_state.add_error(str(e))
-            self.db.log_error(str(e), 'search_cycle')
-            self.db.add_log_entry('ERROR', f'[SEARCH] Exception: {str(e)[:150]}', 'search')
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Search cycle error (attempt {retry_count}/{max_retries}): {e}")
+                self.shared_state.add_error(str(e))
+                
+                try:
+                    self.db.log_error(str(e), 'search_cycle')
+                    self.db.add_log_entry('ERROR', f'[SEARCH] Exception (attempt {retry_count}): {str(e)[:150]}', 'search')
+                except Exception as db_error:
+                    logger.error(f"Failed to log error to database: {db_error}")
+                
+                if retry_count < max_retries:
+                    sleep_time = retry_count * 5  # Exponential backoff
+                    logger.info(f"[SEARCH] Retrying in {sleep_time} seconds...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"[SEARCH] All retry attempts exhausted")
+                    import traceback
+                    logger.error(f"[SEARCH] Traceback:\n{traceback.format_exc()}")
+                    # Don't raise - let scheduler continue
     
     def telegram_cycle(self):
         """Telegram notification cycle - INDEPENDENT from search"""
-        logger.info("[TELEGRAM] Processing pending notifications...")
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                logger.info("[TELEGRAM] Processing pending notifications...")
 
-        try:
-            # Process 60 items per cycle (2 items/sec = faster delivery)
-            notification_stats = process_pending_notifications(max_items=60)
+                # Process 60 items per cycle (2 items/sec = faster delivery)
+                notification_stats = process_pending_notifications(max_items=60)
 
-            if notification_stats['total'] > 0:
-                logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
-                # Only log to DB if there were actual notifications sent
-                self.db.add_log_entry('INFO', f'[TELEGRAM] Sent {notification_stats["sent"]}/{notification_stats["total"]}', 'telegram')
-                if notification_stats['failed'] > 0:
-                    logger.warning(f"[TELEGRAM] Failed to send {notification_stats['failed']} notifications")
-            else:
-                logger.debug("[TELEGRAM] No pending notifications")  # Changed to debug to reduce noise
+                if notification_stats['total'] > 0:
+                    logger.info(f"[TELEGRAM] Sent {notification_stats['sent']}/{notification_stats['total']} notifications")
+                    # Only log to DB if there were actual notifications sent
+                    try:
+                        self.db.add_log_entry('INFO', f'[TELEGRAM] Sent {notification_stats["sent"]}/{notification_stats["total"]}', 'telegram')
+                    except Exception as db_error:
+                        logger.error(f"Failed to log to database: {db_error}")
+                    
+                    if notification_stats['failed'] > 0:
+                        logger.warning(f"[TELEGRAM] Failed to send {notification_stats['failed']} notifications")
+                else:
+                    logger.debug("[TELEGRAM] No pending notifications")  # Changed to debug to reduce noise
+                
+                return  # Success, exit retry loop
 
-        except Exception as e:
-            logger.error(f"[TELEGRAM] Notification cycle error: {e}")
-            logger.error(f"[TELEGRAM] Error details: {type(e).__name__}: {str(e)}")
-            import traceback
-            logger.error(f"[TELEGRAM] Traceback:\n{traceback.format_exc()}")
-            self.shared_state.add_error(str(e))
-            self.db.log_error(str(e), 'telegram_cycle')
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"[TELEGRAM] Notification cycle error (attempt {retry_count}/{max_retries}): {e}")
+                logger.error(f"[TELEGRAM] Error details: {type(e).__name__}: {str(e)}")
+                import traceback
+                logger.error(f"[TELEGRAM] Traceback:\n{traceback.format_exc()}")
+                
+                self.shared_state.add_error(str(e))
+                
+                try:
+                    self.db.log_error(str(e), 'telegram_cycle')
+                except Exception as db_error:
+                    logger.error(f"Failed to log error to database: {db_error}")
+                
+                if retry_count < max_retries:
+                    sleep_time = retry_count * 5  # Exponential backoff
+                    logger.info(f"[TELEGRAM] Retrying in {sleep_time} seconds...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"[TELEGRAM] All retry attempts exhausted")
+                    # Don't raise - let scheduler continue
 
     def cleanup_old_data(self):
         """Periodic cleanup of old data"""
@@ -232,6 +277,10 @@ class MercariNotificationApp:
         # Log to DB (persistent)
         self.db.add_log_entry('INFO', f'[SCHEDULER] Entering main loop with {len(schedule.get_jobs())} jobs', 'scheduler')
 
+        # Get health state from shared_state for heartbeat updates
+        self.shared_state.set('scheduler_last_heartbeat', datetime.now())
+        self.shared_state.set('scheduler_is_alive', True)
+
         loop_iteration = 0
         while True:
             try:
@@ -259,24 +308,50 @@ class MercariNotificationApp:
                 if loop_iteration % 60 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
 
-                # HOT RELOAD CONFIG EVERY ITERATION
-                if config.reload_if_needed():
-                    logger.info("[CONFIG] ✅ Configuration reloaded from database")
-                    self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
+                # HOT RELOAD CONFIG EVERY ITERATION (with error handling)
+                try:
+                    if config.reload_if_needed():
+                        logger.info("[CONFIG] ✅ Configuration reloaded from database")
+                        try:
+                            self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
+                        except Exception as db_log_error:
+                            logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
 
-                    # If search interval changed, recreate schedule
-                    if config.SEARCH_INTERVAL != last_interval:
-                        logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
-                        self.db.add_log_entry('INFO', f"Search interval changed: {last_interval}s → {config.SEARCH_INTERVAL}s", 'config')
-                        self._setup_schedule()
-                        last_interval = config.SEARCH_INTERVAL
+                        # If search interval changed, recreate schedule
+                        if config.SEARCH_INTERVAL != last_interval:
+                            logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
+                            try:
+                                self.db.add_log_entry('INFO', f"Search interval changed: {last_interval}s → {config.SEARCH_INTERVAL}s", 'config')
+                            except Exception as db_log_error:
+                                logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
+                            self._setup_schedule()
+                            last_interval = config.SEARCH_INTERVAL
+                except Exception as config_error:
+                    logger.warning(f"[CONFIG] ⚠️ Failed to reload config: {config_error}")
+                    # Continue with cached config - don't break the scheduler loop!
 
-                schedule.run_pending()
+                # Run pending jobs (with error handling built into each job)
+                try:
+                    schedule.run_pending()
+                except Exception as schedule_error:
+                    logger.error(f"[SCHEDULER] ❌ Error in run_pending(): {schedule_error}")
+                    import traceback
+                    logger.error(f"[SCHEDULER] Traceback:\n{traceback.format_exc()}")
+                    # Continue - don't break the loop!
 
                 # Log after first run_pending() only
                 if loop_iteration == 1:
                     logger.info(f"[SCHEDULER] ⏰ First run_pending() completed")
                     self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
+
+                # Update heartbeat every 10 iterations (10 seconds)
+                if loop_iteration % 10 == 0:
+                    try:
+                        self.shared_state.set('scheduler_last_heartbeat', datetime.now())
+                        self.shared_state.set('scheduler_is_alive', True)
+                    except Exception as heartbeat_error:
+                        # Don't break loop if heartbeat fails
+                        pass
 
                 time.sleep(1)
             except KeyboardInterrupt:

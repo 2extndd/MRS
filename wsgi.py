@@ -31,10 +31,19 @@ try:
     logger.info("WSGI application loaded successfully")
     logger.info(f"Application: {application}")
 
+    # Global health check state
+    scheduler_health = {
+        'last_heartbeat': None,
+        'is_alive': False,
+        'restart_count': 0,
+        'thread': None
+    }
+
     # Start background scheduler in separate thread with auto-restart
     def start_scheduler():
         """Start the search scheduler in background thread with auto-restart on failure"""
         import time
+        from datetime import datetime
         from db import get_db
 
         restart_count = 0
@@ -43,6 +52,7 @@ try:
         while True:  # Infinite loop - restart scheduler forever
             db = None
             restart_count += 1
+            scheduler_health['restart_count'] = restart_count
 
             try:
                 logger.info("=" * 60)
@@ -51,54 +61,121 @@ try:
 
                 # Get DB connection for logging
                 db = get_db()
-                db.add_log_entry('INFO', f'[WSGI] Starting scheduler (attempt #{restart_count})...', 'wsgi')
+                try:
+                    db.add_log_entry('INFO', f'[WSGI] Starting scheduler (attempt #{restart_count})...', 'wsgi')
+                except Exception as db_error:
+                    logger.warning(f"[WSGI] Failed to log to DB: {db_error}")
 
                 from mercari_notifications import MercariNotificationApp
 
                 logger.info("[WSGI] Imported MercariNotificationApp")
-                db.add_log_entry('INFO', '[WSGI] Imported MercariNotificationApp', 'wsgi')
+                try:
+                    db.add_log_entry('INFO', '[WSGI] Imported MercariNotificationApp', 'wsgi')
+                except:
+                    pass
 
                 # Create app instance and run scheduler
                 logger.info("[WSGI] Creating MercariNotificationApp instance...")
-                db.add_log_entry('INFO', '[WSGI] Creating MercariNotificationApp instance...', 'wsgi')
+                try:
+                    db.add_log_entry('INFO', '[WSGI] Creating MercariNotificationApp instance...', 'wsgi')
+                except:
+                    pass
 
                 mercari_app = MercariNotificationApp()
 
                 logger.info("[WSGI] MercariNotificationApp created successfully")
-                db.add_log_entry('INFO', '[WSGI] MercariNotificationApp created successfully', 'wsgi')
+                try:
+                    db.add_log_entry('INFO', '[WSGI] MercariNotificationApp created successfully', 'wsgi')
+                except:
+                    pass
 
                 logger.info("[WSGI] Calling run_scheduler()...")
-                db.add_log_entry('INFO', '[WSGI] Calling run_scheduler()...', 'wsgi')
+                try:
+                    db.add_log_entry('INFO', '[WSGI] Calling run_scheduler()...', 'wsgi')
+                except:
+                    pass
+
+                # Mark as alive before starting
+                scheduler_health['is_alive'] = True
+                scheduler_health['last_heartbeat'] = datetime.now()
 
                 mercari_app.run_scheduler()
 
                 # If we get here, scheduler exited normally (shouldn't happen)
                 logger.warning("[WSGI] ⚠️ Scheduler exited normally - restarting in 5 seconds...")
-                db.add_log_entry('WARNING', '[WSGI] Scheduler exited unexpectedly! Restarting in 5s...', 'wsgi')
+                scheduler_health['is_alive'] = False
+                try:
+                    db.add_log_entry('WARNING', '[WSGI] Scheduler exited unexpectedly! Restarting in 5s...', 'wsgi')
+                except:
+                    pass
                 time.sleep(5)
 
             except Exception as e:
+                scheduler_health['is_alive'] = False
                 logger.error(f"[WSGI] ❌ Scheduler crashed: {e}")
                 import traceback
-                error_msg = f"[WSGI] Scheduler crashed (attempt #{restart_count}): {e}"
+                error_msg = f"[WSGI] Scheduler crashed (attempt #{restart_count}): {str(e)[:200]}"
                 logger.error(f"[WSGI] Traceback:\n{traceback.format_exc()}")
 
                 if db:
-                    db.add_log_entry('ERROR', error_msg, 'wsgi')
+                    try:
+                        db.add_log_entry('ERROR', error_msg, 'wsgi')
+                    except Exception as db_error:
+                        logger.warning(f"[WSGI] Failed to log error to DB: {db_error}")
 
                 # Exponential backoff - wait longer after each failure (up to 60s)
                 restart_delay = min(restart_count * 2, max_restart_delay)
                 logger.info(f"[WSGI] 🔄 Restarting scheduler in {restart_delay} seconds...")
                 if db:
-                    db.add_log_entry('INFO', f'[WSGI] Auto-restarting in {restart_delay}s...', 'wsgi')
+                    try:
+                        db.add_log_entry('INFO', f'[WSGI] Auto-restarting in {restart_delay}s...', 'wsgi')
+                    except:
+                        pass
 
                 time.sleep(restart_delay)
+
+    def health_check_monitor():
+        """Monitor scheduler health and restart if dead"""
+        import time
+        from datetime import datetime, timedelta
+        
+        logger.info("[HEALTH] Health check monitor started")
+        
+        while True:
+            try:
+                time.sleep(60)  # Check every 60 seconds
+                
+                # Check if scheduler thread is alive
+                if scheduler_health['thread'] and not scheduler_health['thread'].is_alive():
+                    logger.error("[HEALTH] ❌ Scheduler thread is DEAD! Restarting...")
+                    
+                    # Restart scheduler thread
+                    new_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
+                    new_thread.start()
+                    scheduler_health['thread'] = new_thread
+                    
+                    logger.info("[HEALTH] ✅ Scheduler thread restarted")
+                    
+                # Check heartbeat timeout (no updates for 5 minutes = problem)
+                if scheduler_health['last_heartbeat']:
+                    elapsed = datetime.now() - scheduler_health['last_heartbeat']
+                    if elapsed > timedelta(minutes=5):
+                        logger.warning(f"[HEALTH] ⚠️ No heartbeat for {elapsed.total_seconds():.0f} seconds")
+                        
+            except Exception as e:
+                logger.error(f"[HEALTH] Health check error: {e}")
 
     # Start scheduler in daemon thread (dies when main process exits)
     scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
     scheduler_thread.start()
+    scheduler_health['thread'] = scheduler_thread
+
+    # Start health check monitor
+    health_thread = threading.Thread(target=health_check_monitor, daemon=True, name="HealthCheckThread")
+    health_thread.start()
 
     logger.info("✅ Background scheduler thread started with auto-restart")
+    logger.info("✅ Health check monitor started")
     logger.info("✅ Web UI + Auto-scan scheduler are both running")
 
 except Exception as e:

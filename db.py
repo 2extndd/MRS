@@ -258,40 +258,113 @@ class DatabaseManager:
         except Exception as e:
             print(f"[DB] Warning: Could not initialize default config: {e}")
 
-    def execute_query(self, query, params=None, fetch=False):
-        """Execute SQL query with proper parameter binding"""
-        try:
-            # Convert PostgreSQL placeholders to SQLite if needed
-            if self.db_type == 'sqlite' and params:
-                query = query.replace('%s', '?')
-                query = query.replace('SERIAL', 'INTEGER')
-                query = query.replace('BOOLEAN', 'INTEGER')
-                query = query.replace('TIMESTAMP', 'TEXT')
+    def execute_query(self, query, params=None, fetch=False, retry_count=3):
+        """Execute SQL query with proper parameter binding and auto-reconnect"""
+        last_exception = None
+        
+        for attempt in range(retry_count):
+            try:
+                # Ensure connection is alive before executing query
+                self._ensure_connection()
+                
+                # Convert PostgreSQL placeholders to SQLite if needed
+                if self.db_type == 'sqlite' and params:
+                    query = query.replace('%s', '?')
+                    query = query.replace('SERIAL', 'INTEGER')
+                    query = query.replace('BOOLEAN', 'INTEGER')
+                    query = query.replace('TIMESTAMP', 'TEXT')
 
-            cursor = self.conn.cursor()
+                cursor = self.conn.cursor()
 
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-
-            if fetch:
-                # Both PostgreSQL (with RealDictCursor) and SQLite (with Row factory) return dict-like objects
-                results = cursor.fetchall()
-                if self.db_type == 'sqlite':
-                    # Convert sqlite3.Row to dict
-                    return [dict(row) for row in results]
+                if params:
+                    cursor.execute(query, params)
                 else:
-                    # PostgreSQL with RealDictCursor already returns dict-like objects
-                    return results
+                    cursor.execute(query)
 
-            self.conn.commit()
-            return cursor
+                if fetch:
+                    # Both PostgreSQL (with RealDictCursor) and SQLite (with Row factory) return dict-like objects
+                    results = cursor.fetchall()
+                    if self.db_type == 'sqlite':
+                        # Convert sqlite3.Row to dict
+                        return [dict(row) for row in results]
+                    else:
+                        # PostgreSQL with RealDictCursor already returns dict-like objects
+                        return results
 
+                self.conn.commit()
+                return cursor
+
+            except (psycopg2.OperationalError, psycopg2.InterfaceError, sqlite3.OperationalError) as e:
+                last_exception = e
+                print(f"[DB ERROR] Connection error on attempt {attempt + 1}/{retry_count}: {e}")
+                
+                if attempt < retry_count - 1:
+                    print(f"[DB] Attempting to reconnect...")
+                    try:
+                        self._reconnect()
+                    except Exception as reconnect_error:
+                        print(f"[DB ERROR] Reconnection failed: {reconnect_error}")
+                        if attempt == retry_count - 1:
+                            raise
+                else:
+                    print(f"[DB ERROR] All retry attempts exhausted")
+                    raise
+                    
+            except Exception as e:
+                print(f"[DB ERROR] Query failed: {e}")
+                print(f"[DB ERROR] Query: {query}")
+                try:
+                    self.conn.rollback()
+                except:
+                    pass
+                raise
+        
+        # If we exhausted all retries
+        if last_exception:
+            raise last_exception
+    
+    def _ensure_connection(self):
+        """Ensure database connection is alive"""
+        if self.conn is None:
+            print("[DB] Connection is None, reconnecting...")
+            self._reconnect()
+            return
+            
+        try:
+            # Quick connection check
+            cursor = self.conn.cursor()
+            if self.db_type == 'postgresql':
+                cursor.execute("SELECT 1")
+            else:
+                cursor.execute("SELECT 1")
+            cursor.close()
         except Exception as e:
-            print(f"[DB ERROR] Query failed: {e}")
-            print(f"[DB ERROR] Query: {query}")
-            self.conn.rollback()
+            print(f"[DB] Connection check failed: {e}, reconnecting...")
+            self._reconnect()
+    
+    def _reconnect(self):
+        """Reconnect to database"""
+        try:
+            if self.conn:
+                try:
+                    self.conn.close()
+                except:
+                    pass
+            
+            # Reconnect based on database type
+            database_url = config.DATABASE_URL
+            
+            if self.db_type == 'postgresql':
+                self.conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+                print(f"[DB] ✅ Reconnected to PostgreSQL")
+            else:
+                db_path = config.SQLITE_DB_PATH
+                self.conn = sqlite3.connect(db_path, check_same_thread=False)
+                self.conn.row_factory = sqlite3.Row
+                print(f"[DB] ✅ Reconnected to SQLite: {db_path}")
+                
+        except Exception as e:
+            print(f"[DB ERROR] ❌ Failed to reconnect: {e}")
             raise
 
     # ==================== SEARCHES ====================
