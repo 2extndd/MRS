@@ -304,9 +304,14 @@ class MercariNotificationApp:
                     self.db.add_log_entry('INFO', f'[SCHEDULER] Time: {current_time}', 'scheduler')
                     self.db.add_log_entry('INFO', f'[SCHEDULER] Jobs detail: {jobs_detail}', 'scheduler')
 
-                # Reduced logging frequency: every 60 iterations (1 minute) instead of 10 seconds
-                if loop_iteration % 60 == 0:
-                    logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration}, calling run_pending()...")
+                # Log every 30 seconds to track scheduler health MORE FREQUENTLY
+                if loop_iteration % 30 == 0:
+                    logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration} ({loop_iteration // 60} min uptime)")
+                    try:
+                        next_run = schedule.next_run()
+                        logger.info(f"[SCHEDULER] ⏰ Next scheduled run: {next_run}")
+                    except:
+                        pass
 
                 # HOT RELOAD CONFIG EVERY ITERATION (with error handling)
                 try:
