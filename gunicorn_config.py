@@ -15,5 +15,8 @@ timeout = 600  # 10 minutes - long timeout for background scheduler thread
 graceful_timeout = 30  # Graceful shutdown timeout
 loglevel = "info"
 
-# wsgi.py handles scheduler startup via threading
-# No post_fork needed - simpler and more reliable
+# Worker lifecycle hooks
+def post_worker_init(worker):
+    """Import and call post_worker_init from wsgi.py"""
+    from wsgi import post_worker_init as wsgi_post_worker_init
+    wsgi_post_worker_init(worker)

@@ -183,6 +183,34 @@ except Exception as e:
     raise
 
 
+# ============================================================================
+# CRITICAL FIX: Ensure scheduler starts in Gunicorn worker process
+# ============================================================================
+def post_worker_init(worker):
+    """
+    Called just after a worker has been initialized.
+    This ensures scheduler starts in the actual worker process, not the master.
+    """
+    logger.info(f"[GUNICORN] Worker {worker.pid} initialized - ensuring scheduler is running")
+    
+    # Check if scheduler thread exists and is alive
+    if not scheduler_health.get('thread') or not scheduler_health['thread'].is_alive():
+        logger.warning(f"[GUNICORN] Scheduler not running in worker {worker.pid}, starting now...")
+        
+        # Start scheduler thread
+        scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
+        scheduler_thread.start()
+        scheduler_health['thread'] = scheduler_thread
+        
+        # Start health check monitor
+        health_thread = threading.Thread(target=health_check_monitor, daemon=True, name="HealthCheckThread")
+        health_thread.start()
+        
+        logger.info(f"[GUNICORN] ✅ Scheduler started in worker {worker.pid}")
+    else:
+        logger.info(f"[GUNICORN] ✅ Scheduler already running in worker {worker.pid}")
+
+
 if __name__ == "__main__":
     # For local testing
     port = int(os.getenv('PORT', 5000))
