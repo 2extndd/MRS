@@ -15,7 +15,8 @@ bind = f"0.0.0.0:{port}"
 
 # Worker configuration
 workers = 1  # Single worker to avoid multiple scheduler instances
-timeout = 30
+timeout = 600  # 10 minutes - long timeout for background scheduler thread
+graceful_timeout = 30  # Graceful shutdown timeout
 loglevel = "info"
 
 # Store scheduler thread reference
