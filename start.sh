@@ -12,5 +12,5 @@ if [ "$SERVICE_LOWER" = "worker" ]; then
     exec python3 mercari_notifications.py worker
 else
     echo "Starting web process..."
-    exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info wsgi:application
+    exec gunicorn --config gunicorn_config.py wsgi:application
 fi
