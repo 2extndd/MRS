@@ -66,8 +66,15 @@ class MercariNotificationApp:
         # CRITICAL: Load config from database BEFORE initializing scheduler
         # This ensures SEARCH_INTERVAL uses database value (60s) instead of .env default (300s)
         logger.info("[CONFIG] Loading configuration from database before scheduler init...")
+        self.db.add_log_entry('INFO', '[CONFIG] Loading config from database...', 'config')
+
         config.reload_if_needed()
+
         logger.info(f"[CONFIG] Using SEARCH_INTERVAL = {config.SEARCH_INTERVAL}s from database")
+        logger.info(f"[CONFIG] Category blacklist: {len(config.CATEGORY_BLACKLIST)} categories")
+
+        self.db.add_log_entry('INFO', f'[CONFIG] SEARCH_INTERVAL={config.SEARCH_INTERVAL}s', 'config')
+        self.db.add_log_entry('INFO', f'[CONFIG] Category blacklist: {len(config.CATEGORY_BLACKLIST)} categories', 'config')
 
         # Validate configuration
         errors = config.validate_config()
