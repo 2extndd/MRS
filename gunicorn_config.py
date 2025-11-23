@@ -5,11 +5,13 @@ Handles scheduler startup in worker processes after fork
 
 import logging
 import threading
+import os
 
 logger = logging.getLogger(__name__)
 
-# Bind address
-bind = "0.0.0.0:8080"
+# Bind address - use PORT from environment (Railway sets this dynamically)
+port = int(os.getenv('PORT', 8080))
+bind = f"0.0.0.0:{port}"
 
 # Worker configuration
 workers = 1  # Single worker to avoid multiple scheduler instances
@@ -26,6 +28,11 @@ def post_fork(server, worker):
     Start the background scheduler here to avoid fork() issues.
     """
     global _scheduler_thread
+
+    # Print to stdout immediately (logger might not work yet)
+    print("=" * 60, flush=True)
+    print(f"[GUNICORN] post_fork hook CALLED for worker PID {worker.pid}", flush=True)
+    print("=" * 60, flush=True)
 
     logger.info("=" * 60)
     logger.info(f"[GUNICORN] post_fork hook called for worker {worker.pid}")
@@ -75,10 +82,17 @@ def post_fork(server, worker):
                 db.add_log_entry('ERROR', error_msg, 'gunicorn')
 
     # Start scheduler in daemon thread (dies when worker exits)
-    _scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
-    _scheduler_thread.start()
+    try:
+        _scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
+        _scheduler_thread.start()
 
-    logger.info(f"✅ Background scheduler thread started in worker {worker.pid}")
+        print(f"[GUNICORN] ✅ Scheduler thread started successfully", flush=True)
+        logger.info(f"✅ Background scheduler thread started in worker {worker.pid}")
+    except Exception as e:
+        print(f"[GUNICORN] ❌ Failed to start scheduler thread: {e}", flush=True)
+        logger.error(f"❌ Failed to start scheduler thread: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 
 def on_exit(server):
