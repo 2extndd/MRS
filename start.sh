@@ -11,6 +11,11 @@ if [ "$SERVICE_LOWER" = "worker" ]; then
     echo "Starting worker process..."
     exec python3 mercari_notifications.py worker
 else
-    echo "Starting web process..."
+    echo "==============================================================================="
+    echo "[START.SH] 🚀 Starting web process with Gunicorn"
+    echo "[START.SH] Config: gunicorn_config.py"
+    echo "[START.SH] Workers: 1, Timeout: 120"
+    echo "[START.SH] This should trigger post_worker_init() hook"
+    echo "==============================================================================="
     exec gunicorn --config gunicorn_config.py wsgi:application
 fi
