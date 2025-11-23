@@ -278,7 +278,8 @@ class MercariNotificationApp:
         self.db.add_log_entry('INFO', f'[SCHEDULER] Entering main loop with {len(schedule.get_jobs())} jobs', 'scheduler')
 
         # Get health state from shared_state for heartbeat updates
-        self.shared_state.set('scheduler_last_heartbeat', datetime.now())
+        from datetime import datetime as dt_for_heartbeat
+        self.shared_state.set('scheduler_last_heartbeat', dt_for_heartbeat.now())
         self.shared_state.set('scheduler_is_alive', True)
 
         loop_iteration = 0
@@ -289,8 +290,7 @@ class MercariNotificationApp:
                 # Log first iteration and every 10 seconds
                 if loop_iteration == 1:
                     # Debug: Check schedule state
-                    from datetime import datetime
-                    current_time = datetime.now()
+                    current_time = dt_for_heartbeat.now()
                     jobs_info = []
                     for job in schedule.get_jobs():
                         jobs_info.append(f"{job.job_func.__name__}: next={job.next_run}")
@@ -347,7 +347,7 @@ class MercariNotificationApp:
                 # Update heartbeat every 10 iterations (10 seconds)
                 if loop_iteration % 10 == 0:
                     try:
-                        self.shared_state.set('scheduler_last_heartbeat', datetime.now())
+                        self.shared_state.set('scheduler_last_heartbeat', dt_for_heartbeat.now())
                         self.shared_state.set('scheduler_is_alive', True)
                     except Exception as heartbeat_error:
                         # Don't break loop if heartbeat fails
