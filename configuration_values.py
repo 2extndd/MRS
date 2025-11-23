@@ -287,11 +287,17 @@ class Config:
                     cls.USD_CONVERSION_RATE = float(new_config['config_usd_conversion_rate'])
                     logger.info(f"[CONFIG] USD_CONVERSION_RATE: {old_val} → {cls.USD_CONVERSION_RATE}")
 
-                # Category blacklist (global filter)
-                if 'config_category_blacklist' in new_config:
+                # Category blacklist (global filter) - check BOTH key names
+                blacklist_key = None
+                if 'category_blacklist' in new_config:
+                    blacklist_key = 'category_blacklist'  # Web UI uses this key (WITHOUT config_ prefix)
+                elif 'config_category_blacklist' in new_config:
+                    blacklist_key = 'config_category_blacklist'  # Alternative key
+
+                if blacklist_key:
                     import json
-                    blacklist_data = new_config['config_category_blacklist']
-                    
+                    blacklist_data = new_config[blacklist_key]
+
                     # Parse blacklist (could be JSON array or string)
                     if isinstance(blacklist_data, list):
                         cls.CATEGORY_BLACKLIST = blacklist_data
@@ -303,10 +309,13 @@ class Config:
                             cls.CATEGORY_BLACKLIST = [c.strip() for c in blacklist_data.split(',') if c.strip()]
                     else:
                         cls.CATEGORY_BLACKLIST = []
-                    
-                    logger.info(f"[CONFIG] Category blacklist loaded: {len(cls.CATEGORY_BLACKLIST)} categories filtered")
+
+                    logger.info(f"[CONFIG] Category blacklist loaded from '{blacklist_key}': {len(cls.CATEGORY_BLACKLIST)} categories")
                     if cls.CATEGORY_BLACKLIST:
-                        logger.info(f"[CONFIG] Blacklisted categories: {cls.CATEGORY_BLACKLIST}")
+                        for i, cat in enumerate(cls.CATEGORY_BLACKLIST[:10], 1):
+                            logger.info(f"[CONFIG]   {i}. {cat}")
+                        if len(cls.CATEGORY_BLACKLIST) > 10:
+                            logger.info(f"[CONFIG]   ... and {len(cls.CATEGORY_BLACKLIST) - 10} more")
 
                 cls._config_cache = new_config
                 logger.info(f"[CONFIG] ✅ Hot reload complete! search_interval={cls.SEARCH_INTERVAL}s, max_items={cls.MAX_ITEMS_PER_SEARCH}, blacklist={len(cls.CATEGORY_BLACKLIST)}")
