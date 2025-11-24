@@ -71,7 +71,7 @@
                             ${{ (item.price * (config.USD_CONVERSION_RATE or 0.0067))|round(2) }}
                         </span>
                         <span class="text-muted" style="font-size: 13px;">
-                            ¥{{ item.price }}{% if item.size %} · {{ item.size }}{% endif %}
+                            ¥{{ item.price }}{% if item.size %} - {{ item.size }}{% endif %}
                         </span>
                     </div>
                     
@@ -244,7 +244,7 @@ function loadMoreItems() {
                                 </h6>
                                 <div class="mt-auto p-2 bg-light rounded" style="min-height: 50px;">
                                     <span class="fw-bold text-dark" style="font-size: 18px; display: block;">$${usdPrice}</span>
-                                    <span class="text-muted" style="font-size: 13px;">¥${item.price}${item.size ? ' · ' + item.size : ''}</span>
+                                    <span class="text-muted" style="font-size: 13px;">¥${item.price}${item.size ? ' - ' + item.size : ''}</span>
                                 </div>
                                 ${item.search_keyword ? `<div class="mb-2"><span class="badge bg-primary" style="font-size: 11px;">${item.search_keyword}</span></div>` : ''}
                                 ${item.found_at ? `<small class="text-muted mt-auto time-ago" style="font-size: 11px;" data-timestamp="${item.found_at}">${timeAgo(item.found_at)}</small>` : ''}
