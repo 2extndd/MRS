@@ -397,19 +397,39 @@ class MercariNotificationApp:
 
         # INDEPENDENT PROCESSES:
         # 1. Search cycle - scans and adds to DB
-        schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
+        # CRITICAL: Run immediately on startup to ensure scheduler is working
+        job = schedule.every(config.SEARCH_INTERVAL).seconds.do(self.search_cycle)
+        job.tag('search_cycle')
 
         # 2. Telegram cycle - sends from DB (INDEPENDENT!)
         # Run every 35 seconds with 60 items per batch (60 items * 0.5s delay = ~30s + API calls)
-        schedule.every(35).seconds.do(self.telegram_cycle)
+        telegram_job = schedule.every(35).seconds.do(self.telegram_cycle)
+        telegram_job.tag('telegram_cycle')
 
         # 3. Maintenance tasks
         # Use UTC timezone for scheduled tasks (Railway is UTC)
         # 03:00 UTC = 06:00 MSK (Moscow time)
-        schedule.every().day.at("03:00", "UTC").do(self.cleanup_old_data)
-        schedule.every(2).hours.do(self.refresh_proxies)
+        cleanup_job = schedule.every().day.at("03:00", "UTC").do(self.cleanup_old_data)
+        cleanup_job.tag('cleanup')
+        proxy_job = schedule.every(2).hours.do(self.refresh_proxies)
+        proxy_job.tag('proxies')
 
-        logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s")
+        # Run first search cycle immediately (in background thread to not block setup)
+        def run_first_cycle():
+            import time
+            time.sleep(2)  # Small delay to ensure scheduler loop is running
+            try:
+                logger.info(f"[SCHEDULER] 🚀 Running first search cycle immediately...")
+                self.search_cycle()
+                logger.info(f"[SCHEDULER] ✅ First search cycle completed")
+            except Exception as e:
+                logger.error(f"[SCHEDULER] ❌ First search cycle failed: {e}")
+
+        import threading
+        first_cycle_thread = threading.Thread(target=run_first_cycle, daemon=True)
+        first_cycle_thread.start()
+
+        logger.info(f"[SCHEDULER] ⏱  Search cycle: every {config.SEARCH_INTERVAL}s (first run: immediate)")
         logger.info(f"[SCHEDULER] 📬 Telegram cycle: every 35s (60 items per batch, 2 items/sec)")
         logger.info(f"[SCHEDULER] 🧹 Cleanup: daily at 03:00 UTC (06:00 MSK)")
         logger.info(f"[SCHEDULER] 🔧 Total jobs scheduled: {len(schedule.get_jobs())}")
