@@ -463,7 +463,7 @@ function saveCategoryBlacklist() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            category_blacklist: JSON.stringify(categories)  // Save as JSON array
+            category_blacklist: categories  // Send as array, backend will serialize
         })
     })
     .then(r => r.json())
