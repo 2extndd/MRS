@@ -289,7 +289,16 @@ class Mercari:
                     # Log if Shops product has no category (for debugging)
                     if is_shops_product and not item_category:
                         logger.debug(f"Item {item_id} is shops product with no category available")
-                    
+
+                    # Extract SIZE from search result item or full_item_data
+                    item_size = None
+                    # Try to extract size from full_item_data if available
+                    if full_item_data:
+                        item_size = self._extract_size(full_item_data)
+                    # Fallback: try to extract from search result item
+                    if not item_size:
+                        item_size = self._extract_size(item)
+
                     item_dict = {
                         'mercari_id': item_id,
                         'title': getattr(item, 'name', ''),
@@ -299,7 +308,7 @@ class Mercari:
                         'image_url': None,
                         'brand': None,
                         'condition': None,
-                        'size': None,
+                        'size': item_size,
                         'shipping_cost': 0,
                         'stock_quantity': 1,
                         'seller_name': None,

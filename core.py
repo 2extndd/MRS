@@ -391,6 +391,11 @@ class MercariSearcher:
                 # GLOBAL CATEGORY FILTER: Check if item's category is blacklisted
                 # OPTIMIZATION: Do this BEFORE downloading images to save time
                 item_category = getattr(full_item, 'category', None)
+
+                # DEBUG: Log category for EVERY item (especially Shops!)
+                is_shops_item = not mercari_id.startswith('m')
+                logger.info(f"[FILTER] {'[SHOPS]' if is_shops_item else '[REGULAR]'} Item {mercari_id}: category = '{item_category}'")
+
                 item_rejected = False
                 if item_category and config.CATEGORY_BLACKLIST:
                     # Check if category matches any blacklisted category
@@ -400,8 +405,15 @@ class MercariSearcher:
                             logger.info(f"[FILTER]    Title: {full_item.title[:60]}")
                             logger.info(f"[FILTER]    Matched blacklist: '{blacklisted_cat}'")
                             item_rejected = True
+
+                            # Log to database
+                            try:
+                                self.db.add_log_entry('INFO', f'[FILTER] 🚫 Rejected {mercari_id}: {item_category} (matched: {blacklisted_cat})', 'filter')
+                            except:
+                                pass
+
                             break  # Stop checking other blacklist entries
-                
+
                 # Skip this item if it was rejected (saves ~3-4 seconds per filtered item)
                 if item_rejected:
                     continue
