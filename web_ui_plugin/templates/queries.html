@@ -85,11 +85,10 @@
 
                     <!-- Scan Settings -->
                     <div class="small text-muted mb-3">
-                        <div><i class="bi bi-clock me-1"></i>Interval: {{ search.scan_interval or 300 }}s</div>
-                        <div><i class="bi bi-hash me-1"></i>Limit: {{ search.scan_limit or 50 }} items</div>
                         {% if search.thread_id %}
                         <div><i class="bi bi-chat-dots me-1"></i>Thread: {{ search.thread_id }}</div>
                         {% endif %}
+                        <div class="text-muted fst-italic">Using global config settings</div>
                     </div>
 
                     <!-- Last Scanned -->
@@ -169,19 +168,9 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Scan Interval (seconds)</label>
-                            <input type="number" class="form-control" name="scan_interval" id="add_scan_interval" 
-                                   value="300" min="60">
-                            <small class="text-muted">How often to check for new items</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Items Per Scan</label>
-                            <input type="number" class="form-control" name="scan_limit" id="add_scan_limit" 
-                                   value="50" min="10" max="100">
-                            <small class="text-muted">Max items to fetch per scan</small>
-                        </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> Scan interval and items per query are configured globally in Config page.
                     </div>
                     
                     <div class="alert alert-info">
@@ -229,15 +218,9 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Scan Interval (seconds)</label>
-                            <input type="number" class="form-control" name="scan_interval" id="edit_scan_interval" min="60">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Items Per Scan</label>
-                            <input type="number" class="form-control" name="scan_limit" id="edit_scan_limit" min="10" max="100">
-                        </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> Scan interval and items per query are configured globally in Config page.
                     </div>
                 </form>
             </div>
@@ -290,9 +273,7 @@ function addQuery() {
     const data = {
         search_url: formData.get('search_url'),
         name: formData.get('name'),
-        thread_id: formData.get('thread_id'),
-        scan_interval: parseInt(formData.get('scan_interval')) || 300,
-        scan_limit: parseInt(formData.get('scan_limit')) || 50
+        thread_id: formData.get('thread_id')
     };
     
     fetch('/api/queries/add', {
@@ -330,10 +311,8 @@ function editQuery(queryId) {
                 const editSearchUrlEl = document.getElementById('edit_search_url');
                 const editNameEl = document.getElementById('edit_name');
                 const editThreadIdEl = document.getElementById('edit_thread_id');
-                const editScanIntervalEl = document.getElementById('edit_scan_interval');
-                const editScanLimitEl = document.getElementById('edit_scan_limit');
                 
-                if (!editQueryIdEl || !editSearchUrlEl || !editNameEl || !editThreadIdEl || !editScanIntervalEl || !editScanLimitEl) {
+                if (!editQueryIdEl || !editSearchUrlEl || !editNameEl || !editThreadIdEl) {
                     console.error('Edit form elements not found!');
                     alert('❌ Error: Edit form not properly loaded');
                     return;
@@ -343,8 +322,6 @@ function editQuery(queryId) {
                 editSearchUrlEl.value = query.search_url || '';
                 editNameEl.value = query.name || '';
                 editThreadIdEl.value = query.thread_id || '';
-                editScanIntervalEl.value = query.scan_interval || 300;
-                editScanLimitEl.value = query.scan_limit || 50;
                 
                 // Show modal
                 const modalEl = document.getElementById('editQueryModal');
@@ -375,9 +352,7 @@ function updateQuery() {
     const data = {
         search_url: formData.get('search_url'),
         name: formData.get('name'),
-        thread_id: formData.get('thread_id'),
-        scan_interval: parseInt(formData.get('scan_interval')) || 300,
-        scan_limit: parseInt(formData.get('scan_limit')) || 50
+        thread_id: formData.get('thread_id')
     };
     
     fetch(`/api/queries/${queryId}`, {

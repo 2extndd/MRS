@@ -508,7 +508,6 @@ def api_add_query():
             brand=data.get('brand') or validation.get('brand'),
             condition=data.get('condition') or validation.get('condition'),
             size=data.get('size') or validation.get('size'),
-            scan_interval=data.get('scan_interval', 300),
             notify_on_price_drop=data.get('notify_on_price_drop', False)
         )
 
@@ -557,11 +556,8 @@ def api_update_query(query_id):
             'keyword': data.get('keyword') or validation.get('keyword')
         }
         
-        # Add scan_limit and scan_interval if provided
-        if 'scan_limit' in data:
-            update_data['scan_limit'] = data['scan_limit']
-        if 'scan_interval' in data:
-            update_data['scan_interval'] = data['scan_interval']
+        # Note: scan_limit and scan_interval are now configured globally in config
+        # and are not stored per-query anymore
         
         db.update_search(query_id, **update_data)
 
