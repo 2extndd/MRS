@@ -245,6 +245,12 @@ class Mercari:
                     is_shops_product = not item_id.startswith('m')
 
                     # Try to get category from search results first (works for both regular and Shops)
+                    # DEBUG: Log what attributes item has
+                    logger.debug(f"[CATEGORY DEBUG] Item {item_id} ({'SHOPS' if is_shops_product else 'REGULAR'})")
+                    logger.debug(f"[CATEGORY DEBUG]   hasattr item_category: {hasattr(item, 'item_category')}")
+                    if hasattr(item, 'item_category'):
+                        logger.debug(f"[CATEGORY DEBUG]   item.item_category value: {item.item_category}")
+
                     if hasattr(item, 'item_category') and item.item_category:
                         try:
                             category_obj = item.item_category
@@ -258,9 +264,9 @@ class Mercari:
 
                             if category_parts:
                                 item_category = ' > '.join(category_parts)
-                                logger.debug(f"Item {item_id} category from search: {item_category}")
+                                logger.info(f"[CATEGORY] ✅ {item_id} category from search: {item_category}")
                         except Exception as e:
-                            logger.debug(f"Failed to extract category from search results for {item_id}: {e}")
+                            logger.warning(f"[CATEGORY] ❌ Failed to extract category for {item_id}: {e}")
 
                     # If category not in search results and not shops product, fetch full item
                     if not item_category and hasattr(item, 'full_item') and not is_shops_product:
