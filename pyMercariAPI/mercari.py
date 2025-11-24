@@ -729,28 +729,41 @@ class Mercari:
         # Try title first (available in search results), then description (only in full_item)
         text_sources = [title, description]
 
-        # Common size patterns in Japanese (ordered by priority)
+        # Common size patterns in Japanese (ordered by priority - most specific first)
         size_patterns = [
-            r'サイズ[:\s]*([A-Z0-9]+)',  # サイズ: XS, サイズ M
-            r'size[:\s]*([A-Z0-9]+)',     # size: L, size XL
-            r'([0-9]+\.?[0-9]*)\s?cm',   # 80cm, 90.5cm, 27.5cm (shoes)
-            r'\b(XS|XXL|XXXL|XL|L|M|S)\b',  # Standalone (must be exact word)
-            r'フリーサイズ',  # Japanese "free size"
+            (r'サイズ[:\s]*([A-Z0-9]+)', 'keyword'),  # サイズ: XS, サイズ M, サイズ 26
+            (r'size[:\s]*([A-Z0-9]+)', 'keyword'),     # size: L, size XL, size 28
+            (r'フリーサイズ', 'free'),                  # Japanese "free size"
+            (r'\b(XS|XXL|XXXL|XL|L|M|S)\b', 'letter'),  # Standalone letter sizes
+            (r'([0-9]+(?:\.[0-9]+)?)\s*cm', 'cm'),      # 80cm, 27.5cm (shoes) - cm is REQUIRED
         ]
 
         for text in text_sources:
             if not text:
                 continue
 
-            for pattern in size_patterns:
+            for pattern, pattern_type in size_patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
-                    if pattern == r'フリーサイズ':
+                    if pattern_type == 'free':
                         return 'FREE'
+
                     size = match.group(1).strip().upper()
-                    # Validate size - exclude common words that might match
+
+                    # Validate size based on type
+                    if pattern_type == 'cm':
+                        # Validate cm sizes (shoes: 20-35, height: 70-200)
+                        try:
+                            size_num = float(size)
+                            if 20 <= size_num <= 35 or 70 <= size_num <= 200:
+                                return size + 'CM'
+                        except:
+                            pass
+                        continue  # Skip invalid cm sizes
+
+                    # For keyword and letter sizes
                     if size and len(size) <= 10:
-                        # Exclude if it's part of a brand name or common word
+                        # Exclude common words that might match
                         if size not in ['IS', 'AS', 'US', 'IN', 'ON', 'OR', 'SO', 'TO']:
                             return size
         

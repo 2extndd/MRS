@@ -209,7 +209,7 @@ function loadRecentItems(append = false) {
                                 <div class="mt-auto">
                                     <div class="mb-2" style="min-height: 42px;">
                                         <div class="fw-bold" style="font-size: 1.1rem; line-height: 1.2;">$${usdPrice}</div>
-                                        <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}${item.size ? ' - ' + item.size : ''}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}${item.size ? ' - <strong>' + item.size + '</strong>' : ''}</div>
                                     </div>
                                     <div class="d-flex flex-column gap-1">
                                         ${item.search_keyword ?
@@ -379,7 +379,7 @@ function createItemCardHTML(item) {
                     <div class="mt-auto">
                         <div class="mb-2" style="min-height: 42px;">
                             <div class="fw-bold" style="font-size: 1.1rem; line-height: 1.2;">$${usdPrice}</div>
-                            <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}${item.size ? ' - ' + item.size : ''}</div>
+                            <div class="text-muted" style="font-size: 0.7rem; line-height: 1.2;">¥${item.price}${item.size ? ' - <strong>' + item.size + '</strong>' : ''}</div>
                         </div>
                         <div class="d-flex flex-column gap-1">
                             ${item.search_keyword ?
