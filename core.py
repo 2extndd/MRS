@@ -416,11 +416,13 @@ class MercariSearcher:
                     original_url = get_original_image_url(image_url)
                     logger.info(f"[PROCESS] 📸 Image URL: {original_url[:80]}...")
                     image_url = original_url
+                    logger.debug(f"[PROCESS] DEBUG: image_url after conversion = {image_url[:100] if image_url else 'NONE'}")
                 else:
                     logger.warning(f"[PROCESS] ⚠️ No image URL for item {mercari_id}")
 
                 # Download and encode HIGH-RESOLUTION image
                 image_data = None
+                logger.debug(f"[PROCESS] DEBUG: Checking image_url = {image_url[:100] if image_url else 'NONE'}, bool={bool(image_url)}")
                 if image_url:
                     logger.info(f"[PROCESS] 📥 Downloading HIGH-RES image...")
                     image_data = download_and_encode_image(image_url, timeout=20, use_proxy=False)
