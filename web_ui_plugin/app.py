@@ -885,6 +885,40 @@ def api_save_railway_config():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/config/category_blacklist/migrate', methods=['POST'])
+def api_migrate_category_blacklist():
+    """Migrate blacklist from old key to new key (emergency fix)"""
+    try:
+        logger.info("[BLACKLIST MIGRATE] Starting migration...")
+
+        # Check if old key exists (without config_ prefix)
+        old_key_value = db.load_config('category_blacklist')
+        logger.info(f"[BLACKLIST MIGRATE] Old key value: {old_key_value}")
+
+        # Check current value in new key
+        new_key_value = db.load_config('config_category_blacklist')
+        logger.info(f"[BLACKLIST MIGRATE] New key value: {new_key_value}")
+
+        if old_key_value and not new_key_value:
+            # Migrate from old to new
+            logger.info("[BLACKLIST MIGRATE] Migrating from old key to new key...")
+            if db.save_config('config_category_blacklist', json.dumps(old_key_value)):
+                logger.info("[BLACKLIST MIGRATE] ✅ Migration successful!")
+                return jsonify({
+                    'success': True,
+                    'message': 'Migration successful',
+                    'migrated_count': len(old_key_value) if isinstance(old_key_value, list) else 0
+                })
+
+        return jsonify({'success': False, 'error': 'Nothing to migrate'})
+
+    except Exception as e:
+        logger.error(f"[BLACKLIST MIGRATE] ❌ Error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/config/category_blacklist/add', methods=['POST'])
 def api_add_category_to_blacklist():
     """Add a category to the blacklist"""
@@ -900,9 +934,14 @@ def api_add_category_to_blacklist():
         # Load current blacklist (use config_ prefix like other endpoints)
         current_blacklist_str = db.load_config('config_category_blacklist')
         logger.info(f"[BLACKLIST] Loaded from DB (config_category_blacklist): {current_blacklist_str}")
+        logger.info(f"[BLACKLIST] Type: {type(current_blacklist_str)}, Is list?: {isinstance(current_blacklist_str, list)}")
         current_blacklist = []
 
-        if current_blacklist_str:
+        # Check if load_config already parsed it as a list
+        if isinstance(current_blacklist_str, list):
+            current_blacklist = current_blacklist_str
+            logger.info(f"[BLACKLIST] Already a list with {len(current_blacklist)} items")
+        elif current_blacklist_str:
             try:
                 current_blacklist = json.loads(current_blacklist_str)
                 if not isinstance(current_blacklist, list):
