@@ -583,6 +583,13 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         
+        # Extract category for logging
+        category_value = kwargs.get('category')
+
+        # DEBUG: Log category for Shops items
+        if mercari_id and not mercari_id.startswith('m'):
+            print(f"[DB ADD_ITEM] SHOPS item {mercari_id}: category = '{category_value}'")
+
         params = (
             mercari_id,
             search_id,
@@ -601,7 +608,7 @@ class DatabaseManager:
             kwargs.get('seller_rating'),
             kwargs.get('location'),
             kwargs.get('description'),
-            kwargs.get('category'),
+            category_value,
             get_moscow_time()
         )
 
