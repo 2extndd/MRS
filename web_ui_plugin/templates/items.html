@@ -221,7 +221,7 @@ function loadMoreItems() {
                 const usdPrice = (item.price * usdRate).toFixed(2);
                 const imageUrl = item.image_url || '';
                 // Use proxy for ALL images (including Mercari Shops)
-                const proxiedImageUrl = `/api/image/${itemId}`;
+                const proxiedImageUrl = `/api/image/${item.id}`;
 
                 const html = `
                     <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-4">
