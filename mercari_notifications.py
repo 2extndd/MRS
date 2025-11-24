@@ -109,7 +109,13 @@ class MercariNotificationApp:
         """Search cycle - ONLY searches and adds to DB"""
         max_retries = 3
         retry_count = 0
-        
+
+        # Log START to DB to detect hangs
+        try:
+            self.db.add_log_entry('INFO', '[SEARCH] search_cycle() START', 'search')
+        except:
+            pass
+
         while retry_count < max_retries:
             try:
                 from datetime import datetime as dt_now
@@ -128,10 +134,9 @@ class MercariNotificationApp:
                 if redeployer:
                     redeployer.check_and_redeploy_if_needed()
 
-                # Only log to DB if there were actual results
-                if results:
-                    self.db.add_log_entry('INFO', f'[SEARCH] Completed at {current_time_str}', 'search')
-                
+                # Log to DB (always, not just if results)
+                self.db.add_log_entry('INFO', f'[SEARCH] Completed at {current_time_str} (found {len(results) if results else 0} items)', 'search')
+
                 return  # Success, exit retry loop
 
             except Exception as e:
@@ -307,6 +312,11 @@ class MercariNotificationApp:
                 # Log every 30 seconds to track scheduler health MORE FREQUENTLY
                 if loop_iteration % 30 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration} ({loop_iteration // 60} min uptime)")
+                    # Log to DB to track scheduler death
+                    try:
+                        self.db.add_log_entry('INFO', f'[SCHEDULER] Loop alive! Iter {loop_iteration} ({loop_iteration // 60}min uptime)', 'scheduler')
+                    except Exception as db_log_error:
+                        logger.warning(f"[SCHEDULER] Failed to log heartbeat to DB: {db_log_error}")
                     try:
                         next_run = schedule.next_run()
                         logger.info(f"[SCHEDULER] ⏰ Next scheduled run: {next_run}")
@@ -336,12 +346,21 @@ class MercariNotificationApp:
                     # Continue with cached config - don't break the scheduler loop!
 
                 # Run pending jobs (with error handling built into each job)
+                # Log BEFORE run_pending to detect if it hangs
+                jobs_pending = len([job for job in schedule.get_jobs() if schedule.idle_seconds() == 0])
+                if jobs_pending > 0 and loop_iteration % 10 == 0:
+                    logger.info(f"[SCHEDULER] 🔄 About to run {jobs_pending} pending job(s)...")
+
                 try:
                     schedule.run_pending()
                 except Exception as schedule_error:
                     logger.error(f"[SCHEDULER] ❌ Error in run_pending(): {schedule_error}")
                     import traceback
                     logger.error(f"[SCHEDULER] Traceback:\n{traceback.format_exc()}")
+                    try:
+                        self.db.add_log_entry('ERROR', f'[SCHEDULER] run_pending() error: {str(schedule_error)[:100]}', 'scheduler')
+                    except:
+                        pass
                     # Continue - don't break the loop!
 
                 # Log after first run_pending() only
