@@ -897,7 +897,7 @@ def api_add_category_to_blacklist():
         logger.info(f"[BLACKLIST] Adding category to blacklist: {category}")
 
         # Load current blacklist
-        current_blacklist_str = db.get_config('category_blacklist')
+        current_blacklist_str = db.load_config('category_blacklist')
         current_blacklist = []
 
         if current_blacklist_str:
