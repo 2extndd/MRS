@@ -739,8 +739,10 @@ class Mercari:
         title = getattr(item, 'name', '') or getattr(item, 'title', '') or ''
         description = getattr(item, 'description', '') or ''
 
-        # Try title first (available in search results), then description (only in full_item)
-        text_sources = [title, description]
+        # IMPORTANT: Try description FIRST (more accurate), then title
+        # Description has "サイズ : M" format which is authoritative
+        # Title may have misleading numbers like "48" which is not size
+        text_sources = [description, title]
 
         # Common size patterns in Japanese (ordered by priority - most specific first)
         size_patterns = [
