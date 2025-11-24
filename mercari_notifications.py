@@ -312,11 +312,12 @@ class MercariNotificationApp:
                 # Log every 30 seconds to track scheduler health MORE FREQUENTLY
                 if loop_iteration % 30 == 0:
                     logger.info(f"[SCHEDULER] ⏰ Loop alive! Iteration {loop_iteration} ({loop_iteration // 60} min uptime)")
-                    # Log to DB to track scheduler death
-                    try:
-                        self.db.add_log_entry('INFO', f'[SCHEDULER] Loop alive! Iter {loop_iteration} ({loop_iteration // 60}min uptime)', 'scheduler')
-                    except Exception as db_log_error:
-                        logger.warning(f"[SCHEDULER] Failed to log heartbeat to DB: {db_log_error}")
+                    # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                    # These logs are already visible in Railway logs via logger.info()
+                    # try:
+                    #     self.db.add_log_entry('INFO', f'[SCHEDULER] Loop alive! Iter {loop_iteration} ({loop_iteration // 60}min uptime)', 'scheduler')
+                    # except Exception as db_log_error:
+                    #     logger.warning(f"[SCHEDULER] Failed to log heartbeat to DB: {db_log_error}")
                     try:
                         next_run = schedule.next_run()
                         logger.info(f"[SCHEDULER] ⏰ Next scheduled run: {next_run}")
@@ -327,18 +328,20 @@ class MercariNotificationApp:
                 try:
                     if config.reload_if_needed():
                         logger.info("[CONFIG] ✅ Configuration reloaded from database")
-                        try:
-                            self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
-                        except Exception as db_log_error:
-                            logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
+                        # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                        # try:
+                        #     self.db.add_log_entry('INFO', 'Configuration reloaded from database', 'config')
+                        # except Exception as db_log_error:
+                        #     logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
 
                         # If search interval changed, recreate schedule
                         if config.SEARCH_INTERVAL != last_interval:
                             logger.info(f"[CONFIG] Search interval changed from {last_interval}s to {config.SEARCH_INTERVAL}s, updating schedule...")
-                            try:
-                                self.db.add_log_entry('INFO', f"Search interval changed: {last_interval}s → {config.SEARCH_INTERVAL}s", 'config')
-                            except Exception as db_log_error:
-                                logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
+                            # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                            # try:
+                            #     self.db.add_log_entry('INFO', f"Search interval changed: {last_interval}s → {config.SEARCH_INTERVAL}s", 'config')
+                            # except Exception as db_log_error:
+                            #     logger.warning(f"[CONFIG] Failed to log to database: {db_log_error}")
                             self._setup_schedule()
                             last_interval = config.SEARCH_INTERVAL
                 except Exception as config_error:
@@ -357,16 +360,18 @@ class MercariNotificationApp:
                     logger.error(f"[SCHEDULER] ❌ Error in run_pending(): {schedule_error}")
                     import traceback
                     logger.error(f"[SCHEDULER] Traceback:\n{traceback.format_exc()}")
-                    try:
-                        self.db.add_log_entry('ERROR', f'[SCHEDULER] run_pending() error: {str(schedule_error)[:100]}', 'scheduler')
-                    except:
-                        pass
+                    # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                    # try:
+                    #     self.db.add_log_entry('ERROR', f'[SCHEDULER] run_pending() error: {str(schedule_error)[:100]}', 'scheduler')
+                    # except:
+                    #     pass
                     # Continue - don't break the loop!
 
                 # Log after first run_pending() only
                 if loop_iteration == 1:
                     logger.info(f"[SCHEDULER] ⏰ First run_pending() completed")
-                    self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
+                    # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                    # self.db.add_log_entry('INFO', '[SCHEDULER] First run_pending() done', 'scheduler')
 
                 # Update heartbeat every 10 iterations (10 seconds)
                 if loop_iteration % 10 == 0:
