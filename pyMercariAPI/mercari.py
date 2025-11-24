@@ -299,9 +299,11 @@ class Mercari:
                         if category_id:
                             # Store as string "ID:127" format for blacklist matching
                             item_category = f"ID:{category_id}"
-                            logger.info(f"[SHOPS CATEGORY] {item_id} using category_id: {category_id}")
+                            logger.info(f"[SHOPS CATEGORY] {item_id} using category_id: {category_id} -> '{item_category}'")
                         else:
-                            logger.debug(f"Item {item_id} is shops product with no category available")
+                            logger.warning(f"[SHOPS CATEGORY] {item_id} is shops product with NO category_id available!")
+                            # DEBUG: Log all available attributes
+                            logger.debug(f"[SHOPS CATEGORY] {item_id} attributes: {dir(item)}")
 
                     # Extract SIZE from search result item or full_item_data
                     item_size = None
@@ -330,6 +332,10 @@ class Mercari:
                         'category': item_category,
                         'description': ''
                     }
+
+                    # DEBUG: Log item_dict category for Shops
+                    if is_shops_product:
+                        logger.info(f"[SHOPS DICT] {item_id}: item_dict['category'] = '{item_dict['category']}'")
 
                     # Get HIGH RESOLUTION image
                     # Priority: full_item_data (if available) > search result data

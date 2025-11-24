@@ -34,6 +34,12 @@ class Item:
         self.location = data.get('location')
         self.category = data.get('category')
 
+        # DEBUG: Log category for Shops items
+        if self.id and not self.id.startswith('m'):
+            import logging
+            logger = logging.getLogger('mercari_api')
+            logger.info(f"[Item.__init__] SHOPS item {self.id}: category from data = '{self.category}'")
+
         # Description
         self.description = data.get('description', '')
 
