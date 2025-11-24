@@ -750,9 +750,9 @@ class Mercari:
                     size = match.group(1).strip().upper()
                     # Validate size - exclude common words that might match
                     if size and len(size) <= 10:
-                    # Exclude if it's part of a brand name or common word
-                    if size not in ['IS', 'AS', 'US', 'IN', 'ON', 'OR', 'SO', 'TO']:
-                        return size
+                        # Exclude if it's part of a brand name or common word
+                        if size not in ['IS', 'AS', 'US', 'IN', 'ON', 'OR', 'SO', 'TO']:
+                            return size
         
         return None
 
