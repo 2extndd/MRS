@@ -899,6 +899,7 @@ def api_add_category_to_blacklist():
 
         # Load current blacklist
         current_blacklist_str = db.load_config('category_blacklist')
+        logger.info(f"[BLACKLIST] Loaded from DB: {current_blacklist_str}")
         current_blacklist = []
 
         if current_blacklist_str:
@@ -906,7 +907,9 @@ def api_add_category_to_blacklist():
                 current_blacklist = json.loads(current_blacklist_str)
                 if not isinstance(current_blacklist, list):
                     current_blacklist = []
-            except:
+                logger.info(f"[BLACKLIST] Parsed as list: {len(current_blacklist)} categories")
+            except Exception as e:
+                logger.error(f"[BLACKLIST] Failed to parse JSON: {e}")
                 current_blacklist = []
 
         # Check if already exists
@@ -916,9 +919,15 @@ def api_add_category_to_blacklist():
 
         # Add new category
         current_blacklist.append(category)
+        logger.info(f"[BLACKLIST] New list has {len(current_blacklist)} categories")
 
         # Save back to database
-        if db.save_config('category_blacklist', json.dumps(current_blacklist)):
+        new_value_json = json.dumps(current_blacklist)
+        logger.info(f"[BLACKLIST] Saving to DB: {new_value_json[:200]}...")
+        save_result = db.save_config('category_blacklist', new_value_json)
+        logger.info(f"[BLACKLIST] save_config returned: {save_result}")
+
+        if save_result:
             logger.info(f"[BLACKLIST] ✅ Category added: {category}")
             logger.info(f"[BLACKLIST] Total categories in blacklist: {len(current_blacklist)}")
 
