@@ -42,7 +42,7 @@
                     {% if item.image_url %}
                         <div style="aspect-ratio: 4/5; overflow: hidden; position: relative; background: #f8f9fa;">
                             {# Use proxy for ALL Mercari images to bypass CORS/hotlink protection #}
-                            <img src="{{ url_for('proxy_image', url=item.image_url) }}"
+                            <img src="{{ url_for('get_item_image', item_id=item.id) }}"
                                  class="d-block w-100 h-100"
                                  alt="{{ item.title }}"
                                  style="object-fit: cover; object-position: center;"
@@ -221,7 +221,7 @@ function loadMoreItems() {
                 const usdPrice = (item.price * usdRate).toFixed(2);
                 const imageUrl = item.image_url || '';
                 // Use proxy for ALL images (including Mercari Shops)
-                const proxiedImageUrl = imageUrl ? `/proxy-image?url=${encodeURIComponent(imageUrl)}` : '';
+                const proxiedImageUrl = `/api/image/${itemId}`;
 
                 const html = `
                     <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-4">
