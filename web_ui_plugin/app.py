@@ -897,9 +897,9 @@ def api_add_category_to_blacklist():
 
         logger.info(f"[BLACKLIST] Adding category to blacklist: {category}")
 
-        # Load current blacklist
-        current_blacklist_str = db.load_config('category_blacklist')
-        logger.info(f"[BLACKLIST] Loaded from DB: {current_blacklist_str}")
+        # Load current blacklist (use config_ prefix like other endpoints)
+        current_blacklist_str = db.load_config('config_category_blacklist')
+        logger.info(f"[BLACKLIST] Loaded from DB (config_category_blacklist): {current_blacklist_str}")
         current_blacklist = []
 
         if current_blacklist_str:
@@ -921,10 +921,10 @@ def api_add_category_to_blacklist():
         current_blacklist.append(category)
         logger.info(f"[BLACKLIST] New list has {len(current_blacklist)} categories")
 
-        # Save back to database
+        # Save back to database (use config_ prefix like other endpoints)
         new_value_json = json.dumps(current_blacklist)
-        logger.info(f"[BLACKLIST] Saving to DB: {new_value_json[:200]}...")
-        save_result = db.save_config('category_blacklist', new_value_json)
+        logger.info(f"[BLACKLIST] Saving to DB (config_category_blacklist): {new_value_json[:200]}...")
+        save_result = db.save_config('config_category_blacklist', new_value_json)
         logger.info(f"[BLACKLIST] save_config returned: {save_result}")
 
         if save_result:
