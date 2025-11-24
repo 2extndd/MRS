@@ -712,35 +712,44 @@ class Mercari:
 
     def _extract_size(self, item) -> Optional[str]:
         """
-        Extract size from item description or attributes
-        
+        Extract size from item title, description or attributes
+
         Args:
             item: mercapi item object
-            
+
         Returns:
             Size string or None
         """
         import re
-        
+
+        # Get both title and description (search results have title but not description)
+        title = getattr(item, 'name', '') or getattr(item, 'title', '') or ''
         description = getattr(item, 'description', '') or ''
-        
+
+        # Try title first (available in search results), then description (only in full_item)
+        text_sources = [title, description]
+
         # Common size patterns in Japanese (ordered by priority)
         size_patterns = [
             r'サイズ[:\s]*([A-Z0-9]+)',  # サイズ: XS, サイズ M
             r'size[:\s]*([A-Z0-9]+)',     # size: L, size XL
-            r'([0-9]+\.?[0-9]*)\s?cm',   # 80cm, 90.5cm
+            r'([0-9]+\.?[0-9]*)\s?cm',   # 80cm, 90.5cm, 27.5cm (shoes)
             r'\b(XS|XXL|XXXL|XL|L|M|S)\b',  # Standalone (must be exact word)
             r'フリーサイズ',  # Japanese "free size"
         ]
-        
-        for pattern in size_patterns:
-            match = re.search(pattern, description, re.IGNORECASE)
-            if match:
-                if pattern == r'フリーサイズ':
-                    return 'FREE'
-                size = match.group(1).strip().upper()
-                # Validate size - exclude common words that might match
-                if size and len(size) <= 10:
+
+        for text in text_sources:
+            if not text:
+                continue
+
+            for pattern in size_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    if pattern == r'フリーサイズ':
+                        return 'FREE'
+                    size = match.group(1).strip().upper()
+                    # Validate size - exclude common words that might match
+                    if size and len(size) <= 10:
                     # Exclude if it's part of a brand name or common word
                     if size not in ['IS', 'AS', 'US', 'IN', 'ON', 'OR', 'SO', 'TO']:
                         return size
