@@ -39,10 +39,10 @@
                     <small class="text-muted">How many items to scan per query</small>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Query Delay (seconds)</label>
+                    <label class="form-label">Search Cycle Interval (seconds)</label>
                     <input type="number" class="form-control" name="search_interval"
                            value="{{ config.SEARCH_INTERVAL }}" min="60" max="3600">
-                    <small class="text-muted">Global delay between all queries</small>
+                    <small class="text-muted">How often to scan ALL queries (60s = every minute)</small>
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">JPY to USD Rate</label>
