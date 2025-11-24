@@ -36,7 +36,17 @@
     {% if items %}
         {% for item in items %}
         <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-4">
-            <div class="card h-100">
+            <div class="card h-100 position-relative item-card" data-category="{{ item.category if item.category else '' }}">
+                <!-- Small blacklist button (appears on hover, only for Shops with ID:XXX) -->
+                {% if item.category and item.category.startswith('ID:') %}
+                <button class="btn btn-sm btn-danger position-absolute blacklist-btn"
+                        style="top: 5px; right: 5px; z-index: 10; opacity: 0; transition: opacity 0.2s; padding: 2px 6px; font-size: 10px;"
+                        onclick="addCategoryToBlacklist('{{ item.category }}'); event.stopPropagation();"
+                        title="Add {{ item.category }} to blacklist">
+                    🚫
+                </button>
+                {% endif %}
+
                 <!-- Clickable Image with 4:5 aspect ratio - OPENS MERCARI -->
                 <a href="{{ item.item_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none position-relative d-block">
                     {% if item.image_url %}
@@ -292,13 +302,51 @@ function updateTimeAgo() {
     });
 }
 
+// Add category to blacklist
+function addCategoryToBlacklist(category) {
+    if (!confirm(`Add category "${category}" to blacklist?\n\nAll items from this category will be filtered out.`)) {
+        return;
+    }
+
+    fetch('/api/config/category_blacklist/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: category })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Category "${category}" added to blacklist!`);
+            // Hide all items with this category
+            document.querySelectorAll(`.item-card[data-category="${category}"]`).forEach(card => {
+                card.parentElement.style.display = 'none';
+            });
+        } else {
+            alert(`❌ Failed to add category: ${data.error || 'Unknown error'}`);
+        }
+    })
+    .catch(err => {
+        console.error('Error adding category to blacklist:', err);
+        alert('❌ Error adding category to blacklist');
+    });
+}
+
 // Initial setup
 document.addEventListener('DOMContentLoaded', function() {
     setupInfiniteScroll();
     updateTimeAgo(); // Initialize time ago on load
-    
+
     // Update time ago every 20 seconds
     setInterval(updateTimeAgo, 20000);
 });
 </script>
+
+<style>
+/* Show blacklist button on hover */
+.item-card:hover .blacklist-btn {
+    opacity: 1 !important;
+}
+</style>
 {% endblock %}

@@ -884,6 +884,67 @@ def api_save_railway_config():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/config/category_blacklist/add', methods=['POST'])
+def api_add_category_to_blacklist():
+    """Add a category to the blacklist"""
+    try:
+        data = request.get_json()
+        category = data.get('category', '').strip()
+
+        if not category:
+            return jsonify({'success': False, 'error': 'Category is required'}), 400
+
+        logger.info(f"[BLACKLIST] Adding category to blacklist: {category}")
+
+        # Load current blacklist
+        current_blacklist_str = db.get_config('category_blacklist')
+        current_blacklist = []
+
+        if current_blacklist_str:
+            try:
+                current_blacklist = json.loads(current_blacklist_str)
+                if not isinstance(current_blacklist, list):
+                    current_blacklist = []
+            except:
+                current_blacklist = []
+
+        # Check if already exists
+        if category in current_blacklist:
+            logger.info(f"[BLACKLIST] Category already in blacklist: {category}")
+            return jsonify({'success': True, 'message': 'Category already in blacklist'})
+
+        # Add new category
+        current_blacklist.append(category)
+
+        # Save back to database
+        if db.save_config('category_blacklist', json.dumps(current_blacklist)):
+            logger.info(f"[BLACKLIST] ✅ Category added: {category}")
+            logger.info(f"[BLACKLIST] Total categories in blacklist: {len(current_blacklist)}")
+
+            # Trigger config reload in main app
+            if 'app' in globals() and hasattr(globals()['app'], 'notification_app'):
+                try:
+                    globals()['app'].notification_app.reload_config()
+                    logger.info("[BLACKLIST] ✅ Config reloaded in notification app")
+                except Exception as e:
+                    logger.warning(f"[BLACKLIST] Could not reload config: {e}")
+
+            return jsonify({
+                'success': True,
+                'message': f'Category "{category}" added to blacklist',
+                'total_categories': len(current_blacklist)
+            })
+        else:
+            logger.error(f"[BLACKLIST] ❌ Failed to save blacklist to database")
+            return jsonify({'success': False, 'error': 'Failed to save to database'}), 500
+
+    except Exception as e:
+        logger.error(f"[BLACKLIST] ❌ Error adding category: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/railway/status', methods=['GET'])
 def api_railway_status():
     """Get Railway auto-redeploy status"""
