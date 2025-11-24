@@ -885,6 +885,90 @@ def api_save_railway_config():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/config/category_blacklist/restore', methods=['POST'])
+def api_restore_category_blacklist():
+    """Restore lost 18 original categories (emergency fix)"""
+    try:
+        logger.info("[BLACKLIST RESTORE] Starting restoration...")
+
+        # Original 18 categories
+        ORIGINAL_CATEGORIES = [
+            "ゲーム・おもちゃ・グッズ",
+            "本・音楽・ゲーム",
+            "エンタメ・ホビー",
+            "ベビー・キッズ",
+            "コスメ・美容",
+            "CD・DVD・ブルーレイ",
+            "フラワー・ガーデニング",
+            "本・雑誌・漫画",
+            "車・バイク・自転車",
+            "その他",
+            "生活家電・空調",
+            "ホビー・楽器・アート",
+            "家具・インテリア",
+            "キッチン・日用品・その他",
+            "スマホ・タブレット・パソコン",
+            "ペット用品",
+            "アウトドア・釣り・旅行用品",
+            "チケット"
+        ]
+
+        # Load current blacklist
+        current_blacklist = db.load_config('config_category_blacklist', default=[])
+        logger.info(f"[BLACKLIST RESTORE] Current: {current_blacklist}")
+
+        # Convert to list if needed
+        if isinstance(current_blacklist, str):
+            try:
+                current_blacklist = json.loads(current_blacklist)
+            except:
+                current_blacklist = []
+
+        if not isinstance(current_blacklist, list):
+            current_blacklist = []
+
+        # Merge with original categories
+        new_blacklist = list(current_blacklist)
+        added_count = 0
+
+        for category in ORIGINAL_CATEGORIES:
+            if category not in new_blacklist:
+                new_blacklist.append(category)
+                added_count += 1
+                logger.info(f"[BLACKLIST RESTORE] Added: {category}")
+
+        logger.info(f"[BLACKLIST RESTORE] Added {added_count} categories, total: {len(new_blacklist)}")
+
+        # Save to database
+        blacklist_json = json.dumps(new_blacklist, ensure_ascii=False)
+        if db.save_config('config_category_blacklist', blacklist_json):
+            logger.info("[BLACKLIST RESTORE] ✅ Restoration successful!")
+
+            # Trigger config reload
+            if 'app' in globals() and hasattr(globals()['app'], 'notification_app'):
+                try:
+                    globals()['app'].notification_app.reload_config()
+                    logger.info("[BLACKLIST RESTORE] ✅ Config reloaded")
+                except Exception as e:
+                    logger.warning(f"[BLACKLIST RESTORE] Could not reload config: {e}")
+
+            return jsonify({
+                'success': True,
+                'message': f'Restored {added_count} categories',
+                'total_categories': len(new_blacklist),
+                'categories': new_blacklist
+            })
+        else:
+            logger.error("[BLACKLIST RESTORE] ❌ Failed to save")
+            return jsonify({'success': False, 'error': 'Failed to save to database'}), 500
+
+    except Exception as e:
+        logger.error(f"[BLACKLIST RESTORE] ❌ Error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/config/category_blacklist/migrate', methods=['POST'])
 def api_migrate_category_blacklist():
     """Migrate blacklist from old key to new key (emergency fix)"""
