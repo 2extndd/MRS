@@ -239,12 +239,31 @@ class Mercari:
                     
                     # Extract category from item - NEED FULL ITEM DATA
                     # Search results don't include item_category, need to fetch full item
-                    # NOTE: Shops products return 404 on full_item(), skip category for them
+                    # NOTE: Shops products return 404 on full_item(), but may have category in search results
                     item_category = None
                     full_item_data = None
                     is_shops_product = not item_id.startswith('m')
-                    
-                    if hasattr(item, 'full_item') and not is_shops_product:
+
+                    # Try to get category from search results first (works for both regular and Shops)
+                    if hasattr(item, 'item_category') and item.item_category:
+                        try:
+                            category_obj = item.item_category
+                            category_parts = []
+                            if hasattr(category_obj, 'root_category_name') and category_obj.root_category_name:
+                                category_parts.append(category_obj.root_category_name)
+                            if hasattr(category_obj, 'parent_category_name') and category_obj.parent_category_name:
+                                category_parts.append(category_obj.parent_category_name)
+                            if hasattr(category_obj, 'name') and category_obj.name:
+                                category_parts.append(category_obj.name)
+
+                            if category_parts:
+                                item_category = ' > '.join(category_parts)
+                                logger.debug(f"Item {item_id} category from search: {item_category}")
+                        except Exception as e:
+                            logger.debug(f"Failed to extract category from search results for {item_id}: {e}")
+
+                    # If category not in search results and not shops product, fetch full item
+                    if not item_category and hasattr(item, 'full_item') and not is_shops_product:
                         try:
                             # Call full_item() to get complete category information
                             # Skip for shops products as they return 404
@@ -263,11 +282,13 @@ class Mercari:
                                 
                                 if category_parts:
                                     item_category = ' > '.join(category_parts)
-                                    logger.debug(f"Item {item_id} category: {item_category}")
+                                    logger.debug(f"Item {item_id} category from full_item: {item_category}")
                         except Exception as e:
                             logger.debug(f"Failed to get full item data for {item_id}: {e}")
-                    elif is_shops_product:
-                        logger.debug(f"Item {item_id} is shops product, skipping full_item() call")
+
+                    # Log if Shops product has no category (for debugging)
+                    if is_shops_product and not item_category:
+                        logger.debug(f"Item {item_id} is shops product with no category available")
                     
                     item_dict = {
                         'mercari_id': item_id,
