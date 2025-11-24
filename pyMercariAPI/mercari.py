@@ -292,9 +292,16 @@ class Mercari:
                         except Exception as e:
                             logger.debug(f"Failed to get full item data for {item_id}: {e}")
 
-                    # Log if Shops product has no category (for debugging)
+                    # SHOPS FIX: Use category_id since Shops don't have item_category in search results
                     if is_shops_product and not item_category:
-                        logger.debug(f"Item {item_id} is shops product with no category available")
+                        # Shops items have category_id but not item_category
+                        category_id = getattr(item, 'category_id', None)
+                        if category_id:
+                            # Store as string "ID:127" format for blacklist matching
+                            item_category = f"ID:{category_id}"
+                            logger.info(f"[SHOPS CATEGORY] {item_id} using category_id: {category_id}")
+                        else:
+                            logger.debug(f"Item {item_id} is shops product with no category available")
 
                     # Extract SIZE from search result item or full_item_data
                     item_size = None
