@@ -304,10 +304,11 @@ class MercariNotificationApp:
                     logger.info(f"[SCHEDULER] Current time: {current_time}")
                     logger.info(f"[SCHEDULER] Jobs: {', '.join(jobs_info)}")
 
-                    # Log to DB with full details
-                    jobs_detail = ', '.join(jobs_info)
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] Time: {current_time}', 'scheduler')
-                    self.db.add_log_entry('INFO', f'[SCHEDULER] Jobs detail: {jobs_detail}', 'scheduler')
+                    # REMOVED: DB logging to prevent hangs when PostgreSQL connection is lost
+                    # These logs are already visible in Railway logs via logger.info()
+                    # jobs_detail = ', '.join(jobs_info)
+                    # self.db.add_log_entry('INFO', f'[SCHEDULER] Time: {current_time}', 'scheduler')
+                    # self.db.add_log_entry('INFO', f'[SCHEDULER] Jobs detail: {jobs_detail}', 'scheduler')
 
                 # Log every 30 seconds to track scheduler health MORE FREQUENTLY
                 if loop_iteration % 30 == 0:

@@ -41,8 +41,14 @@ class DatabaseManager:
             if database_url and database_url.startswith('postgres'):
                 # PostgreSQL (Railway)
                 self.db_type = 'postgresql'
-                self.conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
-                print(f"[DB] Connected to PostgreSQL")
+                # Add connection timeout (10s) and statement timeout (30s) to prevent hangs
+                self.conn = psycopg2.connect(
+                    database_url,
+                    cursor_factory=RealDictCursor,
+                    connect_timeout=10,
+                    options='-c statement_timeout=30000'  # 30 seconds in milliseconds
+                )
+                print(f"[DB] Connected to PostgreSQL (timeouts: connect=10s, statement=30s)")
             else:
                 # SQLite (local)
                 self.db_type = 'sqlite'
