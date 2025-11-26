@@ -458,6 +458,155 @@ def api_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/category-stats')
+def api_category_stats():
+    """Get detailed category statistics for items"""
+    try:
+        from datetime import timedelta
+
+        # === ALL TIME STATISTICS ===
+        # Total items
+        total_result = db.execute_query("SELECT COUNT(*) as count FROM items", fetch=True)
+        total_items = total_result[0]['count'] if total_result else 0
+
+        # Items without category
+        no_cat_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE category IS NULL OR category = ''",
+            fetch=True
+        )
+        items_without_category = no_cat_result[0]['count'] if no_cat_result else 0
+
+        # SHOPS items (non-'m' prefix)
+        shops_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%'",
+            fetch=True
+        )
+        shops_items = shops_result[0]['count'] if shops_result else 0
+
+        # SHOPS items without category
+        shops_no_cat_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND (category IS NULL OR category = '')",
+            fetch=True
+        )
+        shops_without_category = shops_no_cat_result[0]['count'] if shops_no_cat_result else 0
+
+        # Regular items ('m' prefix)
+        regular_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id LIKE 'm%'",
+            fetch=True
+        )
+        regular_items = regular_result[0]['count'] if regular_result else 0
+
+        # Regular items without category
+        regular_no_cat_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id LIKE 'm%' AND (category IS NULL OR category = '')",
+            fetch=True
+        )
+        regular_without_category = regular_no_cat_result[0]['count'] if regular_no_cat_result else 0
+
+        # === LAST 2 DAYS STATISTICS ===
+        two_days_ago = datetime.now() - timedelta(days=2)
+
+        # Items from last 2 days
+        recent_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE found_at >= %s",
+            (two_days_ago,),
+            fetch=True
+        )
+        items_last_2_days = recent_result[0]['count'] if recent_result else 0
+
+        # Items without category (last 2 days)
+        recent_no_cat_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE (category IS NULL OR category = '') AND found_at >= %s",
+            (two_days_ago,),
+            fetch=True
+        )
+        items_without_category_2d = recent_no_cat_result[0]['count'] if recent_no_cat_result else 0
+
+        # SHOPS items (last 2 days)
+        shops_recent_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND found_at >= %s",
+            (two_days_ago,),
+            fetch=True
+        )
+        shops_items_2d = shops_recent_result[0]['count'] if shops_recent_result else 0
+
+        # SHOPS items without category (last 2 days)
+        shops_no_cat_recent_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND (category IS NULL OR category = '') AND found_at >= %s",
+            (two_days_ago,),
+            fetch=True
+        )
+        shops_without_category_2d = shops_no_cat_recent_result[0]['count'] if shops_no_cat_recent_result else 0
+
+        # === LAST 2 HOURS STATISTICS (for checking blacklist effectiveness) ===
+        two_hours_ago = datetime.now() - timedelta(hours=2)
+
+        # Items from last 2 hours
+        recent_2h_result = db.execute_query(
+            "SELECT COUNT(*) as count FROM items WHERE found_at >= %s",
+            (two_hours_ago,),
+            fetch=True
+        )
+        items_last_2_hours = recent_2h_result[0]['count'] if recent_2h_result else 0
+
+        # Sample items from last 2 hours (with categories)
+        sample_recent_result = db.execute_query(
+            """
+            SELECT mercari_id, title, category, found_at
+            FROM items
+            WHERE found_at >= %s
+            ORDER BY found_at DESC
+            LIMIT 20
+            """,
+            (two_hours_ago,),
+            fetch=True
+        )
+        recent_sample = [
+            {
+                'mercari_id': item['mercari_id'],
+                'title': item['title'][:60] if item['title'] else '',
+                'category': item['category'] or 'NO CATEGORY',
+                'found_at': str(item['found_at']) if item['found_at'] else '',
+                'is_shops': not item['mercari_id'].startswith('m')
+            }
+            for item in (sample_recent_result or [])
+        ]
+
+        return jsonify({
+            'success': True,
+            'all_time': {
+                'total_items': total_items,
+                'items_without_category': items_without_category,
+                'items_with_category': total_items - items_without_category,
+                'shops_items': shops_items,
+                'shops_without_category': shops_without_category,
+                'shops_with_category': shops_items - shops_without_category,
+                'regular_items': regular_items,
+                'regular_without_category': regular_without_category,
+                'regular_with_category': regular_items - regular_without_category
+            },
+            'last_2_days': {
+                'total_items': items_last_2_days,
+                'items_without_category': items_without_category_2d,
+                'items_with_category': items_last_2_days - items_without_category_2d,
+                'shops_items': shops_items_2d,
+                'shops_without_category': shops_without_category_2d,
+                'shops_with_category': shops_items_2d - shops_without_category_2d
+            },
+            'last_2_hours': {
+                'total_items': items_last_2_hours,
+                'sample_items': recent_sample
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"[API] /api/category-stats error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/queries', methods=['GET'])
 def api_get_queries():
     """Get all queries with actual item counts"""
