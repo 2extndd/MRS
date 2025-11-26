@@ -288,11 +288,12 @@ class Config:
                     logger.info(f"[CONFIG] USD_CONVERSION_RATE: {old_val} → {cls.USD_CONVERSION_RATE}")
 
                 # Category blacklist (global filter) - check BOTH key names
+                # PRIORITY: config_category_blacklist (Web UI saves here)
                 blacklist_key = None
-                if 'category_blacklist' in new_config:
-                    blacklist_key = 'category_blacklist'  # Web UI uses this key (WITHOUT config_ prefix)
-                elif 'config_category_blacklist' in new_config:
-                    blacklist_key = 'config_category_blacklist'  # Alternative key
+                if 'config_category_blacklist' in new_config:
+                    blacklist_key = 'config_category_blacklist'  # Web UI saves here (PRIMARY)
+                elif 'category_blacklist' in new_config:
+                    blacklist_key = 'category_blacklist'  # Fallback for old data
 
                 if blacklist_key:
                     import json
