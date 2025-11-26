@@ -377,10 +377,15 @@ class MercariNotificationApp:
                 # Update heartbeat every 10 iterations (10 seconds)
                 if loop_iteration % 10 == 0:
                     try:
-                        self.shared_state.set('scheduler_last_heartbeat', dt_for_heartbeat.now())
+                        current_heartbeat = dt_for_heartbeat.now()
+                        self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)
                         self.shared_state.set('scheduler_is_alive', True)
+
+                        # Also write to database for persistent health check
+                        self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())
                     except Exception as heartbeat_error:
                         # Don't break loop if heartbeat fails
+                        logger.warning(f"[SCHEDULER] Failed to update heartbeat: {heartbeat_error}")
                         pass
 
                 time.sleep(1)
