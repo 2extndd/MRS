@@ -135,33 +135,54 @@ try:
                 time.sleep(restart_delay)
 
     def health_check_monitor():
-        """Monitor scheduler health and restart if dead"""
+        """Monitor scheduler health and restart if dead - MORE AGGRESSIVE!"""
         import time
         from datetime import datetime, timedelta
-        
-        logger.info("[HEALTH] Health check monitor started")
-        
+
+        logger.info("[HEALTH] ⚡ AGGRESSIVE health check monitor started (checks every 30s)")
+
         while True:
             try:
-                time.sleep(60)  # Check every 60 seconds
-                
+                time.sleep(30)  # Check every 30 seconds (was 60)
+
                 # Check if scheduler thread is alive
-                if scheduler_health['thread'] and not scheduler_health['thread'].is_alive():
-                    logger.error("[HEALTH] ❌ Scheduler thread is DEAD! Restarting...")
-                    
+                if not scheduler_health.get('thread') or not scheduler_health['thread'].is_alive():
+                    logger.error("[HEALTH] ❌❌❌ Scheduler thread is DEAD or MISSING! RESTARTING NOW...")
+
                     # Restart scheduler thread
                     new_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
                     new_thread.start()
                     scheduler_health['thread'] = new_thread
-                    
-                    logger.info("[HEALTH] ✅ Scheduler thread restarted")
-                    
-                # Check heartbeat timeout (no updates for 5 minutes = problem)
+
+                    logger.info("[HEALTH] ✅✅✅ Scheduler thread RESTARTED successfully")
+
+                # Check heartbeat timeout (no updates for 2 minutes = RESTART!)
                 if scheduler_health['last_heartbeat']:
                     elapsed = datetime.now() - scheduler_health['last_heartbeat']
-                    if elapsed > timedelta(minutes=5):
-                        logger.warning(f"[HEALTH] ⚠️ No heartbeat for {elapsed.total_seconds():.0f} seconds")
-                        
+                    # AGGRESSIVE: Restart after 2 min of no heartbeat (was 5 min)
+                    if elapsed > timedelta(minutes=2):
+                        logger.error(f"[HEALTH] ❌❌❌ No heartbeat for {elapsed.total_seconds():.0f} seconds - FORCING RESTART!")
+
+                        # Kill existing thread if it exists
+                        if scheduler_health.get('thread'):
+                            logger.warning("[HEALTH] Killing zombie scheduler thread...")
+
+                        # Force restart
+                        new_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
+                        new_thread.start()
+                        scheduler_health['thread'] = new_thread
+                        scheduler_health['is_alive'] = False  # Will be set to True by new thread
+
+                        logger.info("[HEALTH] ✅ Scheduler force-restarted due to heartbeat timeout")
+                else:
+                    # No heartbeat ever recorded = scheduler never started!
+                    elapsed_since_boot = time.time()  # Rough estimate
+                    if elapsed_since_boot > 120:  # 2 minutes after boot
+                        logger.error("[HEALTH] ❌ No heartbeat recorded after 2 min! Starting scheduler...")
+                        new_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerThread")
+                        new_thread.start()
+                        scheduler_health['thread'] = new_thread
+
             except Exception as e:
                 logger.error(f"[HEALTH] Health check error: {e}")
 
