@@ -39,10 +39,14 @@
                     <small class="text-muted">How many items to scan per query</small>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Query Delay (seconds)</label>
+                    <label class="form-label">Query Delay (seconds) ⚡</label>
                     <input type="number" class="form-control" name="search_interval"
-                           value="{{ config.SEARCH_INTERVAL }}" min="60" max="3600">
-                    <small class="text-muted">How often to scan all queries</small>
+                           value="{{ config.SEARCH_INTERVAL }}" min="30" max="3600">
+                    <small class="text-muted">
+                        <strong>✅ Can be less than 5 min!</strong><br>
+                        Scheduler runs 24/7 inside web process.<br>
+                        <strong>Recommended:</strong> 60-120s
+                    </small>
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">JPY to USD Rate</label>
