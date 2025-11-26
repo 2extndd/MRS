@@ -1740,3 +1740,65 @@ def api_proxy_stats():
     except Exception as e:
         logger.error(f"Error getting proxy stats: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/trigger-search', methods=['POST', 'GET'])
+def api_trigger_search():
+    """
+    Trigger a single search cycle via API call.
+    Designed to be called by external cron services (e.g., cron-job.org)
+
+    Security: Add a secret token in request header or query parameter
+    """
+    import threading
+    from datetime import datetime
+
+    try:
+        # Optional: Validate secret token (if configured)
+        secret_token = os.getenv('CRON_SECRET_TOKEN')
+        if secret_token:
+            # Check token in header or query parameter
+            provided_token = request.headers.get('X-Cron-Token') or request.args.get('token')
+            if provided_token != secret_token:
+                logger.warning("[API] Unauthorized trigger-search attempt")
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+        logger.info("=" * 60)
+        logger.info(f"[API] Search cycle triggered via API at {datetime.now()}")
+        logger.info("=" * 60)
+
+        # Run search cycle in background thread to avoid blocking the request
+        def run_cycle():
+            try:
+                from mercari_notifications import MercariNotificationApp
+
+                logger.info("[API] Creating MercariNotificationApp instance...")
+                app_instance = MercariNotificationApp()
+
+                logger.info("[API] Running search cycle...")
+                app_instance.search_cycle()
+
+                logger.info("[API] Running Telegram notification cycle...")
+                app_instance.telegram_cycle()
+
+                logger.info("[API] ✅ Search cycle completed successfully")
+                logger.info("=" * 60)
+
+            except Exception as e:
+                logger.error(f"[API] ❌ Error during search cycle: {e}")
+                import traceback
+                logger.error(f"[API] Traceback:\n{traceback.format_exc()}")
+
+        # Start thread
+        thread = threading.Thread(target=run_cycle, daemon=True, name="API-TriggeredSearchCycle")
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'message': 'Search cycle started',
+            'triggered_at': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"[API] Error triggering search: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
