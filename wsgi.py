@@ -27,10 +27,10 @@ try:
     from web_ui_plugin.app import app as application
 
     logger.info("=" * 60)
-    logger.info("WSGI application loaded successfully")
+    logger.info("[WSGI] Application loaded successfully")
     logger.info("=" * 60)
-    logger.info(f"Application: {application}")
-    logger.info("✅ Web UI is running")
+    logger.info(f"[WSGI] Application: {application}")
+    logger.info("[WSGI] ✅ Web UI is running")
     logger.info("=" * 60)
 
     # Auto-start scheduler in background thread (only in production)
