@@ -464,6 +464,15 @@ def api_category_stats():
     try:
         from datetime import timedelta
 
+        # Check if category_id column exists (PostgreSQL) or use category (SQLite/old schema)
+        has_category_id = db.has_column('items', 'category_id')
+
+        # Determine which field to check for NULL categories
+        if has_category_id:
+            no_cat_condition = "category_id IS NULL"
+        else:
+            no_cat_condition = "category IS NULL OR category = ''"
+
         # === ALL TIME STATISTICS ===
         # Total items
         total_result = db.execute_query("SELECT COUNT(*) as count FROM items", fetch=True)
@@ -471,7 +480,7 @@ def api_category_stats():
 
         # Items without category
         no_cat_result = db.execute_query(
-            "SELECT COUNT(*) as count FROM items WHERE category IS NULL OR category = ''",
+            f"SELECT COUNT(*) as count FROM items WHERE {no_cat_condition}",
             fetch=True
         )
         items_without_category = no_cat_result[0]['count'] if no_cat_result else 0
@@ -485,7 +494,7 @@ def api_category_stats():
 
         # SHOPS items without category
         shops_no_cat_result = db.execute_query(
-            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND (category IS NULL OR category = '')",
+            f"SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND ({no_cat_condition})",
             fetch=True
         )
         shops_without_category = shops_no_cat_result[0]['count'] if shops_no_cat_result else 0
@@ -499,7 +508,7 @@ def api_category_stats():
 
         # Regular items without category
         regular_no_cat_result = db.execute_query(
-            "SELECT COUNT(*) as count FROM items WHERE mercari_id LIKE 'm%' AND (category IS NULL OR category = '')",
+            f"SELECT COUNT(*) as count FROM items WHERE mercari_id LIKE 'm%' AND ({no_cat_condition})",
             fetch=True
         )
         regular_without_category = regular_no_cat_result[0]['count'] if regular_no_cat_result else 0
@@ -517,7 +526,7 @@ def api_category_stats():
 
         # Items without category (last 2 days)
         recent_no_cat_result = db.execute_query(
-            "SELECT COUNT(*) as count FROM items WHERE (category IS NULL OR category = '') AND found_at >= %s",
+            f"SELECT COUNT(*) as count FROM items WHERE ({no_cat_condition}) AND found_at >= %s",
             (two_days_ago,),
             fetch=True
         )
@@ -533,7 +542,7 @@ def api_category_stats():
 
         # SHOPS items without category (last 2 days)
         shops_no_cat_recent_result = db.execute_query(
-            "SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND (category IS NULL OR category = '') AND found_at >= %s",
+            f"SELECT COUNT(*) as count FROM items WHERE mercari_id NOT LIKE 'm%' AND ({no_cat_condition}) AND found_at >= %s",
             (two_days_ago,),
             fetch=True
         )
@@ -551,22 +560,30 @@ def api_category_stats():
         items_last_2_hours = recent_2h_result[0]['count'] if recent_2h_result else 0
 
         # Sample items from last 2 hours (with categories)
-        sample_recent_result = db.execute_query(
+        if has_category_id:
+            sample_query = """
+                SELECT mercari_id, title, category_id, found_at
+                FROM items
+                WHERE found_at >= %s
+                ORDER BY found_at DESC
+                LIMIT 20
             """
-            SELECT mercari_id, title, category, found_at
-            FROM items
-            WHERE found_at >= %s
-            ORDER BY found_at DESC
-            LIMIT 20
-            """,
-            (two_hours_ago,),
-            fetch=True
-        )
+        else:
+            sample_query = """
+                SELECT mercari_id, title, category, found_at
+                FROM items
+                WHERE found_at >= %s
+                ORDER BY found_at DESC
+                LIMIT 20
+            """
+
+        sample_recent_result = db.execute_query(sample_query, (two_hours_ago,), fetch=True)
+
         recent_sample = [
             {
                 'mercari_id': item['mercari_id'],
                 'title': item['title'][:60] if item['title'] else '',
-                'category': item['category'] or 'NO CATEGORY',
+                'category': str(item.get('category_id') or item.get('category') or 'NO CATEGORY'),
                 'found_at': str(item['found_at']) if item['found_at'] else '',
                 'is_shops': not item['mercari_id'].startswith('m')
             }
