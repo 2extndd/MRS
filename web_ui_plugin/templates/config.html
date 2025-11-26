@@ -265,6 +265,70 @@
     </div>
 </div>
 
+<!-- Database Statistics -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-database"></i> Database Statistics</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <strong>Total Items:</strong> <span id="db-total-items" class="badge bg-primary">Loading...</span>
+            </div>
+            <div class="col-md-3">
+                <strong>Items with Category:</strong> <span id="db-items-with-category" class="badge bg-success">-</span>
+            </div>
+            <div class="col-md-3">
+                <strong>Items without Category:</strong> <span id="db-items-without-category" class="badge bg-warning">-</span>
+            </div>
+            <div class="col-md-3">
+                <strong>Active Searches:</strong> <span id="db-active-searches" class="badge bg-info">-</span>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <h6 class="mb-2">Item Type Breakdown:</h6>
+            </div>
+            <div class="col-md-6">
+                <strong>SHOPS Items:</strong> <span id="db-shops-items" class="badge bg-secondary">-</span>
+                <small class="text-muted d-block mt-1">
+                    With category: <span id="db-shops-with-cat">-</span> |
+                    Without: <span id="db-shops-without-cat">-</span>
+                </small>
+            </div>
+            <div class="col-md-6">
+                <strong>Regular Items:</strong> <span id="db-regular-items" class="badge bg-secondary">-</span>
+                <small class="text-muted d-block mt-1">
+                    With category: <span id="db-regular-with-cat">-</span> |
+                    Without: <span id="db-regular-without-cat">-</span>
+                </small>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <h6 class="mb-2">Last 2 Days Statistics:</h6>
+            </div>
+            <div class="col-md-4">
+                <strong>Total (2 days):</strong> <span id="db-2d-total" class="badge bg-info">-</span>
+            </div>
+            <div class="col-md-4">
+                <strong>With Category:</strong> <span id="db-2d-with-cat" class="badge bg-success">-</span>
+            </div>
+            <div class="col-md-4">
+                <strong>Without Category:</strong> <span id="db-2d-without-cat" class="badge bg-warning">-</span>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshDatabaseStats()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Stats
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Save system settings
 function saveSystemSettings() {
@@ -493,7 +557,55 @@ function initThemeToggle() {
     }
 }
 
+// Refresh database statistics
+function refreshDatabaseStats() {
+    // Fetch basic stats
+    fetch('/api/stats')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.database) {
+                document.getElementById('db-total-items').textContent = data.database.total_items || 0;
+                document.getElementById('db-active-searches').textContent = data.database.active_searches || 0;
+            }
+        })
+        .catch(err => console.error('Failed to fetch basic stats:', err));
+
+    // Fetch category stats
+    fetch('/api/category-stats')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const allTime = data.all_time;
+                const last2Days = data.last_2_days;
+
+                // All time stats
+                document.getElementById('db-items-with-category').textContent = allTime.items_with_category || 0;
+                document.getElementById('db-items-without-category').textContent = allTime.items_without_category || 0;
+
+                // SHOPS items
+                document.getElementById('db-shops-items').textContent = allTime.shops_items || 0;
+                document.getElementById('db-shops-with-cat').textContent = allTime.shops_with_category || 0;
+                document.getElementById('db-shops-without-cat').textContent = allTime.shops_without_category || 0;
+
+                // Regular items
+                document.getElementById('db-regular-items').textContent = allTime.regular_items || 0;
+                document.getElementById('db-regular-with-cat').textContent = allTime.regular_with_category || 0;
+                document.getElementById('db-regular-without-cat').textContent = allTime.regular_without_category || 0;
+
+                // Last 2 days
+                document.getElementById('db-2d-total').textContent = last2Days.total_items || 0;
+                document.getElementById('db-2d-with-cat').textContent = last2Days.items_with_category || 0;
+                document.getElementById('db-2d-without-cat').textContent = last2Days.items_without_category || 0;
+            }
+        })
+        .catch(err => {
+            console.error('Failed to fetch category stats:', err);
+            document.getElementById('db-total-items').textContent = 'Error';
+        });
+}
+
 // Initialize on page load
 initThemeToggle();
+refreshDatabaseStats();
 </script>
 {% endblock %}
