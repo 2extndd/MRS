@@ -12,7 +12,7 @@ Run this script ONCE on Railway to optimize database performance.
 
 import sys
 import logging
-from db import MercariDatabase
+from db import get_db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def add_indexes():
     """Add performance indexes to items table"""
-    db = MercariDatabase()
+    db = get_db()
 
     logger.info("=" * 60)
     logger.info("[INDEXES] Adding performance indexes to items table...")
