@@ -16,7 +16,5 @@ graceful_timeout = 30  # Graceful shutdown timeout
 loglevel = "info"
 
 # Worker lifecycle hooks
-def post_worker_init(worker):
-    """Import and call post_worker_init from wsgi.py"""
-    from wsgi import post_worker_init as wsgi_post_worker_init
-    wsgi_post_worker_init(worker)
+# Note: Scheduler auto-starts via wsgi.py module-level code
+# No post_worker_init needed - wsgi.py handles everything
