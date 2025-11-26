@@ -109,9 +109,9 @@
     </table>
 </div>
 
-{% if logs and logs|length >= 100 %}
+{% if logs and logs|length >= 300 %}
 <div class="alert alert-info mt-3">
-    <i class="bi bi-info-circle"></i> Showing last 100 logs. Older logs are automatically cleaned up.
+    <i class="bi bi-info-circle"></i> Showing last 300 logs. Older logs are automatically cleaned up.
 </div>
 {% endif %}
 
@@ -135,7 +135,7 @@ setInterval(function() {
     const level = new URLSearchParams(window.location.search).get('level') || '';
     
     // Reload logs via AJAX
-    fetch(`/api/logs?level=${level}&limit=200`)
+    fetch(`/api/logs?level=${level}&limit=300`)
         .then(r => r.json())
         .then(data => {
             if (data.success) {
