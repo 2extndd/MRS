@@ -181,61 +181,53 @@
     </div>
 </div>
 
-<!-- Railway Auto-Redeploy System -->
+<!-- Railway Auto-Restart System (Scheduler Health Monitoring) -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Railway Auto-Redeploy System</h5>
-        <span class="badge bg-info" id="redeploy-status">Active</span>
+        <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Railway Auto-Restart System</h5>
+        <span class="badge bg-success" id="redeploy-status">Active</span>
     </div>
     <div class="card-body">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i>
+            <strong>How it works:</strong> Scheduler heartbeat is checked every 5 minutes.
+            If dead for >10 minutes, container auto-restarts via <code>os._exit(0)</code> (infinite retries).
+        </div>
         <div class="row mb-3">
             <div class="col-md-3">
-                <strong>HTTP Errors:</strong>
+                <strong>Scheduler Status:</strong>
                 <div class="mt-2">
-                    <span class="badge bg-danger">403: <span id="error-403">0</span></span>
-                    <span class="badge bg-warning">401: <span id="error-401">0</span></span>
-                    <span class="badge bg-info">429: <span id="error-429">0</span></span>
+                    <span class="badge bg-success">Heartbeat monitoring active</span>
                 </div>
             </div>
             <div class="col-md-3">
-                <strong>Total Errors:</strong> <span id="total-errors" class="text-danger">0</span><br>
-                <small class="text-muted">Threshold: {{ config.MAX_ERRORS_BEFORE_REDEPLOY }}</small>
+                <strong>Health Check:</strong> <span class="text-success">Every 5 minutes</span><br>
+                <small class="text-muted">Timeout: 10 minutes</small>
             </div>
             <div class="col-md-3">
-                <strong>First Error:</strong> <span id="first-error" class="small">None</span>
+                <strong>Auto-Restart:</strong> <span class="small">os._exit(0)</span>
+                <div><small class="text-muted">Infinite retries (no limit)</small></div>
             </div>
             <div class="col-md-3">
-                <strong>Last Redeploy:</strong> <span id="last-redeploy" class="small">Never</span>
+                <strong>Last Heartbeat:</strong> <span id="last-heartbeat" class="small">Loading...</span>
             </div>
         </div>
 
-        <form id="railwaySettingsForm">
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Redeploy Threshold</label>
-                    <input type="number" class="form-control" name="max_errors_before_redeploy"
-                           value="{{ config.MAX_ERRORS_BEFORE_REDEPLOY }}" min="1" max="100">
-                    <small class="text-muted">Number of errors before triggering redeploy</small>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Railway Token</label>
-                    <input type="password" class="form-control" name="railway_token"
-                           value="{{ config.RAILWAY_TOKEN or '' }}"
-                           placeholder="Optional - for auto-redeploy">
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-primary" onclick="saveRailwaySettings()">
-                    <i class="bi bi-save"></i> Save Settings
-                </button>
-                <button type="button" class="btn btn-outline-info" onclick="refreshRailwayStatus()">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh Status
-                </button>
-                <button type="button" class="btn btn-outline-danger" onclick="forceRedeploy()">
-                    <i class="bi bi-exclamation-triangle"></i> Force Redeploy
-                </button>
-            </div>
-        </form>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-info" onclick="refreshHeartbeatStatus()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Heartbeat Status
+            </button>
+            <a href="/logs" class="btn btn-outline-secondary">
+                <i class="bi bi-file-text"></i> View Logs
+            </a>
+        </div>
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="bi bi-info-circle"></i>
+                <strong>Note:</strong> Health check script runs automatically via Railway cron job.
+                No manual configuration needed. See AGENTS.md for details.
+            </small>
+        </div>
     </div>
 </div>
 

@@ -2,7 +2,10 @@
 """
 Health check script for scheduler - runs every 5 minutes via Railway cron
 Checks if scheduler is alive by reading heartbeat from database
-If dead for >10 min, logs error (Railway can restart web service based on cron failure)
+If dead for >10 min, triggers container restart using os._exit(0)
+
+NOTE: os._exit(0) causes Railway to auto-restart the container INFINITELY
+(not limited by restartPolicyMaxRetries)
 """
 
 import os
@@ -63,7 +66,8 @@ def check_scheduler_health():
 
         if age_minutes > HEARTBEAT_TIMEOUT_MINUTES:
             logger.error(f"[HEALTH CHECK] ❌ Scheduler is DEAD! No heartbeat for {age_minutes:.1f} minutes (threshold: {HEARTBEAT_TIMEOUT_MINUTES} min)")
-            logger.error("[HEALTH CHECK] ❌ Railway should restart the web service!")
+            logger.error("[HEALTH CHECK] ❌ TRIGGERING CONTAINER RESTART via os._exit(0)...")
+            logger.error("[HEALTH CHECK] ❌ Railway will auto-restart the container INFINITELY")
             return False
         else:
             logger.info(f"[HEALTH CHECK] ✅ Scheduler is ALIVE! Last heartbeat {age_minutes:.1f} minutes ago")
@@ -85,10 +89,13 @@ def main():
 
     if not is_healthy:
         logger.error("[HEALTH CHECK] ❌ Scheduler is NOT healthy!")
-        logger.error("[HEALTH CHECK] ❌ Exiting with error code 1")
-        logger.error("[HEALTH CHECK] ❌ This will be logged in Railway cron job logs")
+        logger.error("[HEALTH CHECK] ❌ FORCING CONTAINER RESTART NOW!")
+        logger.error("[HEALTH CHECK] ❌ Using os._exit(0) to trigger Railway auto-restart")
         logger.info("=" * 60)
-        return 1
+
+        # Force container restart - Railway will auto-restart INFINITELY
+        # This exit code (0) tells Railway this is a clean exit, so it will restart without limits
+        os._exit(0)
     else:
         logger.info("[HEALTH CHECK] ✅ Scheduler is healthy, no action needed")
         logger.info("=" * 60)

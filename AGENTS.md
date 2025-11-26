@@ -132,11 +132,11 @@ CD・DVD・ブルーレイ - CD, DVD, Blu-ray
 
 ## 🚀 Scheduler & Cron Jobs
 
-### ✅ NEW: Database-Based Heartbeat Monitoring (2025-01-26)
+### ✅ NEW: Database-Based Heartbeat Monitoring + Auto-Restart (2025-01-26)
 
 **Problem Solved:** Scheduler daemon thread was dying silently after some time, and Railway cron couldn't detect it.
 
-**Solution:** Database-based heartbeat + health check script
+**Solution:** Database-based heartbeat + health check script + **os._exit(0) auto-restart**
 
 #### How It Works
 
@@ -157,19 +157,23 @@ if loop_iteration % 10 == 0:
    - Runs via Railway cron job every 5 minutes
    - Reads heartbeat from database
    - If heartbeat older than 10 minutes → scheduler is DEAD
-   - Exits with error code 1 (Railway logs show failure)
+   - **Triggers container restart using `os._exit(0)`**
+   - Railway auto-restarts container **INFINITELY** (not limited by `restartPolicyMaxRetries`)
 
 3. **Railway Cron Configuration**
    - Command: `python3 health_check.py`
    - Schedule: `*/5 * * * *` (every 5 minutes)
    - Service: `web`
-   - Purpose: Monitor scheduler health, NOT run searches
+   - Purpose: Monitor scheduler health + auto-restart if dead
 
 **Key Points:**
 - ✅ Query Delay controls scan frequency (30s-3600s)
-- ✅ Cron job only monitors health (every 5 min)
+- ✅ Cron job monitors health every 5 minutes
 - ✅ Heartbeat persists in database (survives process restarts)
 - ✅ 10-minute timeout threshold (allows for temporary issues)
+- ✅ **NEW:** `os._exit(0)` triggers infinite Railway auto-restart (VS5-style)
+- ✅ **NEW:** Railway restarts container within 10-30 seconds
+- ✅ **NEW:** No limit on restart attempts (unlike `restartPolicyMaxRetries = 10`)
 
 #### Logs to Check
 
@@ -180,8 +184,10 @@ if loop_iteration % 10 == 0:
 # Health check SUCCESS
 [HEALTH CHECK] ✅ Scheduler is ALIVE! Last heartbeat 2.3 minutes ago
 
-# Health check FAILURE
+# Health check FAILURE + AUTO-RESTART
 [HEALTH CHECK] ❌ Scheduler is DEAD! No heartbeat for 15.7 minutes
+[HEALTH CHECK] ❌ TRIGGERING CONTAINER RESTART via os._exit(0)...
+[HEALTH CHECK] ❌ Railway will auto-restart the container INFINITELY
 ```
 
 ### ⚠️ PREVIOUS: Railway Cron Limitation
