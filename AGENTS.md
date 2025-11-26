@@ -407,3 +407,6 @@ railway logs --service web | grep "FILTER"
 - Category blacklist filters BEFORE DB save
 - Hot reload every 60s from database
 - Old items DON'T auto-delete when category added to blacklist
+- **NEW:** Add to Blacklist button extracts ROOT category (before " > ")
+- **NEW:** API returns `already_exists` flag to show if category was duplicate
+- **ISSUE:** ~58% of items (70/120) have no category (old data from 2025-11-19)

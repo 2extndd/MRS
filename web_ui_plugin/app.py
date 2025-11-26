@@ -1204,7 +1204,12 @@ def api_add_category_to_blacklist():
         # Check if already exists
         if category in current_blacklist:
             logger.info(f"[BLACKLIST] Category already in blacklist: {category}")
-            return jsonify({'success': True, 'message': 'Category already in blacklist'})
+            return jsonify({
+                'success': True,
+                'message': 'Category already in blacklist',
+                'already_exists': True,
+                'total_categories': len(current_blacklist)
+            })
 
         # Add new category
         current_blacklist.append(category)
@@ -1231,6 +1236,7 @@ def api_add_category_to_blacklist():
             return jsonify({
                 'success': True,
                 'message': f'Category "{category}" added to blacklist',
+                'already_exists': False,
                 'total_categories': len(current_blacklist)
             })
         else:

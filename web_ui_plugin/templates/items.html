@@ -304,7 +304,11 @@ function updateTimeAgo() {
 
 // Add category to blacklist
 function addCategoryToBlacklist(category) {
-    if (!confirm(`Add category "${category}" to blacklist?\n\nAll items from this category will be filtered out.`)) {
+    // Extract root category (before first ' > ')
+    // Example: "フラワー・ガーデニング > 園芸用品 > 鉢・プランター" → "フラワー・ガーデニング"
+    const rootCategory = category.split(' > ')[0].trim();
+    
+    if (!confirm(`Add ROOT category "${rootCategory}" to blacklist?\n\nFull path: ${category}\n\nAll items from this category will be filtered out.`)) {
         return;
     }
 
@@ -313,15 +317,22 @@ function addCategoryToBlacklist(category) {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ category: category })
+        body: JSON.stringify({ category: rootCategory })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert(`✅ Category "${category}" added to blacklist!`);
-            // Hide all items with this category
-            document.querySelectorAll(`.item-card[data-category="${category}"]`).forEach(card => {
-                card.parentElement.style.display = 'none';
+            if (data.already_exists) {
+                alert(`ℹ️ Category "${rootCategory}" was already in blacklist!`);
+            } else {
+                alert(`✅ Category "${rootCategory}" added to blacklist!\n\nTotal categories: ${data.total_categories}`);
+            }
+            // Hide all items with this root category
+            document.querySelectorAll('.item-card').forEach(card => {
+                const itemCategory = card.getAttribute('data-category');
+                if (itemCategory && itemCategory.startsWith(rootCategory)) {
+                    card.parentElement.style.display = 'none';
+                }
             });
         } else {
             alert(`❌ Failed to add category: ${data.error || 'Unknown error'}`);
