@@ -37,25 +37,44 @@ try:
     if os.getenv('RAILWAY_ENVIRONMENT'):
         logger.info("[AUTOSTART] Railway environment detected - starting scheduler...")
 
-        def start_scheduler():
-            try:
-                import time
-                time.sleep(5)  # Wait for app to fully initialize
+        def start_scheduler_with_restart():
+            """Start scheduler with automatic restart on failure"""
+            import time
+            restart_count = 0
+            max_restart_delay = 60  # Max 60 seconds between restarts
 
-                from mercari_notifications import MercariNotificationApp
-                app_instance = MercariNotificationApp()
+            while True:  # Infinite restart loop
+                restart_count += 1
+                try:
+                    logger.info("=" * 60)
+                    logger.info(f"[AUTOSTART] Starting scheduler (attempt #{restart_count})...")
+                    logger.info("=" * 60)
 
-                logger.info("[AUTOSTART] Starting search scheduler...")
-                app_instance.run_scheduler()  # This runs infinite loop
+                    if restart_count == 1:
+                        time.sleep(5)  # Initial delay only on first start
 
-            except Exception as e:
-                logger.error(f"[AUTOSTART] Failed to start scheduler: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
+                    from mercari_notifications import MercariNotificationApp
+                    app_instance = MercariNotificationApp()
 
-        scheduler_thread = threading.Thread(target=start_scheduler, daemon=True, name="SchedulerAutostart")
+                    logger.info("[AUTOSTART] ✅ Scheduler starting infinite loop...")
+                    app_instance.run_scheduler()  # This runs infinite loop
+
+                    # If run_scheduler() returns (shouldn't happen), restart it
+                    logger.warning("[AUTOSTART] ⚠️ Scheduler loop ended unexpectedly - restarting...")
+
+                except Exception as e:
+                    logger.error(f"[AUTOSTART] ❌ Scheduler crashed: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+
+                # Calculate restart delay (exponential backoff, max 60 seconds)
+                restart_delay = min(restart_count * 5, max_restart_delay)
+                logger.info(f"[AUTOSTART] Restarting scheduler in {restart_delay} seconds...")
+                time.sleep(restart_delay)
+
+        scheduler_thread = threading.Thread(target=start_scheduler_with_restart, daemon=True, name="SchedulerAutostart")
         scheduler_thread.start()
-        logger.info("[AUTOSTART] ✅ Scheduler thread started in background")
+        logger.info("[AUTOSTART] ✅ Scheduler thread started in background with auto-restart")
     else:
         logger.info("[AUTOSTART] Local environment - scheduler not auto-started")
 
