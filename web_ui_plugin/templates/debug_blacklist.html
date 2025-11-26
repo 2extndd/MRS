@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Blacklist - MRS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>🔍 Blacklist Debug</h1>
+    
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Current Blacklist Status</h5>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-primary" onclick="loadBlacklist()">Load Blacklist</button>
+            <button class="btn btn-warning" onclick="fixBlacklist()">Fix Blacklist</button>
+            <button class="btn btn-danger" onclick="cleanBlacklistedItems()">Clean Blacklisted Items</button>
+        </div>
+    </div>
+    
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Results</h5>
+        </div>
+        <div class="card-body">
+            <pre id="results" style="max-height: 600px; overflow-y: auto;">Click "Load Blacklist" to see current state</pre>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadBlacklist() {
+    document.getElementById('results').textContent = 'Loading...';
+    
+    fetch('/api/debug-blacklist')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(err => {
+            document.getElementById('results').textContent = 'Error: ' + err;
+        });
+}
+
+function fixBlacklist() {
+    if (!confirm('This will reload blacklist from correct source. Continue?')) return;
+    
+    document.getElementById('results').textContent = 'Fixing...';
+    
+    fetch('/api/fix-blacklist', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+            alert(data.message || 'Done');
+        })
+        .catch(err => {
+            document.getElementById('results').textContent = 'Error: ' + err;
+        });
+}
+
+function cleanBlacklistedItems() {
+    if (!confirm('This will DELETE all items with blacklisted categories! Continue?')) return;
+    
+    document.getElementById('results').textContent = 'Cleaning...';
+    
+    fetch('/api/clean-blacklisted-items', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+            alert(`Deleted ${data.deleted_count} items!`);
+        })
+        .catch(err => {
+            document.getElementById('results').textContent = 'Error: ' + err;
+        });
+}
+</script>
+{% endblock %}

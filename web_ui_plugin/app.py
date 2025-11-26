@@ -1758,6 +1758,11 @@ def api_check_blacklist_item(item_id):
         config._last_reload_time = 0
         config.reload_if_needed()
         
+        # DEBUG: Load blacklist directly from DB to compare
+        blacklist_from_db = db.load_config('config_category_blacklist', default=[])
+        logger.info(f"[API] Blacklist from DB: type={type(blacklist_from_db)}, len={len(blacklist_from_db) if isinstance(blacklist_from_db, (list, set)) else 'N/A'}")
+        logger.info(f"[API] Config.CATEGORY_BLACKLIST: type={type(config.CATEGORY_BLACKLIST)}, len={len(config.CATEGORY_BLACKLIST)}")
+        
         # Check item
         query = """
             SELECT id, mercari_id, title, category, found_at, search_id
@@ -1817,6 +1822,108 @@ def api_check_blacklist_item(item_id):
         
     except Exception as e:
         logger.error(f"Error checking item: {e}")
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
+@app.route('/debug-blacklist')
+def debug_blacklist():
+    """Debug page for blacklist"""
+    return render_template('debug_blacklist.html')
+
+
+@app.route('/api/debug-blacklist')
+def api_debug_blacklist():
+    """Get detailed blacklist debug info"""
+    try:
+        from configuration_values import config
+        import json
+        
+        # Get from database directly
+        all_config = db.get_all_config()
+        
+        # Find all blacklist-related keys
+        blacklist_keys = {}
+        for key, value in all_config.items():
+            if 'blacklist' in key.lower() or 'category' in key.lower():
+                blacklist_keys[key] = {
+                    'type': str(type(value)),
+                    'length': len(value) if isinstance(value, (list, set, str)) else None,
+                    'value': value if not isinstance(value, list) or len(value) < 50 else value[:10] + ['...']
+                }
+        
+        # Get from config class
+        config._last_reload_time = 0
+        config.reload_if_needed()
+        
+        return jsonify({
+            'success': True,
+            'database_keys': blacklist_keys,
+            'config_class': {
+                'CATEGORY_BLACKLIST': {
+                    'type': str(type(config.CATEGORY_BLACKLIST)),
+                    'length': len(config.CATEGORY_BLACKLIST),
+                    'items': list(config.CATEGORY_BLACKLIST)[:20] + (['...'] if len(config.CATEGORY_BLACKLIST) > 20 else [])
+                }
+            },
+            'database_type': db.db_type
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/clean-blacklisted-items', methods=['POST'])
+def api_clean_blacklisted_items():
+    """Delete all items with blacklisted categories"""
+    try:
+        from configuration_values import config
+        
+        # Reload blacklist
+        config._last_reload_time = 0
+        config.reload_if_needed()
+        
+        if not config.CATEGORY_BLACKLIST:
+            return jsonify({
+                'success': False,
+                'error': 'Blacklist is empty'
+            })
+        
+        deleted_count = 0
+        deleted_categories = {}
+        
+        for category in config.CATEGORY_BLACKLIST:
+            # Count items before delete
+            count_query = "SELECT COUNT(*) as count FROM items WHERE category LIKE %s"
+            count_result = db.execute_query(count_query, (f'%{category}%',), fetch=True)
+            count = count_result[0]['count'] if count_result else 0
+            
+            if count > 0:
+                # Delete items
+                delete_query = "DELETE FROM items WHERE category LIKE %s"
+                db.execute_query(delete_query, (f'%{category}%',))
+                deleted_count += count
+                deleted_categories[category] = count
+                
+                logger.info(f"[CLEANUP] Deleted {count} items with category '{category}'")
+        
+        return jsonify({
+            'success': True,
+            'deleted_count': deleted_count,
+            'deleted_by_category': deleted_categories,
+            'blacklist_size': len(config.CATEGORY_BLACKLIST)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error cleaning blacklisted items: {e}")
         import traceback
         return jsonify({
             'success': False,
