@@ -132,9 +132,61 @@ CD・DVD・ブルーレイ - CD, DVD, Blu-ray
 
 ## 🚀 Scheduler & Cron Jobs
 
-### ⚠️ IMPORTANT: Railway Cron NOT USED!
+### ✅ NEW: Database-Based Heartbeat Monitoring (2025-01-26)
 
-**DO NOT use Railway Cron Job** (minimum 5 minutes limitation)
+**Problem Solved:** Scheduler daemon thread was dying silently after some time, and Railway cron couldn't detect it.
+
+**Solution:** Database-based heartbeat + health check script
+
+#### How It Works
+
+1. **Scheduler Writes Heartbeat** (`mercari_notifications.py:377-389`)
+   - Every 10 seconds, scheduler writes timestamp to database
+   - Uses `key_value_store` table with key `scheduler_heartbeat`
+   - Persistent across process restarts
+
+```python
+# mercari_notifications.py:377-389
+if loop_iteration % 10 == 0:
+    current_heartbeat = dt_for_heartbeat.now()
+    self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)  # In-memory
+    self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())  # Database
+```
+
+2. **Health Check Script** ([health_check.py](health_check.py))
+   - Runs via Railway cron job every 5 minutes
+   - Reads heartbeat from database
+   - If heartbeat older than 10 minutes → scheduler is DEAD
+   - Exits with error code 1 (Railway logs show failure)
+
+3. **Railway Cron Configuration**
+   - Command: `python3 health_check.py`
+   - Schedule: `*/5 * * * *` (every 5 minutes)
+   - Service: `web`
+   - Purpose: Monitor scheduler health, NOT run searches
+
+**Key Points:**
+- ✅ Query Delay controls scan frequency (30s-3600s)
+- ✅ Cron job only monitors health (every 5 min)
+- ✅ Heartbeat persists in database (survives process restarts)
+- ✅ 10-minute timeout threshold (allows for temporary issues)
+
+#### Logs to Check
+
+```bash
+# Scheduler writing heartbeat
+[SCHEDULER] ⏰ Loop alive! Iteration 30 (1 min uptime)
+
+# Health check SUCCESS
+[HEALTH CHECK] ✅ Scheduler is ALIVE! Last heartbeat 2.3 minutes ago
+
+# Health check FAILURE
+[HEALTH CHECK] ❌ Scheduler is DEAD! No heartbeat for 15.7 minutes
+```
+
+### ⚠️ PREVIOUS: Railway Cron Limitation
+
+**DO NOT use Railway Cron Job to run searches** (minimum 5 minutes limitation)
 
 ### How Scheduler Works
 
@@ -142,6 +194,7 @@ CD・DVD・ブルーレイ - CD, DVD, Blu-ray
 2. **Background Thread:** Runs 24/7 in daemon thread
 3. **Auto-Restart:** Infinite loop with exponential backoff on crashes
 4. **Configurable Interval:** `config.SEARCH_INTERVAL` can be **30 seconds to 1 hour**
+5. **NEW: Heartbeat:** Writes to database every 10 seconds for health monitoring
 
 ```python
 # wsgi.py:50-55
