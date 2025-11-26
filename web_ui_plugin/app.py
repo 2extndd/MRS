@@ -1748,6 +1748,83 @@ def api_proxy_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/check-blacklist-item/<item_id>', methods=['GET'])
+def api_check_blacklist_item(item_id):
+    """Check if item exists and why it passed/failed blacklist"""
+    try:
+        from configuration_values import config
+        
+        # Force reload config
+        config._last_reload_time = 0
+        config.reload_if_needed()
+        
+        # Check item
+        query = """
+            SELECT id, mercari_id, title, category, found_at, search_id
+            FROM items
+            WHERE mercari_id = %s
+        """
+        result = db.execute_query(query, (item_id,), fetch=True)
+        
+        if not result:
+            return jsonify({
+                'success': False,
+                'found': False,
+                'message': f'Item {item_id} not found in database'
+            })
+        
+        item = result[0]
+        item_category = item['category']
+        
+        # Check blacklist
+        is_blacklisted = False
+        matched_entry = None
+        
+        if item_category and config.CATEGORY_BLACKLIST:
+            for blacklisted_cat in config.CATEGORY_BLACKLIST:
+                if blacklisted_cat in item_category:
+                    is_blacklisted = True
+                    matched_entry = blacklisted_cat
+                    break
+        
+        # Count items with this category
+        count_query = "SELECT COUNT(*) as count FROM items WHERE category = %s"
+        count_result = db.execute_query(count_query, (item_category,), fetch=True)
+        items_with_same_category = count_result[0]['count'] if count_result else 0
+        
+        return jsonify({
+            'success': True,
+            'found': True,
+            'item': {
+                'id': item['id'],
+                'mercari_id': item['mercari_id'],
+                'title': item['title'],
+                'category': item_category,
+                'found_at': str(item['found_at']),
+                'search_id': item['search_id']
+            },
+            'blacklist': {
+                'total_categories': len(config.CATEGORY_BLACKLIST),
+                'categories': list(config.CATEGORY_BLACKLIST),
+                'is_blacklisted': is_blacklisted,
+                'matched_entry': matched_entry
+            },
+            'database': {
+                'items_with_same_category': items_with_same_category
+            },
+            'verdict': 'SHOULD_BE_REJECTED' if is_blacklisted else 'CORRECTLY_ADDED'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking item: {e}")
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 @app.route('/api/trigger-search', methods=['POST', 'GET'])
 def api_trigger_search():
     """
