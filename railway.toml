@@ -5,8 +5,3 @@ builder = "nixpacks"
 startCommand = "bash start.sh"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
-
-# Cron job: runs search cycle every minute (matches SEARCH_INTERVAL config)
-[[crons]]
-schedule = "* * * * *"
-command = "python3 run_search_cycle.py"
