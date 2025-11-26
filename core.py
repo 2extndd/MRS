@@ -280,7 +280,7 @@ class MercariSearcher:
             if items_in_db == 0:
                 # First scan - load more items to populate database
                 original_limit = limit
-                limit = min(50, config.MAX_ITEMS_PER_SEARCH * 10)  # Up to 50 items on first scan
+                limit = 50  # Always use 50 items on first scan
                 logger.info(f"[FIRST SCAN] This search has 0 items in DB, increasing limit: {original_limit} → {limit}")
 
             logger.info(f"Searching: {search_url[:100]}... (limit: {limit})")

@@ -42,11 +42,6 @@
                     <label class="form-label">Query Delay (seconds) ⚡</label>
                     <input type="number" class="form-control" name="search_interval"
                            value="{{ config.SEARCH_INTERVAL }}" min="30" max="3600">
-                    <small class="text-muted">
-                        <strong>✅ Can be less than 5 min!</strong><br>
-                        Scheduler runs 24/7 inside web process.<br>
-                        <strong>Recommended:</strong> 60-120s
-                    </small>
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">JPY to USD Rate</label>
@@ -74,9 +69,6 @@
                 <textarea class="form-control" name="category_blacklist" rows="6" id="categoryBlacklistInput"
                           placeholder="ゲーム・おもちゃ・グッズ&#10;本・音楽・ゲーム&#10;エンタメ・ホビー">{{ config.CATEGORY_BLACKLIST|join('\n') if config.CATEGORY_BLACKLIST else '' }}</textarea>
                 <small class="text-muted">Items from these categories will be automatically filtered out and won't appear in Telegram. Enter category names in Japanese as they appear on Mercari.</small>
-            </div>
-            <div class="alert alert-info mb-3">
-                <strong>ℹ️ How it works:</strong> Any item whose category contains one of the blacklisted strings will be rejected before being saved to the database. This is a <strong>global filter</strong> that applies to all search queries.
             </div>
             <div class="mb-3">
                 <strong>Common categories to filter:</strong>
@@ -265,70 +257,6 @@
                 <strong>Display Currency:</strong> {{ config.DISPLAY_CURRENCY }}<br>
                 <strong>Port:</strong> {{ config.PORT }}
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Database Statistics -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5><i class="bi bi-database"></i> Database Statistics</h5>
-    </div>
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <strong>Total Items:</strong> <span id="db-total-items" class="badge bg-primary">Loading...</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Items with Category:</strong> <span id="db-items-with-category" class="badge bg-success">-</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Items without Category:</strong> <span id="db-items-without-category" class="badge bg-warning">-</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Active Searches:</strong> <span id="db-active-searches" class="badge bg-info">-</span>
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-md-12">
-                <h6 class="mb-2">Item Type Breakdown:</h6>
-            </div>
-            <div class="col-md-6">
-                <strong>SHOPS Items:</strong> <span id="db-shops-items" class="badge bg-secondary">-</span>
-                <small class="text-muted d-block mt-1">
-                    With category: <span id="db-shops-with-cat">-</span> |
-                    Without: <span id="db-shops-without-cat">-</span>
-                </small>
-            </div>
-            <div class="col-md-6">
-                <strong>Regular Items:</strong> <span id="db-regular-items" class="badge bg-secondary">-</span>
-                <small class="text-muted d-block mt-1">
-                    With category: <span id="db-regular-with-cat">-</span> |
-                    Without: <span id="db-regular-without-cat">-</span>
-                </small>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-12">
-                <h6 class="mb-2">Last 2 Days Statistics:</h6>
-            </div>
-            <div class="col-md-4">
-                <strong>Total (2 days):</strong> <span id="db-2d-total" class="badge bg-info">-</span>
-            </div>
-            <div class="col-md-4">
-                <strong>With Category:</strong> <span id="db-2d-with-cat" class="badge bg-success">-</span>
-            </div>
-            <div class="col-md-4">
-                <strong>Without Category:</strong> <span id="db-2d-without-cat" class="badge bg-warning">-</span>
-            </div>
-        </div>
-
-        <div class="mt-3">
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshDatabaseStats()">
-                <i class="bi bi-arrow-clockwise"></i> Refresh Stats
-            </button>
         </div>
     </div>
 </div>
