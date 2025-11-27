@@ -376,6 +376,63 @@ def api_scheduler_status():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/scheduler/heartbeat')
+def api_scheduler_heartbeat():
+    """Get scheduler heartbeat from database - used by Web UI to check if scheduler is alive"""
+    try:
+        from datetime import datetime, timedelta
+        from dateutil import parser
+
+        # Read heartbeat from database
+        heartbeat_str = db.load_config('scheduler_heartbeat')
+
+        if not heartbeat_str:
+            return jsonify({
+                'success': False,
+                'alive': False,
+                'error': 'No heartbeat found - scheduler never started',
+                'last_heartbeat': None,
+                'age_seconds': None
+            })
+
+        # Parse heartbeat timestamp
+        try:
+            heartbeat_time = parser.isoparse(heartbeat_str)
+        except Exception as parse_error:
+            return jsonify({
+                'success': False,
+                'alive': False,
+                'error': f'Failed to parse heartbeat: {parse_error}',
+                'last_heartbeat': heartbeat_str,
+                'age_seconds': None
+            })
+
+        # Calculate age
+        now = datetime.now(heartbeat_time.tzinfo) if heartbeat_time.tzinfo else datetime.now()
+        age = now - heartbeat_time
+        age_seconds = age.total_seconds()
+
+        # Scheduler is considered alive if heartbeat < 60 seconds old
+        is_alive = age_seconds < 60
+
+        return jsonify({
+            'success': True,
+            'alive': is_alive,
+            'last_heartbeat': heartbeat_time.isoformat(),
+            'age_seconds': age_seconds,
+            'age_minutes': age_seconds / 60,
+            'threshold_seconds': 60
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'alive': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/test-telegram-send')
 def api_test_telegram_send():
     """Manually trigger telegram notification cycle for debugging"""
