@@ -37,8 +37,8 @@ def check_scheduler_health():
         logger.info("=" * 60)
 
         # Import database
-        from db import MercariDatabase
-        db = MercariDatabase()
+        from db import get_db
+        db = get_db()
 
         # Read heartbeat from database
         heartbeat_str = db.load_config('scheduler_heartbeat')
