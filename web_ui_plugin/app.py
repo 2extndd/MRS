@@ -381,7 +381,6 @@ def api_scheduler_heartbeat():
     """Get scheduler heartbeat from database - used by Web UI to check if scheduler is alive"""
     try:
         from datetime import datetime, timedelta
-        from dateutil import parser
 
         # Read heartbeat from database
         heartbeat_str = db.load_config('scheduler_heartbeat')
@@ -395,9 +394,11 @@ def api_scheduler_heartbeat():
                 'age_seconds': None
             })
 
-        # Parse heartbeat timestamp
+        # Parse heartbeat timestamp (ISO 8601 format)
         try:
-            heartbeat_time = parser.isoparse(heartbeat_str)
+            # Remove timezone 'Z' suffix if present (Python 3.7+ fromisoformat doesn't support it)
+            clean_timestamp = heartbeat_str.replace('Z', '+00:00')
+            heartbeat_time = datetime.fromisoformat(clean_timestamp)
         except Exception as parse_error:
             return jsonify({
                 'success': False,
