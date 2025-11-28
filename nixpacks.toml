@@ -1,0 +1,11 @@
+# Nixpacks configuration for Railway
+# This tells Railway to use Procfile for multi-process deployment
+
+[phases.setup]
+nixPkgs = ["python310", "postgresql"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python mercari_notifications.py"
