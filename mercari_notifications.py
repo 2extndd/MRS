@@ -288,7 +288,18 @@ class MercariNotificationApp:
         self.shared_state.set('scheduler_is_alive', True)
 
         loop_iteration = 0
+        last_heartbeat_log = 0
         while True:
+            # Update heartbeat in shared state (for web UI)
+            # This is non-blocking and fast (Redis/memory)
+            self.shared_state.update_heartbeat()
+            
+            # Log heartbeat to console every 60 seconds to confirm loop is alive
+            current_time = time.time()
+            if current_time - last_heartbeat_log > 60:
+                logger.info(f"[WATCHDOG] 💓 Scheduler loop is alive. Active threads: {threading.active_count()}")
+                last_heartbeat_log = current_time
+
             try:
                 loop_iteration += 1
 

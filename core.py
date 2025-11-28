@@ -155,13 +155,13 @@ class MercariSearcher:
 
                     # Log names of new items found
                     if items_result.get('items_data') and len(items_result['items_data']) > 0:
-                        logger.info(f"[SCAN] 🆕 NEW ITEMS ADDED ({len(items_result['items_data'])}):")
+                        logger.debug(f"[SCAN] 🆕 NEW ITEMS ADDED ({len(items_result['items_data'])}):")
                         for idx, item in enumerate(items_result['items_data'][:10], 1):  # Log first 10
-                            logger.info(f"[SCAN]    {idx}. {item.get('title', 'Unknown')[:60]} - ¥{item.get('price', 0):,}")
+                            logger.debug(f"[SCAN]    {idx}. {item.get('title', 'Unknown')[:60]} - ¥{item.get('price', 0):,}")
                         if len(items_result['items_data']) > 10:
-                            logger.info(f"[SCAN]    ... and {len(items_result['items_data']) - 10} more")
+                            logger.debug(f"[SCAN]    ... and {len(items_result['items_data']) - 10} more")
                     elif items_result['new_items'] == 0:
-                        logger.info(f"[SCAN] ℹ️  No new items (all {items_result['items_found']} items already in database)")
+                        logger.debug(f"[SCAN] ℹ️  No new items (all {items_result['items_found']} items already in database)")
 
                     self.db.add_log_entry('INFO',
                         f"✅ Found {items_result['items_found']} items ({items_result['new_items']} new) in {query_name}",
