@@ -124,8 +124,11 @@ class MercariSearcher:
         }
 
         # Define worker function for thread pool
-        def process_single_search(search):
+            def process_single_search(search):
             """Process a single search in a thread - each thread has its own API instance"""
+            # CRITICAL: Create separate API instance for this thread
+            # Cannot share async objects between threads!
+            thread_api = None
             try:
                 # Get query name for better logging
                 query_name = search.get('name', search.get('keyword', f"Query ID {search['id']}"))
@@ -139,8 +142,6 @@ class MercariSearcher:
                 # Each thread uses the shared DB instance (psycopg2 handles connections thread-safe)
                 self.db.add_log_entry('INFO', f"🔍 Scanning query: {query_name}", 'scanner', f"ID: {search['id']}")
 
-                # CRITICAL: Create separate API instance for this thread
-                # Cannot share async objects between threads!
                 thread_api = self._init_api()
                 
                 # Perform search with thread-local API
@@ -194,6 +195,15 @@ class MercariSearcher:
                     'error': str(e),
                     'search_id': search['id']
                 }
+            finally:
+                # CRITICAL: Close API instance to release resources (event loops)
+                if thread_api:
+                    try:
+                        if hasattr(thread_api, 'close'):
+                            thread_api.close()
+                            logger.debug(f"[SCAN] Closed API instance for search {search['id']}")
+                    except Exception as close_error:
+                        logger.error(f"Error closing API instance: {close_error}")
 
         # Execute searches in parallel using thread pool
         # Dynamic max_workers: scale up to 20 based on ready searches

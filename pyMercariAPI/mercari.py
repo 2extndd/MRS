@@ -98,6 +98,28 @@ class Mercari:
             logger.warning(f"Event loop issue, creating fresh loop: {e}")
             return asyncio.run(coro)
 
+    def close(self):
+        """
+        Close resources (event loop)
+        """
+        try:
+            if self._loop and not self._loop.is_closed():
+                if self._loop.is_running():
+                    logger.warning("Attempting to close running event loop")
+                else:
+                    self._loop.close()
+                    logger.debug("Event loop closed")
+            
+            # Also try to close mercapi session if it exists and has a close method
+            # Note: mercapi doesn't expose close() publicly but might have underlying session
+            if self._mercapi:
+                # If mercapi has a session or similar, close it here
+                # Currently mercapi manages its own session in context manager or per request
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error closing Mercari API resources: {e}")
+
     def _rate_limit(self):
         """Apply rate limiting between requests"""
         current_time = time.time()
