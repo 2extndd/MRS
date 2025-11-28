@@ -124,7 +124,7 @@ class MercariSearcher:
         }
 
         # Define worker function for thread pool
-            def process_single_search(search):
+        def process_single_search(search):
             """Process a single search in a thread - each thread has its own API instance"""
             # CRITICAL: Create separate API instance for this thread
             # Cannot share async objects between threads!
