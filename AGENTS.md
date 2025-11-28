@@ -1,7 +1,247 @@
 # 🤖 AI Memory: Mercari Research System (MRS)
 
-**Last Updated:** 2025-01-XX  
-**System Status:** ✅ Production Ready on Railway
+**Last Updated:** 2025-11-28
+**System Status:** ⚠️ BROKEN - Worker service stops after ~30 minutes on Railway
+
+---
+
+## 🚨 CRITICAL ISSUE: Scheduler Loop Stops (2025-11-28)
+
+### ❌ Problem Summary
+
+**Railway Worker service scheduler loop STOPS after running for ~30 minutes**, despite being in an infinite `while True` loop.
+
+**Evidence:**
+- Last heartbeat: `2025-11-28T16:56:59` (176+ minutes ago as of 22:53 UTC+3)
+- Worker logs show activity until 16:26, then silence
+- Heartbeat API returns `alive: false`
+- No error messages, no exceptions, no crashes - loop just **silently stops**
+
+### 🏗️ NEW Architecture (2025-11-28) - CURRENTLY BROKEN
+
+**Railway now runs TWO separate services:**
+
+```
+Railway Project: MRS
+├─ Service: web (Gunicorn + Flask UI)
+│   ├─ Start Command: bash start.sh
+│   ├─ Process: gunicorn wsgi:application
+│   ├─ Port: 8080
+│   └─ No scheduler (removed from wsgi.py)
+│
+└─ Service: Worker (Background Scheduler) ⚠️ STOPS AFTER 30 MIN
+    ├─ Start Command: python mercari_notifications.py
+    ├─ Process: Infinite while True loop
+    ├─ Configured: Manually in Railway Dashboard
+    └─ ISSUE: Loop stops silently, no errors
+```
+
+**Key Files:**
+- [Procfile](Procfile): Defines both services (web + worker)
+- [wsgi.py](wsgi.py): Web service only, scheduler removed (lines 67-69)
+- [mercari_notifications.py](mercari_notifications.py): Worker process with infinite loop (line 291)
+
+**Why Separate Services:**
+- Web UI needs to be responsive
+- Scheduler is CPU-intensive
+- Allows independent scaling/restart
+- Matches KufarSearcher architecture
+
+### 🐛 Root Cause: PostgreSQL DB Write Blocks Scheduler
+
+**Initial Discovery (2025-11-28 16:00-17:00):**
+
+The infinite loop at [mercari_notifications.py:291](mercari_notifications.py#L291) was **blocking indefinitely** on line 385:
+
+```python
+# BEFORE FIX (commit 737e60d):
+while True:  # Line 291
+    # ... scheduler logic ...
+
+    # Heartbeat update every 10 seconds
+    if loop_iteration % 10 == 0:
+        try:
+            current_heartbeat = dt_for_heartbeat.now()
+            self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)
+            self.shared_state.set('scheduler_is_alive', True)
+
+            # THIS LINE BLOCKS FOREVER when PostgreSQL connection hangs:
+            self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())
+        except Exception as e:
+            logger.warning(f"Heartbeat failed: {e}")
+            pass
+
+    time.sleep(1)
+```
+
+**Why try/except Doesn't Help:**
+- `db.save_config()` **hangs** (doesn't raise exception)
+- PostgreSQL connection becomes unstable/unresponsive
+- Python thread **waits indefinitely** for DB response
+- Try/except only catches exceptions, NOT hanging operations
+
+**First Fix Attempt (commit 737e60d) - FAILED:**
+
+Added threading timeout to prevent blocking:
+
+```python
+# First fix attempt - wrapped DB write in thread with timeout
+def write_heartbeat_with_timeout():
+    try:
+        self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())
+    except Exception as e:
+        logger.warning(f"DB heartbeat write failed: {e}")
+
+heartbeat_thread = threading.Thread(target=write_heartbeat_with_timeout, daemon=True)
+heartbeat_thread.start()
+heartbeat_thread.join(timeout=2.0)  # Wait max 2 seconds
+
+if heartbeat_thread.is_alive():
+    logger.warning(f"⚠️ Heartbeat DB write timed out (>2s) - continuing without blocking")
+```
+
+**BUT: This fix never deployed to Worker!** GitHub webhook didn't trigger auto-deploy.
+
+**Final Fix (commit 77cbdde) - NOT YET DEPLOYED:**
+
+Completely removed DB write:
+
+```python
+# CURRENT FIX (commit 77cbdde) - lines 377-388
+if loop_iteration % 10 == 0:
+    try:
+        current_heartbeat = dt_for_heartbeat.now()
+        self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)
+        self.shared_state.set('scheduler_is_alive', True)
+        # NO DATABASE WRITE - prevents blocking when DB connection fails
+    except Exception as heartbeat_error:
+        logger.warning(f"[SCHEDULER] Failed to update heartbeat: {heartbeat_error}")
+        pass
+```
+
+**Changes:**
+- ✅ Removed `self.db.save_config('scheduler_heartbeat', ...)` completely
+- ✅ Scheduler now updates in-memory heartbeat only via `shared_state`
+- ✅ Cannot be blocked by PostgreSQL connection issues
+- ⚠️ **NOT YET DEPLOYED** - Worker still running old code from before commit 737e60d
+
+### 🚧 Deployment Issues
+
+**Problem:** Railway Worker service does NOT auto-deploy when code pushed to GitHub
+
+**Timeline:**
+1. **16:00** - Pushed commit `737e60d` (threading timeout fix)
+2. **16:23** - Worker still running old code (no "[SCHEDULER] Loop alive!" logs)
+3. **16:56** - Worker stopped (last heartbeat)
+4. **17:00+** - Attempted multiple deploy methods:
+   - `railway up --service Worker` - FAILED (Worker tied to GitHub, ignores local uploads)
+   - Empty commit `c679229` - Triggered deploy but **web and worker both redeployed**, web API broke (missing dateutil)
+   - Pushed commit `77cbdde` (remove DB write) - **NO AUTO-DEPLOY**
+
+**Root Cause:**
+- Worker service created manually in Railway Dashboard
+- **GitHub webhook not configured** or not working
+- Service shows as "GitHub-linked" but doesn't actually auto-deploy
+
+**Evidence:**
+- Git log shows commits pushed: `77cbdde`, `c679229`, `737e60d`
+- Local code is correct (DB write removed)
+- Worker logs still from 16:26 (old code without fixes)
+- No deployment logs after 16:23
+
+### ✅ SOLUTION: Manual Redeploy Required
+
+**NEXT AGENT MUST DO THIS:**
+
+1. **Open Railway Dashboard:**
+   ```
+   https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker
+   ```
+
+2. **Verify Configuration:**
+   - Start Command: `python mercari_notifications.py`
+   - Source: GitHub (main branch)
+   - Latest commit should be `77cbdde` (fix: REMOVE heartbeat DB write completely)
+
+3. **Manual Redeploy:**
+   - Click "Deploy" or "Redeploy" button
+   - Wait 2-3 minutes for deployment
+   - Check Deployments tab for status
+
+4. **Verify Fix Applied:**
+   ```bash
+   railway logs --service Worker 2>&1 | grep -E "SCHEDULER|Loop alive" | tail -30
+   ```
+
+   **Expected logs (NEW CODE):**
+   ```
+   [SCHEDULER] ⏰ First iteration starting...
+   [SCHEDULER] ⏰ Loop alive! Iteration 30
+   [SCHEDULER] ⏰ Loop alive! Iteration 60
+   [SCHEDULER] ⏰ Loop alive! Iteration 90
+   ```
+
+   **Old code logs (if still not deployed):**
+   ```
+   [SCAN] ✅ Search completed
+   [PROCESS] ✅ NEW ITEM ADDED
+   # NO "[SCHEDULER] Loop alive!" messages
+   ```
+
+5. **Monitor Continuously:**
+   ```bash
+   # Check heartbeat every 2 minutes for 10 minutes
+   for i in {1..5}; do
+       echo "=== Check $i/5 at $(date) ==="
+       curl -s "https://web-production-fe38.up.railway.app/api/scheduler/heartbeat" | python3 -m json.tool
+       sleep 120
+   done
+   ```
+
+   **Expected:** `alive: true`, `last_heartbeat` updating every check
+
+6. **If Still Failing:**
+   - Check Worker logs for ANY errors
+   - Verify PostgreSQL connection is stable
+   - Consider alternative: Store heartbeat in Redis instead of PostgreSQL
+   - Consider alternative: Remove heartbeat system entirely, rely on Railway health checks
+
+### 📊 Commit History (Last 5)
+
+```bash
+77cbdde (HEAD -> main) - fix: REMOVE heartbeat DB write completely - prevents scheduler blocking
+c679229 - chore: Trigger Worker redeploy with heartbeat timeout fix
+737e60d - fix: Add timeout to heartbeat DB writes to prevent scheduler blocking
+2abe41a - fix: Remove autostart - use Railway worker service
+3123648 - fix: Restore scheduler autostart in wsgi.py
+```
+
+### 🔍 Key Code Locations
+
+**Infinite Loop (Must Never Stop):**
+- [mercari_notifications.py:291-403](mercari_notifications.py#L291-L403)
+- `while True:` with `schedule.run_pending()` and `time.sleep(1)`
+
+**Heartbeat Update (No DB Write):**
+- [mercari_notifications.py:377-388](mercari_notifications.py#L377-L388)
+- Updates `shared_state` only, no blocking operations
+
+**Worker Service Config:**
+- Manual configuration in Railway Dashboard
+- Start Command: `python mercari_notifications.py`
+- Must deploy from GitHub main branch
+
+**Logs to Check:**
+```bash
+# Scheduler alive (every 30 seconds)
+[SCHEDULER] ⏰ Loop alive! Iteration {N}
+
+# Scanning activity
+[SCAN] ✅ Search completed: X total items from API
+
+# Heartbeat updates (in-memory only, every 10 seconds)
+# No DB write logs
+```
 
 ---
 
@@ -9,27 +249,47 @@
 
 **MRS (Marketplace Research System)** - автоматизированный сканер Mercari для поиска и мониторинга товаров.
 
-### Architecture
+### ⚠️ NEW Architecture: Two Railway Services
+
 ```
-Railway Web Service (Single Process)
+Railway Project: MRS (f17da572-14c9-47b5-a9f1-1b6d5b6dea2d)
+
+Service 1: web
   ↓
-  start.sh → gunicorn → wsgi.py
+  bash start.sh → gunicorn wsgi:application
   ↓
-  ├─ Flask Web UI (port 8080)
-  │   ├─ /dashboard - Main dashboard
-  │   ├─ /config - Configuration
-  │   ├─ /queries - Search queries management
-  │   ├─ /items - Items list
-  │   └─ /logs - System logs
-  │
-  └─ Scheduler (Background Thread - 24/7)
-      ├─ search_cycle() - Scan Mercari every N seconds
-      ├─ telegram_cycle() - Send notifications
-      └─ hot_reload() - Reload config from DB every 60s
+  Flask Web UI (port 8080)
+  ├─ /dashboard - Main dashboard
+  ├─ /config - Configuration
+  ├─ /queries - Search queries management
+  ├─ /items - Items list
+  ├─ /api/scheduler/heartbeat - Scheduler health check
+  └─ /logs - System logs
+
+Service 2: Worker (BACKGROUND PROCESS)
+  ↓
+  python mercari_notifications.py
+  ↓
+  Infinite Loop Scheduler
+  ├─ search_cycle() - Scan Mercari every N seconds
+  ├─ telegram_cycle() - Send notifications
+  ├─ hot_reload() - Reload config from DB every 60s
+  └─ heartbeat update - Update shared_state every 10s
 ```
 
+**Why Two Services:**
+- Web UI must be responsive (user requests)
+- Scheduler is CPU-intensive (continuous scanning)
+- Independent scaling and restart
+- Matches KufarSearcher architecture pattern
+
+**Communication:**
+- Web UI reads scheduler status from `shared_state` (in-memory)
+- Both services connect to same PostgreSQL database
+- Worker writes items, Web UI displays them
+
 ### Database
-- **Production (Railway):** PostgreSQL
+- **Production (Railway):** PostgreSQL (shared between web + worker)
 - **Local (Development):** SQLite (`mercari_scanner.db`)
 - **Auto-switches** based on `DATABASE_URL` env var
 
@@ -43,10 +303,10 @@ Railway Web Service (Single Process)
 |------|---------|---------------|
 | `core.py` | Main search logic | `process_search_results()`, category filtering |
 | `mercari_scraper.py` | Mercari API wrapper | `search_mercari()`, item parsing |
-| `mercari_notifications.py` | Scheduler & cycles | `search_cycle()`, `telegram_cycle()` |
+| `mercari_notifications.py` | **WORKER PROCESS** | Infinite loop scheduler, search/telegram cycles |
 | `db.py` | Database abstraction | PostgreSQL/SQLite with hot reload |
 | `configuration_values.py` | Config management | Hot reload every 60s from DB |
-| `wsgi.py` | Production entry | Auto-starts scheduler on Railway |
+| `wsgi.py` | **WEB PROCESS** | Flask app only, NO scheduler |
 
 ### 2. Web UI Plugin
 
@@ -77,158 +337,138 @@ Railway Web Service (Single Process)
 
 ---
 
-## 🚨 Category Blacklist System
+## 🚀 Worker Service Deployment (Railway)
 
-### How It Works
+### Service Configuration
 
-**Location:** `core.py` lines 390-418
+**Service Name:** Worker
+**Start Command:** `python mercari_notifications.py`
+**Source:** GitHub (main branch)
+**Auto-Deploy:** ⚠️ NOT WORKING - requires manual redeploy
 
-```python
-# 1. Get item category
-item_category = getattr(full_item, 'category', None)
+**Environment Variables (shared with web service):**
+- `DATABASE_URL` - PostgreSQL connection string (auto-provided by Railway)
+- `RAILWAY_ENVIRONMENT` - Set to `production`
+- Telegram credentials (same as web service)
 
-# 2. Check against blacklist (substring match)
-if item_category and config.CATEGORY_BLACKLIST:
-    for blacklisted_cat in config.CATEGORY_BLACKLIST:
-        if blacklisted_cat in item_category:
-            logger.info(f"[FILTER] 🚫 Item rejected")
-            item_rejected = True
-            break
+### How to Configure Worker Service (First Time)
 
-# 3. Skip if rejected (BEFORE DB save, BEFORE image download)
-if item_rejected:
-    continue
-```
+1. **Create Service in Railway Dashboard:**
+   - Go to Project → New Service → GitHub Repo
+   - Select repository
+   - Name: `Worker`
 
-### Important Notes
+2. **Set Start Command:**
+   - Service Settings → Start Command
+   - Enter: `python mercari_notifications.py`
+   - Save
 
-✅ **Filters BEFORE:**
-- Saving to database
-- Downloading images
-- Sending notifications
+3. **Link to Database:**
+   - Service Settings → Variables
+   - Add reference to PostgreSQL service
+   - `DATABASE_URL` will auto-populate
 
-⚠️ **Substring Matching:**
-- Blacklist: `"ゲーム"` → Blocks: `"テレビゲーム"`, `"ゲーム・おもちゃ"`
-- Use exact full category names from Mercari
+4. **Deploy:**
+   - Deployments tab → Deploy
+   - Wait 2-3 minutes
 
-⏰ **Timing:**
-- Blacklist loaded at startup (`mercari_notifications.py:70`)
-- Hot reload every 60 seconds
-- **Old items stay in DB** if category added to blacklist later!
+### How to Redeploy (When Code Changes)
 
-### Common Categories (Japanese)
+**⚠️ CRITICAL: Auto-deploy from GitHub is BROKEN**
 
-```
-ゲーム・おもちゃ・グッズ - Games, Toys, Goods
-本・音楽・ゲーム - Books, Music, Games
-エンタメ・ホビー - Entertainment, Hobbies
-ベビー・キッズ - Baby, Kids
-コスメ・美容 - Cosmetics, Beauty
-CD・DVD・ブルーレイ - CD, DVD, Blu-ray
-コップ・グラス・酒器 - Cups, Glasses, Sake ware
-```
+**Manual Redeploy Required:**
 
----
+1. Open Railway Dashboard: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker
+2. Click "Deploy" or "Redeploy" button
+3. Verify deployment in Deployments tab
+4. Check logs for `[SCHEDULER] ⏰ Loop alive!` messages
 
-## 🚀 Scheduler & Cron Jobs
+**DO NOT USE `railway up --service Worker`** - Worker is GitHub-linked, ignores local uploads
 
-### ✅ NEW: Database-Based Heartbeat Monitoring + Auto-Restart (2025-01-26)
-
-**Problem Solved:** Scheduler daemon thread was dying silently after some time, and Railway cron couldn't detect it.
-
-**Solution:** Database-based heartbeat + health check script + **os._exit(0) auto-restart**
-
-#### How It Works
-
-1. **Scheduler Writes Heartbeat** (`mercari_notifications.py:377-389`)
-   - Every 10 seconds, scheduler writes timestamp to database
-   - Uses `key_value_store` table with key `scheduler_heartbeat`
-   - Persistent across process restarts
-
-```python
-# mercari_notifications.py:377-389
-if loop_iteration % 10 == 0:
-    current_heartbeat = dt_for_heartbeat.now()
-    self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)  # In-memory
-    self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())  # Database
-```
-
-2. **Health Check Script** ([health_check.py](health_check.py))
-   - Runs via Railway cron job every 5 minutes
-   - Reads heartbeat from database
-   - If heartbeat older than 10 minutes → scheduler is DEAD
-   - **Triggers container restart using `os._exit(0)`**
-   - Railway auto-restarts container **INFINITELY** (not limited by `restartPolicyMaxRetries`)
-
-3. **Railway Cron Configuration**
-   - Command: `python3 health_check.py`
-   - Schedule: `*/5 * * * *` (every 5 minutes)
-   - Service: `web`
-   - Purpose: Monitor scheduler health + auto-restart if dead
-
-**Key Points:**
-- ✅ Query Delay controls scan frequency (30s-3600s)
-- ✅ Cron job monitors health every 5 minutes
-- ✅ Heartbeat persists in database (survives process restarts)
-- ✅ 10-minute timeout threshold (allows for temporary issues)
-- ✅ **NEW:** `os._exit(0)` triggers infinite Railway auto-restart (VS5-style)
-- ✅ **NEW:** Railway restarts container within 10-30 seconds
-- ✅ **NEW:** No limit on restart attempts (unlike `restartPolicyMaxRetries = 10`)
-
-#### Logs to Check
+### Logs to Monitor
 
 ```bash
-# Scheduler writing heartbeat
-[SCHEDULER] ⏰ Loop alive! Iteration 30 (1 min uptime)
+# View Worker logs
+railway logs --service Worker
 
-# Health check SUCCESS
-[HEALTH CHECK] ✅ Scheduler is ALIVE! Last heartbeat 2.3 minutes ago
+# Check for scheduler activity (every 30 seconds)
+railway logs --service Worker | grep "Loop alive"
 
-# Health check FAILURE + AUTO-RESTART
-[HEALTH CHECK] ❌ Scheduler is DEAD! No heartbeat for 15.7 minutes
-[HEALTH CHECK] ❌ TRIGGERING CONTAINER RESTART via os._exit(0)...
-[HEALTH CHECK] ❌ Railway will auto-restart the container INFINITELY
+# Check for errors
+railway logs --service Worker | grep -E "error|Error|ERROR|Exception|Traceback"
+
+# Monitor specific time range
+railway logs --service Worker | grep "2025-11-28 19:"
 ```
 
-### ⚠️ PREVIOUS: Railway Cron Limitation
-
-**DO NOT use Railway Cron Job to run searches** (minimum 5 minutes limitation)
-
-### How Scheduler Works
-
-1. **Auto-Start:** `wsgi.py` lines 36-76 automatically starts scheduler on Railway
-2. **Background Thread:** Runs 24/7 in daemon thread
-3. **Auto-Restart:** Infinite loop with exponential backoff on crashes
-4. **Configurable Interval:** `config.SEARCH_INTERVAL` can be **30 seconds to 1 hour**
-5. **NEW: Heartbeat:** Writes to database every 10 seconds for health monitoring
-
-```python
-# wsgi.py:50-55
-def start_scheduler_with_restart():
-    while True:  # Infinite restart loop
-        try:
-            app_instance = MercariNotificationApp()
-            app_instance.run_scheduler()  # Runs forever
-        except Exception as e:
-            logger.error(f"Scheduler crashed: {e}")
-            time.sleep(restart_delay)
+**Expected logs (healthy Worker):**
+```
+[SCHEDULER] ⏰ First iteration starting...
+[SCHEDULER] Jobs scheduled: 2
+[SCHEDULER] ⏰ Loop alive! Iteration 30
+[SCAN] 🔍 Running search cycle...
+[SCAN] ✅ Search completed: 15 total items from API
+[SCHEDULER] ⏰ Loop alive! Iteration 60
 ```
 
-### Logs to Check
-
-```bash
-[AUTOSTART] Railway environment detected - starting scheduler...
-[AUTOSTART] ✅ Scheduler thread started in background
-[SCHEDULER] ⏰ Entering main loop...
-[SCHEDULER] Jobs scheduled: 4
-[SCHEDULER] ⏰ Loop alive! Iteration 30 (1 min uptime)
+**Bad logs (old code or crashed):**
+```
+[SCAN] ✅ Search completed
+[PROCESS] ✅ NEW ITEM ADDED
+# No "[SCHEDULER] Loop alive!" messages
+# Or logs stop completely after some time
 ```
 
 ---
 
 ## 🐛 Known Issues & Solutions
 
-### Issue #1: Items with blacklisted categories in DB
+### ❌ Issue #1: Worker Scheduler Loop Stops After ~30 Minutes
+
+**Problem:** Infinite `while True` loop at [mercari_notifications.py:291](mercari_notifications.py#L291) silently stops running.
+
+**Root Cause:** PostgreSQL `db.save_config()` call hangs indefinitely when connection becomes unstable (lines 377-388 OLD CODE).
+
+**Solution Applied (commit 77cbdde):**
+- Completely removed `self.db.save_config('scheduler_heartbeat', ...)`
+- Heartbeat now updates `shared_state` (in-memory) only
+- No blocking database operations in loop
+
+**Status:** ⚠️ **FIX NOT DEPLOYED** - Worker running old code, manual redeploy required
+
+**How to Fix:**
+1. Manual redeploy Worker service via Railway Dashboard
+2. Verify logs show `[SCHEDULER] ⏰ Loop alive!` every 30 seconds
+3. Monitor heartbeat API for continuous updates
+
+---
+
+### ❌ Issue #2: Railway Auto-Deploy Not Working for Worker
+
+**Problem:** Pushing code to GitHub does NOT trigger Worker service redeploy.
+
+**Evidence:**
+- Commits `77cbdde`, `c679229`, `737e60d` pushed to main
+- Worker logs still from 16:26 (before commits)
+- No deployment activity in Railway Dashboard
+
+**Possible Causes:**
+- GitHub webhook not configured
+- Worker service misconfigured (not properly linked to GitHub)
+- Railway bug/limitation
+
+**Workaround:**
+- **Manual redeploy via Railway Dashboard** (only reliable method)
+- Click Deploy button after every code push
+- Monitor deployment status
+
+**DO NOT USE:**
+- `railway up --service Worker` - Fails (Worker is GitHub-linked)
+- Empty commits to trigger webhook - Unreliable
+
+---
+
+### Issue #3: Items with blacklisted categories in DB
 
 **Problem:** Old items remain in DB if category added to blacklist later.
 
@@ -248,22 +488,16 @@ for category in config.CATEGORY_BLACKLIST:
     )
 ```
 
-### Issue #2: Query Delay not updating
+---
+
+### Issue #4: Query Delay not updating
 
 **Problem:** Config cached, hot reload not triggered.
 
 **Solution:**
 - Wait 60 seconds for hot reload
-- Or restart Railway service
+- Or restart Railway Worker service
 - Check logs: `[CONFIG] Hot reload triggered`
-
-### Issue #3: Scheduler not starting
-
-**Problem:** Missing `RAILWAY_ENVIRONMENT` variable.
-
-**Solution:**
-- Check Railway Variables: `railway variables`
-- Add if missing: `RAILWAY_ENVIRONMENT=production`
 
 ---
 
@@ -286,6 +520,9 @@ python3 run_search_cycle.py
 
 # 4. Run web UI
 python3 web_ui_plugin/app.py
+
+# 5. Run worker (scheduler) locally
+python3 mercari_notifications.py
 ```
 
 ### Test on Railway
@@ -294,19 +531,26 @@ python3 web_ui_plugin/app.py
 # 1. Link to project
 railway link -p f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
 
-# 2. Check logs
+# 2. Check Worker logs
+railway logs --service Worker
+
+# 3. Check Web logs
 railway logs --service web
 
-# 3. Run commands
-railway run --service web python3 run_search_cycle.py
+# 4. Check Worker status
+curl -s "https://web-production-fe38.up.railway.app/api/scheduler/heartbeat" | python3 -m json.tool
 
-# 4. Open shell
-railway shell --service web
+# 5. Open Worker Dashboard
+open "https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker"
 ```
 
 ### Key Log Patterns
 
 ```bash
+# Worker scheduler alive (CRITICAL - must appear every 30 seconds)
+[SCHEDULER] ⏰ Loop alive! Iteration 30
+[SCHEDULER] ⏰ Loop alive! Iteration 60
+
 # Successful scan
 [SEARCH] Searching with keyword: "コペンハーゲン"
 [SEARCH] Found 15 items for search "Royal Copenhagen"
@@ -320,134 +564,86 @@ railway shell --service web
 # Database operations
 [DB] Item added: m12345678901 - Title...
 [DB] Item already exists: m12345678901
-
-# Scheduler alive
-[SCHEDULER] ⏰ Loop alive! Iteration 120 (2 min uptime)
 ```
-
----
-
-## 🔄 Recent Changes (Last 10 Commits)
-
-### Commit f531219 (Current)
-```
-✨ Fix: Query Delay can be less than 5 minutes + Documentation
-
-Changes:
-- config.html: Query Delay min 60s → 30s ⚡
-- Added explanation: Railway Cron NOT needed
-- Scheduler runs 24/7 inside web process
-
-Key Findings:
-- Category blacklist works correctly
-- Filters BEFORE DB save and image download
-- SEARCH_INTERVAL can be 30s-3600s
-```
-
-### Commit db74fe9
-```
-fix: Restart scheduler with improved logging
-- Added restart count
-- Exponential backoff on crashes
-```
-
-### Commit 26029a2
-```
-fix: Add auto-restart logic to scheduler thread
-- Infinite loop with try-catch
-- Daemon thread for auto-cleanup
-```
-
-### Commit b130f8e
-```
-feat: Restore automatic scheduler with configurable interval
-- Removed external cron dependency
-- Scheduler runs inside web process
-```
-
----
-
-## 📝 Best Practices
-
-### Configuration
-- ✅ Use Query Delay: 60-120 seconds (balanced)
-- ✅ Use Max Items: 50 (default, good for most cases)
-- ✅ Add full category names to blacklist (not partial)
-- ⚠️ Test blacklist with few items first
-
-### Deployment
-- ✅ Always deploy through Git push (auto-deploy enabled)
-- ✅ Monitor logs after deployment: `railway logs --service web`
-- ✅ Check scheduler startup: Look for `[AUTOSTART] ✅ Scheduler thread started`
-- ❌ Never use Railway Cron Job (not needed!)
-
-### Debugging
-- 🔍 Check Web UI `/logs` for recent errors
-- 🔍 Use Railway logs with grep: `railway logs | grep "ERROR"`
-- 🔍 Verify config loaded: Look for `[CONFIG] Category blacklist loaded: N categories`
-- 🔍 Test single cycle: `python3 run_search_cycle.py`
-
----
-
-## 🎯 Quick Reference
-
-### Start/Stop Scheduler
-```bash
-# Scheduler auto-starts on Railway - no manual action needed!
-# To restart: push code or restart Railway service
-git push origin main
-```
-
-### Update Config
-1. Web UI → `/config`
-2. Change values
-3. Click "Save"
-4. Wait 60s for hot reload (or restart service)
-
-### Add to Blacklist
-1. Web UI → `/config` → Category Filter
-2. Add category (one per line, in Japanese)
-3. Click "Save Category Filter"
-4. New items filtered immediately
-
-### Check if Working
-1. Railway logs: `[SCHEDULER] ⏰ Loop alive!`
-2. Web UI `/dashboard`: "Last Scan" updates
-3. Web UI `/items`: New items appear
-4. Telegram: Notifications arrive
 
 ---
 
 ## 🚨 Emergency Procedures
 
-### Scheduler Stopped
+### Worker Scheduler Stopped
+
+**Symptoms:**
+- Heartbeat API shows `alive: false`
+- `last_heartbeat` timestamp old (>5 minutes)
+- No `[SCHEDULER] Loop alive!` logs in last 2 minutes
+
+**Diagnosis:**
 ```bash
-# 1. Check Railway logs
-railway logs --service web | tail -50
+# 1. Check heartbeat status
+curl -s "https://web-production-fe38.up.railway.app/api/scheduler/heartbeat" | python3 -m json.tool
 
-# 2. Look for errors
-railway logs --service web | grep "ERROR"
+# 2. Check Worker logs for last activity
+railway logs --service Worker | tail -50
 
-# 3. Restart service
-railway service restart --service web
+# 3. Look for errors
+railway logs --service Worker | grep -E "error|Error|Exception"
+
+# 4. Check loop alive messages
+railway logs --service Worker | grep "Loop alive" | tail -10
 ```
+
+**Fix:**
+```bash
+# Option 1: Restart Worker service via Railway Dashboard
+# 1. Open: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker
+# 2. Settings → Restart Service
+# 3. Wait 1-2 minutes
+# 4. Verify logs show [SCHEDULER] Loop alive!
+
+# Option 2: Redeploy with latest code
+# 1. Railway Dashboard → Worker → Deploy
+# 2. Wait 2-3 minutes for deployment
+# 3. Check logs
+```
+
+---
+
+### Worker Not Deploying New Code
+
+**Symptoms:**
+- Code pushed to GitHub
+- Worker logs show old code behavior
+- No deployment activity in Railway Dashboard
+
+**Fix:**
+```bash
+# Manual redeploy required
+# 1. Open Railway Dashboard
+open "https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker"
+
+# 2. Click Deploy button
+# 3. Verify deployment in Deployments tab
+# 4. Check logs for new code behavior
+
+# To verify code version:
+railway logs --service Worker | grep "SCHEDULER.*Loop alive" | head -5
+# If you see "[SCHEDULER] ⏰ Loop alive!" → NEW CODE (commit 77cbdde+)
+# If you DON'T see it → OLD CODE (before commit 737e60d)
+```
+
+---
 
 ### Database Issues
+
 ```bash
 # 1. Check connection
-railway run --service web python3 -c "from db import get_db; print(get_db().db_type)"
+railway run --service Worker python3 -c "from db import get_db; print(get_db().db_type)"
 
 # 2. Verify DATABASE_URL
-railway variables --service web | grep DATABASE_URL
-```
+railway variables --service Worker | grep DATABASE_URL
 
-### Blacklist Not Working
-```bash
-# 1. Check config in DB
-railway run --service web python3 -c "from configuration_values import config; config.reload_if_needed(); print(config.CATEGORY_BLACKLIST)"
-
-# 2. Check logs for filter messages
-railway logs --service web | grep "FILTER"
+# 3. Test database from Worker
+railway run --service Worker python3 -c "from db import get_db; db = get_db(); print(db.fetch_all('SELECT COUNT(*) FROM items'))"
 ```
 
 ---
@@ -455,17 +651,92 @@ railway logs --service web | grep "FILTER"
 ## 📚 Additional Resources
 
 - **Railway Dashboard:** https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d
-- **Web UI:** https://your-domain.railway.app
-- **Database:** PostgreSQL (internal Railway DNS)
+- **Worker Service:** https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker
+- **Web UI:** https://web-production-fe38.up.railway.app
+- **Heartbeat API:** https://web-production-fe38.up.railway.app/api/scheduler/heartbeat
 
 ---
 
-**Notes for Future AI:**
-- System uses PostgreSQL on Railway, SQLite locally
-- Scheduler runs 24/7 in web process (wsgi.py), NOT via cron
-- Category blacklist filters BEFORE DB save
-- Hot reload every 60s from database
-- Old items DON'T auto-delete when category added to blacklist
-- **NEW:** Add to Blacklist button extracts ROOT category (before " > ")
-- **NEW:** API returns `already_exists` flag to show if category was duplicate
-- **ISSUE:** ~58% of items (70/120) have no category (old data from 2025-11-19)
+## 🎯 PROMPT FOR NEXT AGENT
+
+**CRITICAL TASK: Fix Worker Scheduler Loop Stopping Issue**
+
+### Background
+
+The MRS (Mercari Research System) runs on Railway with TWO services:
+1. **web** - Flask UI (working fine)
+2. **Worker** - Background scheduler (BROKEN - stops after ~30 min)
+
+The Worker service runs an infinite `while True` loop in [mercari_notifications.py:291](mercari_notifications.py#L291) that should NEVER stop. However, it **silently stops** after ~30 minutes with no errors.
+
+**Root Cause:** PostgreSQL `db.save_config()` hangs indefinitely when connection becomes unstable, blocking the entire loop.
+
+**Fix Applied:** Commit `77cbdde` completely removed the blocking DB write from heartbeat update (lines 377-388).
+
+**Problem:** This fix is NOT DEPLOYED to Worker service. Railway auto-deploy from GitHub is broken.
+
+### Your Task
+
+1. **Manually redeploy Worker service:**
+   - Open: https://railway.app/project/f17da572-14c9-47b5-a9f1-1b6d5b6dea2d/service/Worker
+   - Click "Deploy" or "Redeploy"
+   - Verify it deploys commit `77cbdde` or later
+   - Wait 2-3 minutes
+
+2. **Verify fix is working:**
+   ```bash
+   # Should see "[SCHEDULER] ⏰ Loop alive!" every 30 seconds
+   railway logs --service Worker | grep "Loop alive"
+   ```
+
+3. **Monitor continuously for 10 minutes:**
+   ```bash
+   # Check heartbeat every 2 minutes
+   for i in {1..5}; do
+       echo "=== Check $i/5 at $(date) ==="
+       curl -s "https://web-production-fe38.up.railway.app/api/scheduler/heartbeat" | python3 -m json.tool
+       sleep 120
+   done
+   ```
+
+   Expected: `alive: true` with `last_heartbeat` updating each check
+
+4. **If still failing after 10 minutes:**
+   - Check Worker logs for ANY errors
+   - Investigate PostgreSQL connection stability
+   - Consider removing heartbeat system entirely
+   - Consider alternative: Use Redis for heartbeat instead of PostgreSQL
+
+### Critical Files
+
+- [mercari_notifications.py:291-403](mercari_notifications.py#L291-L403) - Infinite loop (must never stop)
+- [mercari_notifications.py:377-388](mercari_notifications.py#L377-L388) - Heartbeat update (no DB write in latest code)
+- [Procfile](Procfile) - Defines web + worker services
+- [wsgi.py](wsgi.py) - Web service only (no scheduler)
+
+### Success Criteria
+
+- ✅ Worker logs show `[SCHEDULER] ⏰ Loop alive!` every 30 seconds
+- ✅ Heartbeat API returns `alive: true` continuously
+- ✅ `last_heartbeat` timestamp updates every 10 seconds
+- ✅ Worker runs for 30+ minutes WITHOUT stopping
+- ✅ No blocking database operations in main loop
+
+### Failure Indicators
+
+- ❌ No `[SCHEDULER] Loop alive!` messages in logs
+- ❌ Heartbeat API shows `alive: false`
+- ❌ `last_heartbeat` timestamp older than 2 minutes
+- ❌ Worker logs show old code behavior (before commit 77cbdde)
+- ❌ Logs stop updating after some time
+
+---
+
+**Last Known State (2025-11-28 22:53 UTC+3):**
+- Worker stopped at: 16:56:59 (176 minutes ago)
+- Last deployment: Unknown (auto-deploy broken)
+- Current code version: OLD (before commit 737e60d)
+- Heartbeat status: `alive: false`
+- Latest commit: `77cbdde` (not deployed)
+
+**Next agent: START HERE** 👆
