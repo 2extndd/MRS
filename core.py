@@ -147,18 +147,25 @@ class MercariSearcher:
                 
                 # Perform search with thread-local API
                 # WRAP IN TIMEOUT to prevent hangs
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                # Perform search with thread-local API
+                # WRAP IN TIMEOUT to prevent hangs
+                # CRITICAL: Do NOT use 'with' context manager here because it waits for thread to finish
+                # We want to abandon the thread if it hangs
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
                     future = executor.submit(self.search_query, search, api_instance=thread_api)
+                    items_result = future.result(timeout=45)  # 45s timeout per search
+                except concurrent.futures.TimeoutError:
+                    logger.error(f"[SCAN] ⏳ Search {search['id']} timed out after 45s (Thread abandoned)")
+                    items_result = {'success': False, 'error': 'Search timed out', 'items_found': 0, 'new_items': 0}
+                    # Try to close API if possible (though thread might be stuck)
                     try:
-                        items_result = future.result(timeout=45)  # 45s timeout per search
-                    except concurrent.futures.TimeoutError:
-                        logger.error(f"[SCAN] ⏳ Search {search['id']} timed out after 45s")
-                        items_result = {'success': False, 'error': 'Search timed out', 'items_found': 0, 'new_items': 0}
-                        # Try to close API if possible (though thread might be stuck)
-                        try:
-                            thread_api.close()
-                        except:
-                            pass
+                        thread_api.close()
+                    except:
+                        pass
+                finally:
+                    # shutdown(wait=False) ensures we don't block waiting for the stuck thread
+                    executor.shutdown(wait=False)
 
                 # Update search scan time
                 self.db.update_search_scan_time(search['id'])
