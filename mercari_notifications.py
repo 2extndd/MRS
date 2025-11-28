@@ -381,8 +381,20 @@ class MercariNotificationApp:
                         self.shared_state.set('scheduler_last_heartbeat', current_heartbeat)
                         self.shared_state.set('scheduler_is_alive', True)
 
-                        # Also write to database for persistent health check
-                        self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())
+                        # Write to database with timeout to prevent blocking
+                        # Use thread to avoid blocking main loop if DB hangs
+                        def write_heartbeat_with_timeout():
+                            try:
+                                self.db.save_config('scheduler_heartbeat', current_heartbeat.isoformat())
+                            except Exception as e:
+                                logger.warning(f"[SCHEDULER] DB heartbeat write failed: {e}")
+
+                        heartbeat_thread = threading.Thread(target=write_heartbeat_with_timeout, daemon=True)
+                        heartbeat_thread.start()
+                        heartbeat_thread.join(timeout=2.0)  # Wait max 2 seconds
+
+                        if heartbeat_thread.is_alive():
+                            logger.warning(f"[SCHEDULER] ⚠️ Heartbeat DB write timed out (>2s) - continuing without blocking")
                     except Exception as heartbeat_error:
                         # Don't break loop if heartbeat fails
                         logger.warning(f"[SCHEDULER] Failed to update heartbeat: {heartbeat_error}")
