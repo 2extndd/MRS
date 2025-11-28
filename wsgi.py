@@ -64,50 +64,9 @@ try:
             logger.error(f"[INDEXES] ❌ Index creation failed: {e}")
             # Don't block startup if index creation fails
 
-    # Auto-start scheduler in background thread (only in production)
-    if os.getenv('RAILWAY_ENVIRONMENT'):
-        logger.info("[AUTOSTART] Railway environment detected - starting scheduler...")
-
-        def start_scheduler_with_restart():
-            """Start scheduler with automatic restart on failure"""
-            import time
-            restart_count = 0
-            max_restart_delay = 60  # Max 60 seconds between restarts
-
-            while True:  # Infinite restart loop
-                restart_count += 1
-                try:
-                    logger.info("=" * 60)
-                    logger.info(f"[AUTOSTART] Starting scheduler (attempt #{restart_count})...")
-                    logger.info("=" * 60)
-
-                    if restart_count == 1:
-                        time.sleep(5)  # Initial delay only on first start
-
-                    from mercari_notifications import MercariNotificationApp
-                    app_instance = MercariNotificationApp()
-
-                    logger.info("[AUTOSTART] ✅ Scheduler starting infinite loop...")
-                    app_instance.run_scheduler()  # This runs infinite loop
-
-                    # If run_scheduler() returns (shouldn't happen), restart it
-                    logger.warning("[AUTOSTART] ⚠️ Scheduler loop ended unexpectedly - restarting...")
-
-                except Exception as e:
-                    logger.error(f"[AUTOSTART] ❌ Scheduler crashed: {e}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-
-                # Calculate restart delay (exponential backoff, max 60 seconds)
-                restart_delay = min(restart_count * 5, max_restart_delay)
-                logger.info(f"[AUTOSTART] Restarting scheduler in {restart_delay} seconds...")
-                time.sleep(restart_delay)
-
-        scheduler_thread = threading.Thread(target=start_scheduler_with_restart, daemon=True, name="SchedulerAutostart")
-        scheduler_thread.start()
-        logger.info("[AUTOSTART] ✅ Scheduler thread started in background with auto-restart")
-    else:
-        logger.info("[AUTOSTART] Local environment - scheduler not auto-started")
+    # Scheduler runs in separate Railway worker service (like KS1)
+    # Configured in Railway Dashboard with Start Command: python mercari_notifications.py
+    logger.info("[WSGI] Scheduler runs in separate worker service")
 
 except Exception as e:
     logger.error(f"Failed to load WSGI application: {e}")
