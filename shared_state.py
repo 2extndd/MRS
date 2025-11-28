@@ -60,7 +60,15 @@ class SharedState:
             # Custom flags
             "force_scan_requested": False,
             "shutdown_requested": False,
+            
+            # Heartbeat
+            "last_heartbeat": datetime.now(),
         }
+
+    def update_heartbeat(self):
+        """Update last heartbeat timestamp"""
+        with self._lock:
+            self._state["last_heartbeat"] = datetime.now()
 
     def get(self, key, default=None):
         """Get state value thread-safely"""
