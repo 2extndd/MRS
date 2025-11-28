@@ -35,19 +35,30 @@
                 <div class="col-md-4 mb-3">
                     <label class="form-label">Items Per Query</label>
                     <input type="number" class="form-control" name="max_items_per_search"
-                           value="{{ config.MAX_ITEMS_PER_SEARCH }}" min="1" max="120">
+                        value="{{ config.MAX_ITEMS_PER_SEARCH }}" min="1" max="120">
                     <small class="text-muted">How many items to scan per query</small>
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">Query Delay (seconds) ⚡</label>
                     <input type="number" class="form-control" name="search_interval"
-                           value="{{ config.SEARCH_INTERVAL }}" min="30" max="3600">
+                        value="{{ config.SEARCH_INTERVAL }}" min="30" max="3600">
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">JPY to USD Rate</label>
                     <input type="number" step="0.0001" class="form-control" name="usd_conversion_rate"
-                           value="{{ config.USD_CONVERSION_RATE }}" min="0.0001" max="1">
+                        value="{{ config.USD_CONVERSION_RATE }}" min="0.0001" max="1">
                     <small class="text-muted">Current: 159¥ ≈ 1$ (0.0063)</small>
+                </div>
+            </div>
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="disable_shops" id="disableShops" {{ 'checked'
+                        if config.DISABLE_SHOPS else '' }}>
+                    <label class="form-check-label" for="disableShops">
+                        <strong>Disable Shops (Exclude Mercari Shops)</strong>
+                        <div class="text-muted small">If enabled, items from professional shops (non-individual sellers)
+                            will be filtered out.</div>
+                    </label>
                 </div>
             </div>
             <button type="button" class="btn btn-primary" onclick="saveSystemSettings()">
@@ -67,22 +78,27 @@
             <div class="mb-3">
                 <label class="form-label">Blacklisted Categories (one per line)</label>
                 <textarea class="form-control" name="category_blacklist" rows="6" id="categoryBlacklistInput"
-                          placeholder="ゲーム・おもちゃ・グッズ&#10;本・音楽・ゲーム&#10;エンタメ・ホビー">{{ config.CATEGORY_BLACKLIST|join('\n') if config.CATEGORY_BLACKLIST else '' }}</textarea>
-                <small class="text-muted">Items from these categories will be automatically filtered out and won't appear in Telegram. Enter category names in Japanese as they appear on Mercari.</small>
+                    placeholder="ゲーム・おもちゃ・グッズ&#10;本・音楽・ゲーム&#10;エンタメ・ホビー">{{ config.CATEGORY_BLACKLIST|join('\n') if config.CATEGORY_BLACKLIST else '' }}</textarea>
+                <small class="text-muted">Items from these categories will be automatically filtered out and won't
+                    appear in Telegram. Enter category names in Japanese as they appear on Mercari.</small>
             </div>
             <div class="mb-3">
                 <strong>Common categories to filter:</strong>
                 <div class="d-flex flex-wrap gap-2 mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('ゲーム・おもちゃ・グッズ')">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="addCategoryToBlacklist('ゲーム・おもちゃ・グッズ')">
                         🎮 Games & Toys
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('本・音楽・ゲーム')">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="addCategoryToBlacklist('本・音楽・ゲーム')">
                         📚 Books & Music
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('エンタメ・ホビー')">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="addCategoryToBlacklist('エンタメ・ホビー')">
                         🎪 Entertainment
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCategoryToBlacklist('ベビー・キッズ')">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="addCategoryToBlacklist('ベビー・キッズ')">
                         👶 Baby & Kids
                     </button>
                 </div>
@@ -108,15 +124,15 @@
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Bot Token</label>
                     <input type="text" class="form-control" name="telegram_bot_token"
-                           value="{{ config.TELEGRAM_BOT_TOKEN or '' }}"
-                           placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
-                    <small class="text-muted">Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a></small>
+                        value="{{ config.TELEGRAM_BOT_TOKEN or '' }}"
+                        placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                    <small class="text-muted">Get this from <a href="https://t.me/BotFather"
+                            target="_blank">@BotFather</a></small>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Chat ID</label>
                     <input type="text" class="form-control" name="telegram_chat_id"
-                           value="{{ config.TELEGRAM_CHAT_ID or '' }}"
-                           placeholder="-1001234567890">
+                        value="{{ config.TELEGRAM_CHAT_ID or '' }}" placeholder="-1001234567890">
                     <small class="text-muted">The chat ID where notifications will be sent</small>
                 </div>
             </div>
@@ -143,21 +159,25 @@
     <div class="card-body">
         <div class="row mb-3">
             <div class="col-md-4">
-                <strong>Status:</strong> <span id="proxy-status">{{ 'Active' if config.PROXY_ENABLED else 'Inactive' }}</span>
+                <strong>Status:</strong> <span id="proxy-status">{{ 'Active' if config.PROXY_ENABLED else 'Inactive'
+                    }}</span>
             </div>
             <div class="col-md-4">
-                <strong>Total Proxies:</strong> <span id="proxy-total">{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST.split('\n')|select|list|length }}{% else %}{{ config.PROXY_LIST|length }}{% endif %}</span>
+                <strong>Total Proxies:</strong> <span id="proxy-total">{% if config.PROXY_LIST is string %}{{
+                    config.PROXY_LIST.split('\n')|select|list|length }}{% else %}{{ config.PROXY_LIST|length }}{% endif
+                    %}</span>
             </div>
             <div class="col-md-4">
-                <strong>Current Proxy:</strong> <code class="small" id="proxy-current">{% if config.PROXY_LIST %}{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST.split('\n')[0] }}{% else %}{{ config.PROXY_LIST[0] }}{% endif %}{% else %}None{% endif %}</code>
+                <strong>Current Proxy:</strong> <code class="small"
+                    id="proxy-current">{% if config.PROXY_LIST %}{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST.split('\n')[0] }}{% else %}{{ config.PROXY_LIST[0] }}{% endif %}{% else %}None{% endif %}</code>
             </div>
         </div>
 
         <form id="proxySettingsForm">
             <div class="mb-3">
                 <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="proxy_enabled"
-                           id="proxyEnabled" {{ 'checked' if config.PROXY_ENABLED else '' }}>
+                    <input class="form-check-input" type="checkbox" name="proxy_enabled" id="proxyEnabled" {{ 'checked'
+                        if config.PROXY_ENABLED else '' }}>
                     <label class="form-check-label" for="proxyEnabled">
                         Enable Proxy (Bot can work without proxy)
                     </label>
@@ -166,7 +186,7 @@
             <div class="mb-3">
                 <label class="form-label">Proxy List (one per line)</label>
                 <textarea class="form-control" name="proxy_list" rows="5"
-                          placeholder="http://user:pass@host:port&#10;socks5://host:port">{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST }}{% elif config.PROXY_LIST %}{{ config.PROXY_LIST|join('\n') }}{% endif %}</textarea>
+                    placeholder="http://user:pass@host:port&#10;socks5://host:port">{% if config.PROXY_LIST is string %}{{ config.PROXY_LIST }}{% elif config.PROXY_LIST %}{{ config.PROXY_LIST|join('\n') }}{% endif %}</textarea>
                 <small class="text-muted">Format: protocol://user:pass@host:port</small>
             </div>
             <div class="d-flex gap-2">
@@ -254,282 +274,285 @@
 </div>
 
 <script>
-// Save system settings
-function saveSystemSettings() {
-    const form = document.getElementById('systemSettingsForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    fetch('/api/config/system', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ System settings saved!\n' + (data.note || ''));
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
+    // Save system settings
+    function saveSystemSettings() {
+        const form = document.getElementById('systemSettingsForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
 
-// Save Telegram settings
-function saveTelegramSettings() {
-    const form = document.getElementById('telegramSettingsForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    fetch('/api/config/telegram', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Telegram settings saved!');
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
+        // Handle checkbox explicitly (unchecked = false)
+        data.disable_shops = document.getElementById('disableShops').checked;
 
-// Test Telegram bot
-function testTelegramBot() {
-    fetch('/api/notifications/test', {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Test message sent to Telegram!');
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
-
-// Save proxy settings
-function saveProxySettings() {
-    const form = document.getElementById('proxySettingsForm');
-    const formData = new FormData(form);
-    const data = {
-        proxy_enabled: form.proxyEnabled.checked,
-        proxy_list: formData.get('proxy_list')
-    };
-    
-    fetch('/api/config/proxy', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Proxy settings saved!');
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
-
-// Test proxies
-function testProxies() {
-    alert('⏳ Testing proxies... This may take a minute.');
-    fetch('/api/proxy/test', {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert(`✅ Proxy test completed!\n\nWorking: ${data.working}/${data.total}\n${data.message}`);
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
-
-// Save Railway settings
-function saveRailwaySettings() {
-    const form = document.getElementById('railwaySettingsForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    fetch('/api/config/railway', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Railway settings saved!');
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
-
-// Refresh Railway status
-function refreshRailwayStatus() {
-    fetch('/api/railway/status')
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            const status = data.status;
-            document.getElementById('error-403').textContent = status.errors['403'];
-            document.getElementById('error-401').textContent = status.errors['401'];
-            document.getElementById('error-429').textContent = status.errors['429'];
-            document.getElementById('total-errors').textContent = status.total_errors;
-            document.getElementById('first-error').textContent = status.first_error;
-            document.getElementById('last-redeploy').textContent = status.last_redeploy;
-            document.getElementById('redeploy-status').textContent = status.status;
-            document.getElementById('redeploy-status').className = 'badge bg-' + 
-                (status.status === 'active' ? 'success' : status.status === 'warning' ? 'warning' : 'danger');
-        }
-    });
-}
-
-// Force redeploy
-function forceRedeploy() {
-    if (!confirm('⚠️ Are you sure you want to force redeploy?\n\nThis will restart the Railway service.')) {
-        return;
-    }
-    
-    alert('⏳ Triggering redeploy...');
-    fetch('/api/railway/redeploy', {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Redeploy triggered successfully!');
-            refreshRailwayStatus();
-        } else {
-            alert('❌ Failed: ' + data.error);
-        }
-    });
-}
-
-// Auto-refresh Railway status every 30 seconds
-setInterval(refreshRailwayStatus, 30000);
-refreshRailwayStatus();
-
-// Category Blacklist functions
-function addCategoryToBlacklist(category) {
-    const textarea = document.getElementById('categoryBlacklistInput');
-    const currentValue = textarea.value.trim();
-    
-    // Check if category already exists
-    const lines = currentValue.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.includes(category)) {
-        alert('⚠️ This category is already in the blacklist!');
-        return;
-    }
-    
-    // Add category
-    if (currentValue) {
-        textarea.value = currentValue + '\n' + category;
-    } else {
-        textarea.value = category;
-    }
-    
-    // Highlight the textarea briefly
-    textarea.style.borderColor = '#0d6efd';
-    setTimeout(() => { textarea.style.borderColor = ''; }, 1000);
-}
-
-function saveCategoryBlacklist() {
-    const textarea = document.getElementById('categoryBlacklistInput');
-    const categoriesText = textarea.value.trim();
-    
-    // Parse categories (one per line)
-    const categories = categoriesText
-        .split('\n')
-        .map(c => c.trim())
-        .filter(c => c.length > 0);
-    
-    console.log('[CONFIG] Saving category blacklist:', categories);
-    
-    fetch('/api/config/system', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            category_blacklist: categories  // Send as array, backend will serialize
+        fetch('/api/config/system', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ Category filter saved!\n\n' + categories.length + ' categories will be filtered.\n\nFilters will apply automatically within 10 seconds.');
-        } else {
-            alert('❌ Failed to save: ' + data.error);
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ System settings saved!\n' + (data.note || ''));
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Save Telegram settings
+    function saveTelegramSettings() {
+        const form = document.getElementById('telegramSettingsForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        fetch('/api/config/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Telegram settings saved!');
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Test Telegram bot
+    function testTelegramBot() {
+        fetch('/api/notifications/test', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Test message sent to Telegram!');
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Save proxy settings
+    function saveProxySettings() {
+        const form = document.getElementById('proxySettingsForm');
+        const formData = new FormData(form);
+        const data = {
+            proxy_enabled: form.proxyEnabled.checked,
+            proxy_list: formData.get('proxy_list')
+        };
+
+        fetch('/api/config/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Proxy settings saved!');
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Test proxies
+    function testProxies() {
+        alert('⏳ Testing proxies... This may take a minute.');
+        fetch('/api/proxy/test', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ Proxy test completed!\n\nWorking: ${data.working}/${data.total}\n${data.message}`);
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Save Railway settings
+    function saveRailwaySettings() {
+        const form = document.getElementById('railwaySettingsForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        fetch('/api/config/railway', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Railway settings saved!');
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
+    }
+
+    // Refresh Railway status
+    function refreshRailwayStatus() {
+        fetch('/api/railway/status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const status = data.status;
+                    document.getElementById('error-403').textContent = status.errors['403'];
+                    document.getElementById('error-401').textContent = status.errors['401'];
+                    document.getElementById('error-429').textContent = status.errors['429'];
+                    document.getElementById('total-errors').textContent = status.total_errors;
+                    document.getElementById('first-error').textContent = status.first_error;
+                    document.getElementById('last-redeploy').textContent = status.last_redeploy;
+                    document.getElementById('redeploy-status').textContent = status.status;
+                    document.getElementById('redeploy-status').className = 'badge bg-' +
+                        (status.status === 'active' ? 'success' : status.status === 'warning' ? 'warning' : 'danger');
+                }
+            });
+    }
+
+    // Force redeploy
+    function forceRedeploy() {
+        if (!confirm('⚠️ Are you sure you want to force redeploy?\n\nThis will restart the Railway service.')) {
+            return;
         }
-    })
-    .catch(err => {
-        alert('❌ Error: ' + err);
-    });
-}
 
-// Initialize theme toggle button state
-function initThemeToggle() {
-    const currentTheme = window.getCurrentTheme();
-    const icon = document.querySelector('.theme-toggle-btn i');
-    const text = document.querySelector('.theme-toggle-btn .theme-text');
-
-    if (icon) {
-        icon.className = currentTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+        alert('⏳ Triggering redeploy...');
+        fetch('/api/railway/redeploy', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Redeploy triggered successfully!');
+                    refreshRailwayStatus();
+                } else {
+                    alert('❌ Failed: ' + data.error);
+                }
+            });
     }
-    if (text) {
-        text.textContent = currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+
+    // Auto-refresh Railway status every 30 seconds
+    setInterval(refreshRailwayStatus, 30000);
+    refreshRailwayStatus();
+
+    // Category Blacklist functions
+    function addCategoryToBlacklist(category) {
+        const textarea = document.getElementById('categoryBlacklistInput');
+        const currentValue = textarea.value.trim();
+
+        // Check if category already exists
+        const lines = currentValue.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.includes(category)) {
+            alert('⚠️ This category is already in the blacklist!');
+            return;
+        }
+
+        // Add category
+        if (currentValue) {
+            textarea.value = currentValue + '\n' + category;
+        } else {
+            textarea.value = category;
+        }
+
+        // Highlight the textarea briefly
+        textarea.style.borderColor = '#0d6efd';
+        setTimeout(() => { textarea.style.borderColor = ''; }, 1000);
     }
-}
 
-// Refresh database statistics
-function refreshDatabaseStats() {
-    // Fetch basic stats
-    fetch('/api/stats')
-        .then(r => r.json())
-        .then(data => {
-            if (data.success && data.database) {
-                document.getElementById('db-total-items').textContent = data.database.total_items || 0;
-                document.getElementById('db-active-searches').textContent = data.database.active_searches || 0;
-            }
+    function saveCategoryBlacklist() {
+        const textarea = document.getElementById('categoryBlacklistInput');
+        const categoriesText = textarea.value.trim();
+
+        // Parse categories (one per line)
+        const categories = categoriesText
+            .split('\n')
+            .map(c => c.trim())
+            .filter(c => c.length > 0);
+
+        console.log('[CONFIG] Saving category blacklist:', categories);
+
+        fetch('/api/config/system', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category_blacklist: categories  // Send as array, backend will serialize
+            })
         })
-        .catch(err => console.error('Failed to fetch basic stats:', err));
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Category filter saved!\n\n' + categories.length + ' categories will be filtered.\n\nFilters will apply automatically within 10 seconds.');
+                } else {
+                    alert('❌ Failed to save: ' + data.error);
+                }
+            })
+            .catch(err => {
+                alert('❌ Error: ' + err);
+            });
+    }
 
-    // Fetch category stats
-    fetch('/api/category-stats')
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                const allTime = data.all_time;
-                const last2Days = data.last_2_days;
+    // Initialize theme toggle button state
+    function initThemeToggle() {
+        const currentTheme = window.getCurrentTheme();
+        const icon = document.querySelector('.theme-toggle-btn i');
+        const text = document.querySelector('.theme-toggle-btn .theme-text');
 
-                // All time stats
-                document.getElementById('db-items-with-category').textContent = allTime.items_with_category || 0;
-                document.getElementById('db-items-without-category').textContent = allTime.items_without_category || 0;
+        if (icon) {
+            icon.className = currentTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+        }
+        if (text) {
+            text.textContent = currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+    }
 
-                // SHOPS items
-                document.getElementById('db-shops-items').textContent = allTime.shops_items || 0;
-                document.getElementById('db-shops-with-cat').textContent = allTime.shops_with_category || 0;
-                document.getElementById('db-shops-without-cat').textContent = allTime.shops_without_category || 0;
+    // Refresh database statistics
+    function refreshDatabaseStats() {
+        // Fetch basic stats
+        fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.database) {
+                    document.getElementById('db-total-items').textContent = data.database.total_items || 0;
+                    document.getElementById('db-active-searches').textContent = data.database.active_searches || 0;
+                }
+            })
+            .catch(err => console.error('Failed to fetch basic stats:', err));
 
-                // Regular items
-                document.getElementById('db-regular-items').textContent = allTime.regular_items || 0;
-                document.getElementById('db-regular-with-cat').textContent = allTime.regular_with_category || 0;
-                document.getElementById('db-regular-without-cat').textContent = allTime.regular_without_category || 0;
+        // Fetch category stats
+        fetch('/api/category-stats')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const allTime = data.all_time;
+                    const last2Days = data.last_2_days;
 
-                // Last 2 days
-                document.getElementById('db-2d-total').textContent = last2Days.total_items || 0;
-                document.getElementById('db-2d-with-cat').textContent = last2Days.items_with_category || 0;
-                document.getElementById('db-2d-without-cat').textContent = last2Days.items_without_category || 0;
-            }
-        })
-        .catch(err => {
-            console.error('Failed to fetch category stats:', err);
-            document.getElementById('db-total-items').textContent = 'Error';
-        });
-}
+                    // All time stats
+                    document.getElementById('db-items-with-category').textContent = allTime.items_with_category || 0;
+                    document.getElementById('db-items-without-category').textContent = allTime.items_without_category || 0;
 
-// Initialize on page load
-initThemeToggle();
-refreshDatabaseStats();
+                    // SHOPS items
+                    document.getElementById('db-shops-items').textContent = allTime.shops_items || 0;
+                    document.getElementById('db-shops-with-cat').textContent = allTime.shops_with_category || 0;
+                    document.getElementById('db-shops-without-cat').textContent = allTime.shops_without_category || 0;
+
+                    // Regular items
+                    document.getElementById('db-regular-items').textContent = allTime.regular_items || 0;
+                    document.getElementById('db-regular-with-cat').textContent = allTime.regular_with_category || 0;
+                    document.getElementById('db-regular-without-cat').textContent = allTime.regular_without_category || 0;
+
+                    // Last 2 days
+                    document.getElementById('db-2d-total').textContent = last2Days.total_items || 0;
+                    document.getElementById('db-2d-with-cat').textContent = last2Days.items_with_category || 0;
+                    document.getElementById('db-2d-without-cat').textContent = last2Days.items_without_category || 0;
+                }
+            })
+            .catch(err => {
+                console.error('Failed to fetch category stats:', err);
+                document.getElementById('db-total-items').textContent = 'Error';
+            });
+    }
+
+    // Initialize on page load
+    initThemeToggle();
+    refreshDatabaseStats();
 </script>
 {% endblock %}

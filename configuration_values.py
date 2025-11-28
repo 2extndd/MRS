@@ -108,6 +108,9 @@ class Config:
         "FREE": ["FREE", "フリー", "F"]
     }
 
+    # Feature Flags
+    DISABLE_SHOPS = os.getenv("DISABLE_SHOPS", "false").lower() == "true"
+
     @classmethod
     def get_display_price(cls, jpy_price):
         """Convert JPY price to display currency"""
@@ -216,6 +219,13 @@ class Config:
                     logger.info(f"[CONFIG] PROXY_LIST: {old_count} → {new_count} proxies")
                     if old_count != new_count:
                         proxy_config_changed = True
+
+                # Disable Shops setting
+                if 'config_disable_shops' in new_config:
+                    old_val = cls.DISABLE_SHOPS
+                    cls.DISABLE_SHOPS = str(new_config['config_disable_shops']).lower() == 'true'
+                    if old_val != cls.DISABLE_SHOPS:
+                        logger.info(f"[CONFIG] DISABLE_SHOPS: {old_val} → {cls.DISABLE_SHOPS}")
 
                 # Reinitialize proxy_manager if proxy config changed
                 if proxy_config_changed:

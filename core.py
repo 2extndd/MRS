@@ -398,6 +398,13 @@ class MercariSearcher:
                     logger.error(f"❌ Item has no ID, skipping")
                     continue
                 
+                # FILTER: Disable Shops (Professional Sellers)
+                # Standard Mercari items start with 'm' (e.g., m123456789)
+                # Shops items usually start with other characters or numbers
+                if self.config.DISABLE_SHOPS and not mercari_id.startswith('m'):
+                    logger.debug(f"[FILTER] 🛍️ Skipping Shops item: {mercari_id} (DISABLE_SHOPS=True)")
+                    continue
+                
                 # GLOBAL CATEGORY FILTER: Check if item's category is blacklisted
                 # OPTIMIZATION: Do this BEFORE downloading images to save time
                 item_category = getattr(full_item, 'category', None)

@@ -184,6 +184,8 @@ def configuration():
         'TELEGRAM_BOT_TOKEN': config_dict.get('telegram_bot_token', config.TELEGRAM_BOT_TOKEN),
         'TELEGRAM_CHAT_ID': config_dict.get('telegram_chat_id', config.TELEGRAM_CHAT_ID),
         'RAILWAY_TOKEN': config_dict.get('railway_token', config.RAILWAY_TOKEN),
+        'RAILWAY_TOKEN': config_dict.get('railway_token', config.RAILWAY_TOKEN),
+        'DISABLE_SHOPS': config_dict.get('disable_shops', config.DISABLE_SHOPS),
         'CATEGORY_BLACKLIST': category_blacklist,
         # Read-only values from config class
         'APP_NAME': config.APP_NAME,
