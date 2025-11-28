@@ -1,5 +1,0 @@
-# Nixpacks configuration for Railway worker service
-# Runs scheduler in infinite loop
-
-[start]
-cmd = "python mercari_notifications.py"
