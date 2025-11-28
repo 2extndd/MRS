@@ -102,7 +102,7 @@ class TelegramWorker:
                 if item_id:
                     try:
                         # Update sent_at timestamp (is_sent already True from get_unsent_items)
-                        from utils import get_moscow_time
+                        from db import get_moscow_time
                         query = "UPDATE items SET sent_at = %s WHERE id = %s"
                         self.db.execute_query(query, (get_moscow_time(), item_id))
                         logger.info(f"[TW] ✅ Updated sent_at for item {item_id}")
