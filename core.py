@@ -37,6 +37,7 @@ class MercariSearcher:
         if use_proxy is None:
             use_proxy = config.PROXY_ENABLED
 
+        self.config = config  # Store config instance
         self.use_proxy = use_proxy
 
         # Initialize Mercari API
@@ -145,7 +146,19 @@ class MercariSearcher:
                 thread_api = self._init_api()
                 
                 # Perform search with thread-local API
-                items_result = self.search_query(search, api_instance=thread_api)
+                # WRAP IN TIMEOUT to prevent hangs
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(self.search_query, search, api_instance=thread_api)
+                    try:
+                        items_result = future.result(timeout=45)  # 45s timeout per search
+                    except concurrent.futures.TimeoutError:
+                        logger.error(f"[SCAN] ⏳ Search {search['id']} timed out after 45s")
+                        items_result = {'success': False, 'error': 'Search timed out', 'items_found': 0, 'new_items': 0}
+                        # Try to close API if possible (though thread might be stuck)
+                        try:
+                            thread_api.close()
+                        except:
+                            pass
 
                 # Update search scan time
                 self.db.update_search_scan_time(search['id'])
