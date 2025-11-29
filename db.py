@@ -72,6 +72,26 @@ class DatabaseManager:
             else:
                 raise
 
+    def has_column(self, table_name, column_name):
+        """Check if column exists in table"""
+        if self.db_type == 'postgresql':
+            query = """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = %s AND column_name = %s
+            """
+            result = self.execute_query(query, (table_name, column_name), fetch=True)
+            return bool(result)
+        else:
+            # SQLite
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                columns = [col[1] for col in cursor.fetchall()]
+                return column_name in columns
+            except:
+                return False
+
     def create_tables(self):
         """Create database tables"""
         # Searches table with Mercari-specific fields
@@ -104,48 +124,35 @@ class DatabaseManager:
         """)
 
         # Migrate existing searches table if it doesn't have name/thread_id
-        # PostgreSQL supports IF NOT EXISTS, SQLite does not
         if self.db_type == 'postgresql':
-            try:
-                self.execute_query("""
-                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS name TEXT
-                """)
-            except:
-                pass
+            # Check columns first to avoid locking table with ALTER
+            if not self.has_column('searches', 'name'):
+                try:
+                    self.execute_query("ALTER TABLE searches ADD COLUMN IF NOT EXISTS name TEXT")
+                except: pass
 
-            try:
-                self.execute_query("""
-                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS thread_id TEXT
-                """)
-            except:
-                pass
+            if not self.has_column('searches', 'thread_id'):
+                try:
+                    self.execute_query("ALTER TABLE searches ADD COLUMN IF NOT EXISTS thread_id TEXT")
+                except: pass
             
-            try:
-                self.execute_query("""
-                    ALTER TABLE searches ADD COLUMN IF NOT EXISTS scan_limit INTEGER DEFAULT 50
-                """)
-            except:
-                pass
+            if not self.has_column('searches', 'scan_limit'):
+                try:
+                    self.execute_query("ALTER TABLE searches ADD COLUMN IF NOT EXISTS scan_limit INTEGER DEFAULT 50")
+                except: pass
         else:
-            # SQLite - check if columns exist first
-            try:
-                cursor = self.conn.cursor()
-                cursor.execute("PRAGMA table_info(searches)")
-                columns = [col[1] for col in cursor.fetchall()]
-                
-                if 'name' not in columns:
-                    print("[DB] Adding 'name' column to searches table")
-                    self.execute_query("ALTER TABLE searches ADD COLUMN name TEXT")
-                
-                if 'thread_id' not in columns:
-                    print("[DB] Adding 'thread_id' column to searches table")
-                    self.execute_query("ALTER TABLE searches ADD COLUMN thread_id TEXT")
-                
-                if 'scan_limit' not in columns:
-                    print("[DB] Adding 'scan_limit' column to searches table")
-                    self.execute_query("ALTER TABLE searches ADD COLUMN scan_limit INTEGER DEFAULT 50")
-            except Exception as e:
-                print(f"[DB] Migration warning: {e}")
+            # SQLite
+            if not self.has_column('searches', 'name'):
+                print("[DB] Adding 'name' column to searches table")
+                self.execute_query("ALTER TABLE searches ADD COLUMN name TEXT")
+            
+            if not self.has_column('searches', 'thread_id'):
+                print("[DB] Adding 'thread_id' column to searches table")
+                self.execute_query("ALTER TABLE searches ADD COLUMN thread_id TEXT")
+            
+            if not self.has_column('searches', 'scan_limit'):
+                print("[DB] Adding 'scan_limit' column to searches table")
+                self.execute_query("ALTER TABLE searches ADD COLUMN scan_limit INTEGER DEFAULT 50")
 
         # Items table with Mercari-specific fields
         self.execute_query("""
@@ -155,8 +162,7 @@ class DatabaseManager:
                 search_id INTEGER,
                 title TEXT NOT NULL,
                 price INTEGER NOT NULL,
-                currency TEXT DEFAULT 'JPY',
-                brand TEXT,
+                currency TEXT DEFAULT 'JPY',\n            brand TEXT,
                 condition TEXT,
                 size TEXT,
                 shipping_cost INTEGER,
@@ -177,25 +183,16 @@ class DatabaseManager:
         """)
         
         # Migrate existing items table to add image_data column if not exists
-        if self.db_type == 'sqlite':
-            try:
-                cursor = self.conn.cursor()
-                cursor.execute("PRAGMA table_info(items)")
-                columns = [col[1] for col in cursor.fetchall()]
-                
-                if 'image_data' not in columns:
-                    print("[DB] Adding 'image_data' column to items table")
-                    self.execute_query("ALTER TABLE items ADD COLUMN image_data TEXT")
-            except Exception as e:
-                print(f"[DB] Migration warning (image_data): {e}")
+        if self.db_type == 'postgresql':
+            if not self.has_column('items', 'image_data'):
+                try:
+                    self.execute_query("ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT")
+                except: pass
         else:
-            # PostgreSQL
-            try:
-                self.execute_query("""
-                    ALTER TABLE items ADD COLUMN IF NOT EXISTS image_data TEXT
-                """)
-            except:
-                pass
+            # SQLite
+            if not self.has_column('items', 'image_data'):
+                print("[DB] Adding 'image_data' column to items table")
+                self.execute_query("ALTER TABLE items ADD COLUMN image_data TEXT")
 
         # Price history table for tracking price changes
         self.execute_query("""
