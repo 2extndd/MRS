@@ -65,7 +65,7 @@ class Config:
     WEB_PASSWORD = os.getenv("WEB_PASSWORD", "admin")
 
     # Logging
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")
     LOG_FILE = os.getenv("LOG_FILE", "mercari_scanner.log")
 
     # Hot reload state
