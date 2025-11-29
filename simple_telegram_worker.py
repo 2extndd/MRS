@@ -159,7 +159,8 @@ class TelegramWorker:
             Formatted message string
         """
         # Title
-        title = item.get('title', 'No title')
+        import html
+        title = html.escape(item.get('title', 'No title'))
 
         # Price in JPY and USD
         price_jpy = item.get('price', 0)
