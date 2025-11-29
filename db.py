@@ -194,6 +194,19 @@ class DatabaseManager:
                 print("[DB] Adding 'image_data' column to items table")
                 self.execute_query("ALTER TABLE items ADD COLUMN image_data TEXT")
 
+        # === INDEXES FOR PERFORMANCE ===
+        # found_at: Critical for dashboard stats (last 2 days/hours) and cleanup
+        self.execute_query("CREATE INDEX IF NOT EXISTS idx_items_found_at ON items(found_at)")
+        
+        # is_sent: Critical for Telegram worker polling
+        self.execute_query("CREATE INDEX IF NOT EXISTS idx_items_is_sent ON items(is_sent)")
+        
+        # search_id: Critical for filtering items by query
+        self.execute_query("CREATE INDEX IF NOT EXISTS idx_items_search_id ON items(search_id)")
+        
+        # mercari_id: Already has UNIQUE constraint (implicit index), but good to be explicit if needed
+        # self.execute_query("CREATE INDEX IF NOT EXISTS idx_items_mercari_id ON items(mercari_id)")
+
         # Price history table for tracking price changes
         self.execute_query("""
             CREATE TABLE IF NOT EXISTS price_history (
