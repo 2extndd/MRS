@@ -59,6 +59,10 @@ class Config:
     PORT = int(os.getenv("PORT", "5000"))
     WEB_UI_HOST = os.getenv("WEB_UI_HOST", "0.0.0.0")
     SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24).hex())
+    
+    # Web UI Authentication
+    WEB_USERNAME = os.getenv("WEB_USERNAME", "admin")
+    WEB_PASSWORD = os.getenv("WEB_PASSWORD", "admin")
 
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

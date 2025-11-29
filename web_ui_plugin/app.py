@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 
+# Basic Auth Configuration
+app.config['BASIC_AUTH_USERNAME'] = config.WEB_USERNAME
+app.config['BASIC_AUTH_PASSWORD'] = config.WEB_PASSWORD
+app.config['BASIC_AUTH_FORCE'] = True  # Protect entire app
+
+from flask_basicauth import BasicAuth
+basic_auth = BasicAuth(app)
+
 # Database and state
 db = get_db()
 shared_state = get_shared_state()
@@ -314,10 +322,11 @@ def api_error_logs():
 
     except Exception as e:
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         })
 
 @app.route('/api/force-telegram-cycle')
@@ -339,10 +348,11 @@ def api_force_telegram_cycle():
 
     except Exception as e:
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         })
 
 @app.route('/api/scheduler-status')
@@ -372,10 +382,11 @@ def api_scheduler_status():
 
     except Exception as e:
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         })
 
 @app.route('/api/scheduler/heartbeat')
@@ -1836,10 +1847,11 @@ def api_check_blacklist_item(item_id):
     except Exception as e:
         logger.error(f"Error checking item: {e}")
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         }), 500
 
 
@@ -1887,10 +1899,11 @@ def api_debug_blacklist():
         })
     except Exception as e:
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         }), 500
 
 
@@ -1938,10 +1951,11 @@ def api_clean_blacklisted_items():
     except Exception as e:
         logger.error(f"Error cleaning blacklisted items: {e}")
         import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Internal Server Error (check logs)',
+            # 'traceback': traceback.format_exc()  # HIDDEN FOR SECURITY
         }), 500
 
 
