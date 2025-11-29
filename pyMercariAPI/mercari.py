@@ -98,20 +98,15 @@ class Mercari:
         loop = self._get_or_create_loop()
         
         # Check if loop is already running (e.g., in Flask with async context)
-        try:
-            if loop.is_running():
-                # Create a new loop in a thread
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, coro)
-                    return future.result()
-            else:
-                # Run in existing loop
-                return loop.run_until_complete(coro)
-        except Exception as e:
-            # Last resort: try asyncio.run with fresh loop
-            logger.warning(f"Event loop issue, creating fresh loop: {e}")
-            return asyncio.run(coro)
+        if loop.is_running():
+            # Create a new loop in a thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            # Run in existing loop
+            return loop.run_until_complete(coro)
 
     def close(self):
         """
