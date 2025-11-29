@@ -61,8 +61,8 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24).hex())
     
     # Web UI Authentication
-    WEB_USERNAME = os.getenv("WEB_USERNAME", "admin")
-    WEB_PASSWORD = os.getenv("WEB_PASSWORD", "admin")
+    WEB_USERNAME = os.getenv("WEB_USERNAME", "extndd")
+    WEB_PASSWORD = os.getenv("WEB_PASSWORD", "admin1")
 
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")
