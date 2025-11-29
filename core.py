@@ -154,9 +154,9 @@ class MercariSearcher:
                 executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                 try:
                     future = executor.submit(self.search_query, search, api_instance=thread_api)
-                    items_result = future.result(timeout=45)  # 45s timeout per search
+                    items_result = future.result(timeout=90)  # 90s timeout per search (increased from 45s)
                 except concurrent.futures.TimeoutError:
-                    logger.error(f"[SCAN] ⏳ Search {search['id']} timed out after 45s (Thread abandoned)")
+                    logger.error(f"[SCAN] ⏳ Search {search['id']} timed out after 90s (Thread abandoned)")
                     items_result = {'success': False, 'error': 'Search timed out', 'items_found': 0, 'new_items': 0}
                     # Try to close API if possible (though thread might be stuck)
                     try:

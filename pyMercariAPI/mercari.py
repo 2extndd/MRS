@@ -75,9 +75,9 @@ class Mercari:
             # Default is 5.0s, but we want to be sure and consistent
             if hasattr(self._mercapi, '_client'):
                 import httpx
-                # Set 20s timeout (connect, read, write, pool)
-                self._mercapi._client.timeout = httpx.Timeout(20.0)
-                logger.debug("Set mercapi client timeout to 20.0s")
+                # Set 40s timeout (connect, read, write, pool) - Increased from 20s
+                self._mercapi._client.timeout = httpx.Timeout(40.0)
+                logger.debug("Set mercapi client timeout to 40.0s")
                 
         return self._mercapi
     
