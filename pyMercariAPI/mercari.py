@@ -63,7 +63,22 @@ class Mercari:
     def _get_mercapi(self):
         """Get or create mercapi instance"""
         if self._mercapi is None:
-            self._mercapi = self._mercapi_class()
+            # Pass proxy if available
+            proxies = None
+            if self.proxy:
+                proxies = self.proxy
+                logger.info(f"Initializing mercapi with proxy: {proxies}")
+
+            self._mercapi = self._mercapi_class(proxies=proxies)
+            
+            # CRITICAL: Set timeout on internal client to prevent hangs
+            # Default is 5.0s, but we want to be sure and consistent
+            if hasattr(self._mercapi, '_client'):
+                import httpx
+                # Set 20s timeout (connect, read, write, pool)
+                self._mercapi._client.timeout = httpx.Timeout(20.0)
+                logger.debug("Set mercapi client timeout to 20.0s")
+                
         return self._mercapi
     
     def _get_or_create_loop(self):
@@ -138,12 +153,20 @@ class Mercari:
 
         Args:
             new_proxy: New proxy URL or None to disable
-
-        Note: mercapi doesn't support proxies yet
         """
         self.proxy = new_proxy
-        if new_proxy:
-            logger.warning("Proxy support not available with mercapi library")
+        # Reset mercapi instance so it gets recreated with new proxy
+        if self._mercapi:
+            try:
+                # Try to close old client if possible
+                if hasattr(self._mercapi, '_client') and hasattr(self._mercapi._client, 'aclose'):
+                    # We can't await here easily, but we can let GC handle it or try to close
+                    # For now just drop the reference
+                    pass
+            except:
+                pass
+            self._mercapi = None
+            logger.info(f"Proxy changed to {new_proxy}, mercapi instance reset")
 
     def test_connection(self) -> bool:
         """
